@@ -1,0 +1,103 @@
+# Projets amont suivis par MakerCraft. Lu par `cargo xtask upstream`.
+# Les clones vivent hors du dépôt, en lecture seule : ne jamais les modifier.
+#
+# kind = "dependency" : crates Rust utilisées telles quelles (git + tag épinglé dans Cargo.toml).
+# kind = "port"       : code GPL traduit en Rust ; on suit les fichiers listés dans [[port]].
+
+[[repo]]
+name = "cadcraft"
+url = "https://github.com/storytold/cadcraft"
+path = "../upstream/cadcraft"
+pinned = "v0.8.0"
+kind = "dependency"
+license = "MIT OR Apache-2.0"
+
+[[repo]]
+name = "solidcraft"
+url = "https://github.com/bherbruck/solidcraft"
+path = "../upstream/solidcraft"
+pinned = "v0.15.0"
+kind = "dependency"
+license = "MIT OR Apache-2.0"
+
+[[repo]]
+name = "LaserGRBL"
+url = "https://github.com/arkypita/LaserGRBL"
+path = "../upstream/LaserGRBL"
+pinned = "v7.14.1"
+kind = "port"
+license = "GPL-3.0"
+
+[[repo]]
+name = "Candle"
+url = "https://github.com/Denvi/Candle"
+path = "../upstream/Candle"
+pinned = "c04e6f2"
+kind = "port"
+license = "GPL-3.0"
+
+[[repo]]
+name = "UGS"
+url = "https://github.com/winder/Universal-G-Code-Sender"
+path = "../upstream/Universal-G-Code-Sender"
+pinned = "v2.1.27"
+kind = "port"
+license = "GPL-3.0"
+
+# --- Fichiers portés (ou à porter) : notre fichier ← fichier source ---
+# status = "prévu" | "porté" ; `cargo xtask upstream` signale tout changement de la source
+# entre `pinned` et la dernière version amont.
+
+[[port]]
+ours = "crates/ext/machine/src/transport/"
+repo = "LaserGRBL"
+source = "LaserGRBL/ComWrapper/IComWrapper.cs"
+status = "prévu"
+
+[[port]]
+ours = "crates/ext/machine/src/transport/"
+repo = "Candle"
+source = "src/candle/connections/connection.h"
+status = "prévu"
+
+[[port]]
+ours = "crates/ext/machine/src/controller/grbl.rs"
+repo = "LaserGRBL"
+source = "LaserGRBL/Core/GrblCore.cs"
+status = "prévu"
+
+[[port]]
+ours = "crates/ext/machine/src/controller/mod.rs"
+repo = "UGS"
+source = "ugs-core/src/com/willwinder/universalgcodesender/IController.java"
+status = "prévu"
+
+[[port]]
+ours = "crates/ext/machine/src/controller/stream.rs"
+repo = "UGS"
+source = "ugs-core/src/com/willwinder/universalgcodesender/communicator/ICommunicator.java"
+status = "prévu"
+
+[[port]]
+ours = "crates/ext/machine/src/lib.rs (MachineState)"
+repo = "UGS"
+source = "ugs-core/src/com/willwinder/universalgcodesender/listeners/ControllerState.java"
+status = "porté"
+
+[[port]]
+ours = "crates/ext/machine/src/gcode/"
+repo = "Candle"
+source = "src/candle/parser/gcodeparser.cpp"
+status = "prévu"
+
+[[port]]
+ours = "crates/ext/machine/src/gcode/arcs.rs"
+repo = "Candle"
+source = "src/candle/parser/gcodepreprocessorutils.cpp"
+status = "prévu"
+
+[[port]]
+ours = "crates/ext/machine/data/"
+repo = "LaserGRBL"
+source = "LaserGRBL/CSV"
+status = "prévu"

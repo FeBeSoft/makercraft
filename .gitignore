@@ -1,0 +1,8 @@
+/target/
+**/*.rs.bk
+*.pdb
+.vs/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+plan/

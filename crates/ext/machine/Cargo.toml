@@ -1,0 +1,13 @@
+[package]
+name = "makercraft-ext-machine"
+description = "MakerCraft : pilotage de machines Grbl/grblHAL (laser, fraiseuse) — portage LaserGRBL/Candle/UGS"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+makercraft-ext-api.workspace = true
+
+[lints]
+workspace = true

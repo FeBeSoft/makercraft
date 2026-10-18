@@ -1,0 +1,53 @@
+[workspace]
+resolver = "3"
+members = ["crates/core/*", "crates/ext/*", "apps/*", "xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+rust-version = "1.95"
+authors = ["MakerCraft contributors"]
+
+[workspace.dependencies]
+# --- noyau MakerCraft ---
+makercraft-geom = { path = "crates/core/geom" }
+makercraft-ext-api = { path = "crates/core/ext-api" }
+# --- extensions ---
+makercraft-ext-machine = { path = "crates/ext/machine" }
+
+# --- fondations ---
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1"
+
+# --- projets amont (MIT/Apache), épinglés : voir UPSTREAM.md ---
+# Décommentés au branchement des extensions dao (CadCraft) et cao (SolidCraft).
+# cadcraft-engine   = { git = "https://github.com/storytold/cadcraft", tag = "v0.8.0" }
+# cadcraft-io       = { git = "https://github.com/storytold/cadcraft", tag = "v0.8.0" }
+# solidcraft-kernel = { git = "https://github.com/bherbruck/solidcraft", tag = "v0.15.0" }
+# solidcraft-engine = { git = "https://github.com/bherbruck/solidcraft", tag = "v0.15.0" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+
+# Quand SolidCraft sera branché, recopier ici ses [patch.crates-io] (truck-*, matext4cgmath,
+# egui-wgpu) : un patch ne s'applique qu'au workspace racine. Voir UPSTREAM.md.
