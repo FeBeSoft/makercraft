@@ -13,9 +13,10 @@
 | L3 | `ext/dao` | adaptateur CadCraft (dessin 2D, DXF/DWG/SVG/PDF) | à faire |
 | L3 | `ext/cao` | adaptateur SolidCraft (B-rep truck, STEP, 3MF) | à faire |
 | L3 | `ext/cam` | parcours : laser vectoriel/raster, fraisage 2.5D | à faire |
-| L3 | `ext/machine` | transport, contrôleur Grbl/grblHAL, G-code | 🟡 squelette |
+| L3 | `ext/machine` | transports (série, TCP, émulateur), protocole Grbl 1.1/grblHAL, contrôleur et streaming, codes d'erreur | ✅ v0.1 (aperçu G-code à faire) |
 | L4 | `ui/shell` | egui : menus et panneaux construits depuis le registre | à faire |
 | app | `makercraft-cli` | lister / exécuter les commandes | ✅ |
+| app | `makercraft-send` | console Grbl et envoi de fichiers G-code | ✅ |
 
 Règle : une couche ne dépend que des couches inférieures ; le noyau ne connaît aucune extension.
 
@@ -37,6 +38,16 @@ fournisseurs neutres enregistrés par les extensions :
 - `Profile2DSource` (dao, cao) : contours fermés, chemins ouverts, calque d'origine ;
 - `SolidSource` (cao) : maillage, sections planes (tranches) ;
 - `MachineSink` (machine) : capacités de la machine, envoi d'un programme G-code.
+
+## Extension machine
+
+Un thread contrôleur possède le transport ; l'interface envoie des `Command` et lit des `Event`
+par canaux, sans jamais bloquer l'envoi. Le `Streamer` (logique pure, testée seule) décide quoi
+envoyer : comptage de caractères dans le tampon de la carte (127 octets par défaut, taille réelle
+lue par `$I` ou `Bf:`), modes tamponné / synchrone / répétition sur erreur, commandes manuelles
+prioritaires sur le programme. Filet de sécurité : `tests/emulator_session.rs` rejoue des sessions
+complètes contre l'émulateur (connexion, jog, 2000 lignes sans débordement, erreurs avec numéro
+de ligne, alarme, pause/reset, taille de tampon, délai de connexion).
 
 ## Feuille de route
 

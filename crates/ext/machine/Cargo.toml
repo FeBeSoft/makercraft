@@ -6,8 +6,16 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+[features]
+default = ["serial"]
+# Port série USB (natif uniquement ; à couper pour une version web).
+serial = ["dep:serialport"]
+
 [dependencies]
 makercraft-ext-api.workspace = true
+makercraft-geom.workspace = true
+thiserror.workspace = true
+serialport = { workspace = true, optional = true }
 
 [lints]
 workspace = true

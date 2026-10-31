@@ -6,3 +6,10 @@
 .vscode/*
 !.vscode/extensions.json
 plan/
+
+# atelier graphique (originaux HD, essais) : les visuels officiels sont dans assets/branding
+/_icon/
+# journaux de build locaux et fichiers Windows
+*.log
+desktop.ini
+Thumbs.db

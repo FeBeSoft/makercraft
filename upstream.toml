@@ -48,42 +48,70 @@ license = "GPL-3.0"
 # status = "prévu" | "porté" ; `cargo xtask upstream` signale tout changement de la source
 # entre `pinned` et la dernière version amont.
 
+# Transport
 [[port]]
-ours = "crates/ext/machine/src/transport/"
+ours = "crates/ext/machine/src/transport/mod.rs (trait Transport)"
 repo = "LaserGRBL"
 source = "LaserGRBL/ComWrapper/IComWrapper.cs"
-status = "prévu"
+status = "porté"
 
 [[port]]
-ours = "crates/ext/machine/src/transport/"
+ours = "crates/ext/machine/src/transport/mod.rs (trait Transport)"
 repo = "Candle"
 source = "src/candle/connections/connection.h"
-status = "prévu"
+status = "porté"
 
 [[port]]
-ours = "crates/ext/machine/src/controller/grbl.rs"
+ours = "crates/ext/machine/src/transport/tcp.rs"
+repo = "LaserGRBL"
+source = "LaserGRBL/ComWrapper/Telnet.cs"
+status = "porté"
+
+[[port]]
+ours = "crates/ext/machine/src/transport/emulator.rs"
+repo = "LaserGRBL"
+source = "LaserGRBL/GrblEmulator/Grblv11Emulator.cs"
+status = "porté"
+
+# Protocole et contrôleur
+[[port]]
+ours = "crates/ext/machine/src/protocol.rs + controller/ (mod.rs, stream.rs)"
 repo = "LaserGRBL"
 source = "LaserGRBL/Core/GrblCore.cs"
-status = "prévu"
+status = "porté"
 
 [[port]]
-ours = "crates/ext/machine/src/controller/mod.rs"
+ours = "crates/ext/machine/src/protocol.rs (prepare_line)"
+repo = "LaserGRBL"
+source = "LaserGRBL/GrblCommand.cs"
+status = "porté"
+
+[[port]]
+ours = "crates/ext/machine/src/controller/mod.rs (Controller)"
 repo = "UGS"
 source = "ugs-core/src/com/willwinder/universalgcodesender/IController.java"
-status = "prévu"
+status = "porté"
 
 [[port]]
 ours = "crates/ext/machine/src/controller/stream.rs"
 repo = "UGS"
 source = "ugs-core/src/com/willwinder/universalgcodesender/communicator/ICommunicator.java"
-status = "prévu"
+status = "porté"
 
 [[port]]
-ours = "crates/ext/machine/src/lib.rs (MachineState)"
+ours = "crates/ext/machine/src/protocol.rs (MachineState)"
 repo = "UGS"
 source = "ugs-core/src/com/willwinder/universalgcodesender/listeners/ControllerState.java"
 status = "porté"
 
+# Données
+[[port]]
+ours = "crates/ext/machine/data/ (error, alarm, setting_codes.v1.1)"
+repo = "LaserGRBL"
+source = "LaserGRBL/CSV"
+status = "porté"
+
+# À venir : G-code (aperçu, estimation de durée)
 [[port]]
 ours = "crates/ext/machine/src/gcode/"
 repo = "Candle"
@@ -94,10 +122,4 @@ status = "prévu"
 ours = "crates/ext/machine/src/gcode/arcs.rs"
 repo = "Candle"
 source = "src/candle/parser/gcodepreprocessorutils.cpp"
-status = "prévu"
-
-[[port]]
-ours = "crates/ext/machine/data/"
-repo = "LaserGRBL"
-source = "LaserGRBL/CSV"
 status = "prévu"
