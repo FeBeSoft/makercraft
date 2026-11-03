@@ -42,7 +42,24 @@ Console : G-code ou commandes `$`, plus `?` (état), `!` (pause), `~` (reprise),
 s'arrête). Options : `--sync` (une ligne à la fois), `--no-reset`, `--pause-on-error`.
 
 Sûreté : arrêt de l'envoi sur alarme, détection d'une machine muette, d'un redémarrage
-inattendu de la carte et des « ok » perdus ; jamais de dépassement du tampon de la carte.
+inattendu de la carte et des « ok » perdus ; jamais de dépassement du tampon de la carte ;
+aucun caractère non ASCII envoyé (Grbl les prendrait pour des commandes temps réel).
+
+## Projets Carbide Create (`.c2d`) vers Grbl
+
+```
+makercraft-c2d info  "projet.c2d"                 # parcours, outils, durée estimée, avertissements
+makercraft-c2d gcode "projet.c2d" [-o dossier]    # un .nc par outil + aperçu SVG
+makercraft-c2d gcode "projet.c2d" --un-fichier    # un seul .nc, pause M0 aux changements d'outil
+makercraft-c2d gcode "projet.c2d" --seul cutout   # seulement certains parcours
+```
+
+Le G-code que Carbide Create range dans le `.c2d` est chiffré : il n'est pas utilisé.
+MakerCraft relit le dessin, les outils et les réglages des parcours, et recalcule les
+trajectoires : découpe (extérieur/intérieur, passes), poche (anneaux concentriques,
+surépaisseur), perçage (débourrage), V-carve **approché** par une gravure sur le trait.
+Pas encore : attaches, rampes, V-carve à profondeur variable, parcours 3D, arcs G2/G3.
+Zéro : X0 Y0 coin avant gauche, Z0 dessus du brut — à refaire à chaque changement d'outil.
 
 Détails : `docs/architecture.md`. Mises à jour amont : `UPSTREAM.md`.
 

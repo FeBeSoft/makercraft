@@ -13,3 +13,6 @@ plan/
 *.log
 desktop.ini
 Thumbs.db
+
+# essais locaux (projets de test, G-code produit)
+/_essais/

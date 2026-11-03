@@ -12,11 +12,13 @@
 | L2 | `core/io` | registre d'importeurs/exporteurs | à faire |
 | L3 | `ext/dao` | adaptateur CadCraft (dessin 2D, DXF/DWG/SVG/PDF) | à faire |
 | L3 | `ext/cao` | adaptateur SolidCraft (B-rep truck, STEP, 3MF) | à faire |
-| L3 | `ext/cam` | parcours : laser vectoriel/raster, fraisage 2.5D | à faire |
+| L3 | `ext/c2d` | lecture des projets Carbide Create `.c2d` (formes, calques, outils, parcours) | ✅ |
+| L3 | `ext/cam` | FAO 2.5D : découpe, poche, perçage, gravure ; G-code Grbl ASCII ; aperçu SVG | 🟡 v0.1 (laser, attaches, V-carve vrai à faire) |
 | L3 | `ext/machine` | transports (série, TCP, émulateur), protocole Grbl 1.1/grblHAL, contrôleur et streaming, codes d'erreur | ✅ v0.1 (aperçu G-code à faire) |
 | L4 | `ui/shell` | egui : menus et panneaux construits depuis le registre | à faire |
 | app | `makercraft-cli` | lister / exécuter les commandes | ✅ |
 | app | `makercraft-send` | console Grbl et envoi de fichiers G-code | ✅ |
+| app | `makercraft-c2d` | projet `.c2d` → G-code Grbl (un fichier par outil) | ✅ |
 
 Règle : une couche ne dépend que des couches inférieures ; le noyau ne connaît aucune extension.
 

@@ -296,10 +296,15 @@ pub fn parse_opt(feedback: &str) -> Option<(u32, u32)> {
 /// Prépare une ligne à envoyer : retire commentaires `( … )` et `; …`, met en majuscules et
 /// supprime les espaces. Les commandes système `$…` sont envoyées telles quelles (la casse peut
 /// compter : mot de passe Wi-Fi…). Renvoie `None` pour une ligne vide ou un délimiteur `%`.
+///
+/// Sécurité : tout caractère non ASCII est retiré. Grbl 1.1 interprète les octets 0x80-0xFF
+/// comme des commandes temps réel (0x94 = avance -1 %, 0xA0 = arrosage…) : un « — » ou un
+/// « à » dans un fichier G-code changerait les réglages de la machine en plein travail.
 pub fn prepare_line(raw: &str) -> Option<String> {
     let raw = raw.trim();
     if raw.starts_with('$') {
-        return Some(raw.to_owned());
+        let clean: String = raw.chars().filter(|c| c.is_ascii() && !c.is_ascii_control()).collect();
+        return Some(clean);
     }
     let mut out = String::with_capacity(raw.len());
     let mut depth = 0u32;
@@ -308,7 +313,7 @@ pub fn prepare_line(raw: &str) -> Option<String> {
             ';' if depth == 0 => break,
             '(' => depth += 1,
             ')' => depth = depth.saturating_sub(1),
-            _ if depth > 0 || c.is_whitespace() => {}
+            _ if depth > 0 || c.is_whitespace() || !c.is_ascii() || c.is_ascii_control() => {}
             _ => out.push(c.to_ascii_uppercase()),
         }
     }
@@ -381,5 +386,8 @@ mod tests {
         assert_eq!(prepare_line("  %  "), None);
         assert_eq!(prepare_line("$WiFi/Password=AbC d"), Some("$WiFi/Password=AbC d".into()));
         assert_eq!(prepare_line("G0 X1 (a (b) c) Y2"), Some("G0X1Y2".into()));
+        // aucun octet ≥ 0x80 ne doit partir vers Grbl (commandes temps réel)
+        assert_eq!(prepare_line("G1 X1 — Y2 à"), Some("G1X1Y2".into()));
+        assert_eq!(prepare_line("$WiFi/SSID=Réseau"), Some("$WiFi/SSID=Rseau".into()));
     }
 }

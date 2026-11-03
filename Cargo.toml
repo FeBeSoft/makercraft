@@ -15,6 +15,8 @@ makercraft-geom = { path = "crates/core/geom" }
 makercraft-ext-api = { path = "crates/core/ext-api" }
 # --- extensions ---
 makercraft-ext-machine = { path = "crates/ext/machine" }
+makercraft-c2d = { path = "crates/ext/c2d" }
+makercraft-cam = { path = "crates/ext/cam" }
 
 # --- fondations ---
 thiserror = "2"
@@ -25,6 +27,11 @@ serialport = "4"
 ctrlc = "3"
 # icône et version dans les .exe Windows (build.rs des apps)
 winresource = "0.1"
+# lecture des projets Carbide Create (.c2d = SQLite + JSON compressé zlib)
+rusqlite = { version = "0.37", features = ["bundled"] }
+flate2 = "1"
+# géométrie 2D pour la FAO : décalages d'outil (buffer) et booléens, Rust pur (MIT/Apache)
+geo = "0.33"
 
 # --- projets amont (MIT/Apache), épinglés : voir UPSTREAM.md ---
 # Décommentés au branchement des extensions dao (CadCraft) et cao (SolidCraft).

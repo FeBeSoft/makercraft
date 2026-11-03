@@ -1,0 +1,21 @@
+[package]
+# le nom « makercraft-c2d » est pris par la bibliothèque de lecture (crates/ext/c2d)
+name = "makercraft-c2d-tool"
+description = "MakerCraft : projet Carbide Create (.c2d) vers G-code Grbl"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "makercraft-c2d"
+path = "src/main.rs"
+
+[dependencies]
+makercraft-cam.workspace = true
+
+[build-dependencies]
+winresource.workspace = true
+
+[lints]
+workspace = true

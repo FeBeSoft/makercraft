@@ -7,7 +7,7 @@ use std::process::ExitCode;
 use makercraft_ext_api::{Extension, Host, Value};
 
 fn extensions() -> Vec<Box<dyn Extension>> {
-    vec![Box::new(makercraft_ext_machine::MachineExtension)]
+    vec![Box::new(makercraft_ext_machine::MachineExtension), Box::new(makercraft_cam::CamExtension)]
 }
 
 fn main() -> ExitCode {
