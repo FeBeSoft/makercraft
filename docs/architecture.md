@@ -19,6 +19,7 @@
 | app | `makercraft-cli` | lister / exécuter les commandes | ✅ |
 | app | `makercraft-send` | console Grbl et envoi de fichiers G-code | ✅ |
 | app | `makercraft-c2d` | projet `.c2d` → G-code Grbl (un fichier par outil) | ✅ |
+| app | `c2d_to_nc` | fenêtre egui : glisser un `.c2d`, vérifications, export des `.nc` à côté du projet | ✅ |
 
 Règle : une couche ne dépend que des couches inférieures ; le noyau ne connaît aucune extension.
 

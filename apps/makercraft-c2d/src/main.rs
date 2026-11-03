@@ -84,7 +84,7 @@ fn gcode(path: &Path, out: Option<PathBuf>, single: bool, only: Option<&str>) ->
         return Err("aucun parcours à usiner".into());
     }
     let dir = out.unwrap_or_else(|| path.parent().map(Path::to_path_buf).unwrap_or_default());
-    let files = write_outputs(&job, &dir, single)?;
+    let files = write_outputs(&job, &dir, single, true)?;
     for w in job.warnings.iter().chain(job.groups.iter().flat_map(|g| g.ops.iter().flat_map(|o| o.warnings.iter()))) {
         println!("⚠ {w}");
     }

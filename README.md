@@ -47,6 +47,16 @@ aucun caractère non ASCII envoyé (Grbl les prendrait pour des commandes temps 
 
 ## Projets Carbide Create (`.c2d`) vers Grbl
 
+**Application `c2d_to_nc`** (fenêtre) : glisser un `.c2d` dans la fenêtre ou sur l'icône de
+l'exe, lire les vérifications (✔ / ⚠ / ✖), cliquer **Exporter les .nc** : les fichiers sont
+écrits à côté du projet. Options : un seul fichier avec pauses M0, aperçu SVG.
+
+```
+cargo build --release -p c2d_to_nc      # → target\release\c2d_to_nc.exe
+```
+
+En ligne de commande :
+
 ```
 makercraft-c2d info  "projet.c2d"                 # parcours, outils, durée estimée, avertissements
 makercraft-c2d gcode "projet.c2d" [-o dossier]    # un .nc par outil + aperçu SVG
