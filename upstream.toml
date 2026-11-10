@@ -44,13 +44,13 @@ pinned = "v2.1.27"
 kind = "port"
 license = "GPL-3.0"
 
-# kind = "reference" : projets consultés pour les idées et l'ergonomie, rien n'est porté pour l'instant.
+# kind = "reference" : projets consultés pour les idées et l'ergonomie, rien n'est porté pour l'instant ; épinglés sur la version en cours.
 
 [[repo]]
 name = "bCNC"
 url = "https://github.com/vlachoudis/bCNC"
 path = "../upstream/bCNC"
-pinned = "1.0.0"
+pinned = "df765fb"   # version en cours au 2026-11-10
 kind = "reference"
 license = "GPL-2.0"
 
@@ -58,7 +58,7 @@ license = "GPL-2.0"
 name = "OpenBuilds-CONTROL"
 url = "https://github.com/OpenBuilds/OpenBuilds-CONTROL"
 path = "../upstream/OpenBuilds-CONTROL"
-pinned = "v1.0.390"
+pinned = "1adcc12"   # version en cours au 2025-06-02
 kind = "reference"
 license = "GPL-3.0"
 
@@ -66,7 +66,7 @@ license = "GPL-3.0"
 name = "COPO"
 url = "https://github.com/gbulleryahen-hash/copo"
 path = "../upstream/copo"
-pinned = "9219817"   # version 1.322 (pas de tags dans ce dépôt)
+pinned = "4934554"   # version en cours au 2026-11-10
 kind = "reference"
 license = "GPL-3.0"
 
@@ -74,7 +74,7 @@ license = "GPL-3.0"
 name = "craft-launcher"
 url = "https://github.com/storytold/craft-launcher"
 path = "../upstream/craft-launcher"
-pinned = "v0.11.1"   # ArtCraft Launcher
+pinned = "c636281"   # version en cours au 2026-11-10
 kind = "reference"
 license = "MIT OR Apache-2.0"
 
@@ -82,7 +82,7 @@ license = "MIT OR Apache-2.0"
 name = "cavalier_contours"
 url = "https://github.com/jbuckmccready/cavalier_contours"
 path = "../upstream/cavalier_contours"
-pinned = "0.9.0"   # offsets et booléens de polylignes avec arcs (candidat dépendance pour makercraft-cam)
+pinned = "5268bea"   # version en cours au 2026-10-21
 kind = "reference"
 license = "MIT OR Apache-2.0"
 
@@ -90,7 +90,7 @@ license = "MIT OR Apache-2.0"
 name = "grblHAL"
 url = "https://github.com/grblHAL/core"
 path = "../upstream/grblHAL-core"
-pinned = "ffbb587"   # pas de tag de version récent ; source officielle du protocole grblHAL
+pinned = "ffbb587"   # version en cours au 2026-11-09
 kind = "reference"
 license = "GPL-3.0"
 
@@ -98,7 +98,7 @@ license = "GPL-3.0"
 name = "gSender"
 url = "https://github.com/Sienci-Labs/gsender"
 path = "../upstream/gsender"
-pinned = "v1.6.4"
+pinned = "7e4c990b6"   # version en cours au 2026-11-03
 kind = "reference"
 license = "GPL-3.0"
 
@@ -106,7 +106,7 @@ license = "GPL-3.0"
 name = "svg2gcode"
 url = "https://github.com/sameer/svg2gcode"
 path = "../upstream/svg2gcode"
-pinned = "cli-v0.0.19"
+pinned = "ed726a8"   # version en cours au 2026-11-09
 kind = "reference"
 license = "MIT"
 
@@ -116,7 +116,7 @@ license = "MIT"
 name = "ruststep"
 url = "https://github.com/ricosjp/ruststep"
 path = "../upstream/ruststep"
-pinned = "ruststep-v0.4.0"   # parseur STEP Part 21 + compilateur EXPRESS en Rust ; schémas AP238 fournis
+pinned = "cd89e5a"   # version en cours au 2025-03-20
 kind = "reference"
 license = "Apache-2.0"
 
@@ -124,7 +124,7 @@ license = "Apache-2.0"
 name = "truck"
 url = "https://github.com/ricosjp/truck"
 path = "../upstream/truck"
-pinned = "truck-stepio-v0.3.0"   # noyau B-rep Rust avec lecture/écriture STEP (truck-stepio)
+pinned = "55548a2"   # version en cours au 2026-11-02
 kind = "reference"
 license = "Apache-2.0"
 
@@ -132,23 +132,15 @@ license = "Apache-2.0"
 name = "STEPcode"
 url = "https://github.com/stepcode/stepcode"
 path = "../upstream/stepcode"
-pinned = "v0.8.2"   # schémas EXPRESS dans data/ : AP203, AP203e2, AP210e2/e3, AP214e3, AP238, AP242
+pinned = "24783b4"   # version en cours au 2026-09-28
 kind = "reference"
 license = "BSD-3-Clause"
-
-[[repo]]
-name = "SFA"
-url = "https://github.com/usnistgov/SFA"
-path = "../upstream/SFA"
-pinned = "1236017"   # NIST STEP File Analyzer (AP242, AP203, AP214, AP209, AP238) ; dossier Release exclu (sparse-checkout)
-kind = "reference"
-license = "NIST (domaine public)"
 
 [[repo]]
 name = "OCCT"
 url = "https://github.com/Open-Cascade-SAS/OCCT"
 path = "../upstream/OCCT"
-pinned = "V8_0_1"   # Open CASCADE, référence industrielle STEP/IGES ; sparse-checkout src/DataExchange seulement
+pinned = "53706f78a"   # version en cours au 2026-10-20
 kind = "reference"
 license = "LGPL-2.1 (avec exception)"
 
@@ -156,7 +148,7 @@ license = "LGPL-2.1 (avec exception)"
 name = "dxf-rs"
 url = "https://github.com/IxMilia/dxf-rs"
 path = "../upstream/dxf-rs"
-pinned = "v0.6.2"   # lecture/écriture DXF en Rust (candidat dépendance)
+pinned = "8c89920"   # version en cours au 2026-10-31
 kind = "reference"
 license = "MIT"
 
@@ -164,7 +156,7 @@ license = "MIT"
 name = "ezdxf"
 url = "https://github.com/mozman/ezdxf"
 path = "../upstream/ezdxf"
-pinned = "v1.4.5"   # référence DXF la plus complète (Python), excellente documentation du format
+pinned = "8a593d32"   # version en cours au 2026-11-08
 kind = "reference"
 license = "MIT"
 
@@ -172,7 +164,7 @@ license = "MIT"
 name = "ACadSharp"
 url = "https://github.com/DomCR/ACadSharp"
 path = "../upstream/ACadSharp"
-pinned = "v3.8.35"   # lecture/écriture DWG et DXF en C#
+pinned = "bccb5c64"   # version en cours au 2026-11-10
 kind = "reference"
 license = "MIT"
 
@@ -180,7 +172,7 @@ license = "MIT"
 name = "LibreDWG"
 url = "https://github.com/LibreDWG/libredwg"
 path = "../upstream/libredwg"
-pinned = "0.14.8931"   # bibliothèque GNU pour le format DWG (R13 à 2018)
+pinned = "4abb2683"   # version en cours au 2026-11-10
 kind = "reference"
 license = "GPL-3.0"
 
