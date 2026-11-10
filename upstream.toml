@@ -78,6 +78,38 @@ pinned = "v0.11.1"   # ArtCraft Launcher
 kind = "reference"
 license = "MIT OR Apache-2.0"
 
+[[repo]]
+name = "cavalier_contours"
+url = "https://github.com/jbuckmccready/cavalier_contours"
+path = "../upstream/cavalier_contours"
+pinned = "0.9.0"   # offsets et booléens de polylignes avec arcs (candidat dépendance pour makercraft-cam)
+kind = "reference"
+license = "MIT OR Apache-2.0"
+
+[[repo]]
+name = "grblHAL"
+url = "https://github.com/grblHAL/core"
+path = "../upstream/grblHAL-core"
+pinned = "ffbb587"   # pas de tag de version récent ; source officielle du protocole grblHAL
+kind = "reference"
+license = "GPL-3.0"
+
+[[repo]]
+name = "gSender"
+url = "https://github.com/Sienci-Labs/gsender"
+path = "../upstream/gsender"
+pinned = "v1.6.4"
+kind = "reference"
+license = "GPL-3.0"
+
+[[repo]]
+name = "svg2gcode"
+url = "https://github.com/sameer/svg2gcode"
+path = "../upstream/svg2gcode"
+pinned = "cli-v0.0.19"
+kind = "reference"
+license = "MIT"
+
 # --- Fichiers portés (ou à porter) : notre fichier ← fichier source ---
 # status = "prévu" | "porté" ; `cargo xtask upstream` signale tout changement de la source
 # entre `pinned` et la dernière version amont.
