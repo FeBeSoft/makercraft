@@ -110,6 +110,80 @@ pinned = "cli-v0.0.19"
 kind = "reference"
 license = "MIT"
 
+# --- Formats d'échange : STEP (ISO 10303), DXF, DWG ---
+
+[[repo]]
+name = "ruststep"
+url = "https://github.com/ricosjp/ruststep"
+path = "../upstream/ruststep"
+pinned = "ruststep-v0.4.0"   # parseur STEP Part 21 + compilateur EXPRESS en Rust ; schémas AP238 fournis
+kind = "reference"
+license = "Apache-2.0"
+
+[[repo]]
+name = "truck"
+url = "https://github.com/ricosjp/truck"
+path = "../upstream/truck"
+pinned = "truck-stepio-v0.3.0"   # noyau B-rep Rust avec lecture/écriture STEP (truck-stepio)
+kind = "reference"
+license = "Apache-2.0"
+
+[[repo]]
+name = "STEPcode"
+url = "https://github.com/stepcode/stepcode"
+path = "../upstream/stepcode"
+pinned = "v0.8.2"   # schémas EXPRESS dans data/ : AP203, AP203e2, AP210e2/e3, AP214e3, AP238, AP242
+kind = "reference"
+license = "BSD-3-Clause"
+
+[[repo]]
+name = "SFA"
+url = "https://github.com/usnistgov/SFA"
+path = "../upstream/SFA"
+pinned = "1236017"   # NIST STEP File Analyzer (AP242, AP203, AP214, AP209, AP238) ; dossier Release exclu (sparse-checkout)
+kind = "reference"
+license = "NIST (domaine public)"
+
+[[repo]]
+name = "OCCT"
+url = "https://github.com/Open-Cascade-SAS/OCCT"
+path = "../upstream/OCCT"
+pinned = "V8_0_1"   # Open CASCADE, référence industrielle STEP/IGES ; sparse-checkout src/DataExchange seulement
+kind = "reference"
+license = "LGPL-2.1 (avec exception)"
+
+[[repo]]
+name = "dxf-rs"
+url = "https://github.com/IxMilia/dxf-rs"
+path = "../upstream/dxf-rs"
+pinned = "v0.6.2"   # lecture/écriture DXF en Rust (candidat dépendance)
+kind = "reference"
+license = "MIT"
+
+[[repo]]
+name = "ezdxf"
+url = "https://github.com/mozman/ezdxf"
+path = "../upstream/ezdxf"
+pinned = "v1.4.5"   # référence DXF la plus complète (Python), excellente documentation du format
+kind = "reference"
+license = "MIT"
+
+[[repo]]
+name = "ACadSharp"
+url = "https://github.com/DomCR/ACadSharp"
+path = "../upstream/ACadSharp"
+pinned = "v3.8.35"   # lecture/écriture DWG et DXF en C#
+kind = "reference"
+license = "MIT"
+
+[[repo]]
+name = "LibreDWG"
+url = "https://github.com/LibreDWG/libredwg"
+path = "../upstream/libredwg"
+pinned = "0.14.8931"   # bibliothèque GNU pour le format DWG (R13 à 2018)
+kind = "reference"
+license = "GPL-3.0"
+
 # --- Fichiers portés (ou à porter) : notre fichier ← fichier source ---
 # status = "prévu" | "porté" ; `cargo xtask upstream` signale tout changement de la source
 # entre `pinned` et la dernière version amont.
