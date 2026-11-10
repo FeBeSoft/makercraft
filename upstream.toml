@@ -44,6 +44,40 @@ pinned = "v2.1.27"
 kind = "port"
 license = "GPL-3.0"
 
+# kind = "reference" : projets consultés pour les idées et l'ergonomie, rien n'est porté pour l'instant.
+
+[[repo]]
+name = "bCNC"
+url = "https://github.com/vlachoudis/bCNC"
+path = "../upstream/bCNC"
+pinned = "1.0.0"
+kind = "reference"
+license = "GPL-2.0"
+
+[[repo]]
+name = "OpenBuilds-CONTROL"
+url = "https://github.com/OpenBuilds/OpenBuilds-CONTROL"
+path = "../upstream/OpenBuilds-CONTROL"
+pinned = "v1.0.390"
+kind = "reference"
+license = "GPL-3.0"
+
+[[repo]]
+name = "COPO"
+url = "https://github.com/gbulleryahen-hash/copo"
+path = "../upstream/copo"
+pinned = "9219817"   # version 1.322 (pas de tags dans ce dépôt)
+kind = "reference"
+license = "GPL-3.0"
+
+[[repo]]
+name = "craft-launcher"
+url = "https://github.com/storytold/craft-launcher"
+path = "../upstream/craft-launcher"
+pinned = "v0.11.1"   # ArtCraft Launcher
+kind = "reference"
+license = "MIT OR Apache-2.0"
+
 # --- Fichiers portés (ou à porter) : notre fichier ← fichier source ---
 # status = "prévu" | "porté" ; `cargo xtask upstream` signale tout changement de la source
 # entre `pinned` et la dernière version amont.
