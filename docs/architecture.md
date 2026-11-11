@@ -23,6 +23,8 @@
 
 Règle : une couche ne dépend que des couches inférieures ; le noyau ne connaît aucune extension.
 
+Ateliers autonomes et intégrés (contrat `Atelier`, format de projet `.makercraft`) : voir `ateliers.md`.
+
 ## Contrat d'extension
 
 Une extension implémente `Extension` (`id`, `label`, `depends_on`, `register`). L'hôte charge
