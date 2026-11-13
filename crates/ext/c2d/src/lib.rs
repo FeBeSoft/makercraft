@@ -13,6 +13,10 @@
 //! Unités : millimètres. Origine : coin avant gauche du brut, Y vers le fond (comme la machine).
 //! Le fichier est ouvert en lecture seule et n'est jamais modifié.
 
+pub mod ext;
+
+pub use ext::C2dExtension;
+
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::Path;
