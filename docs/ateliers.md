@@ -134,7 +134,7 @@ charger une **interface** à l'exécution serait fragile et demanderait de l'`un
 | Atelier | Version autonome | État |
 |---|---|---|
 | Fabrication | `c2d_to_nc` (import .c2d, export .nc) | existe : premier cas réel, à faire passer sur le contrat |
-| Pilotage | Galaad Jog (Isel), puis MC Pilotage (Grbl / grblHAL) | en réflexion |
+| Pilotage | Isel Jog, puis MC Pilotage (Grbl / grblHAL) | en réflexion |
 | Calcul de coupe | MC Coupe (abaque, profil 3018 Pro) | idée : candidat preuve de concept |
 | Dessin | MC Dessin (base CadCraft) | à faire |
 | PCB | MC PCB (Gerber, Excellon, isolation sur 3018) | idée |
