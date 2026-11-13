@@ -39,6 +39,8 @@ geo = "0.33"
 # interface graphique (même pile que CadCraft / SolidCraft)
 eframe = "0.37"
 rfd = "0.17"
+# décodage de l'illustration « À propos » (JPEG) de l'application
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 # --- projets amont (MIT/Apache), épinglés sur leur dernière release stable : voir UPSTREAM.md ---
 # Seuls des crates SANS interface graphique sont liés : les crates egui de CadCraft et de

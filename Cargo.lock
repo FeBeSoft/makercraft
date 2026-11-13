@@ -1801,6 +1801,8 @@ dependencies = [
  "num-traits",
  "png",
  "tiff",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -2066,10 +2068,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "makercraft"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "image",
+ "makercraft-c2d",
+ "makercraft-cam",
+ "makercraft-cao",
+ "makercraft-dao",
+ "makercraft-ext-api",
+ "makercraft-ext-machine",
+ "makercraft-geom",
+ "rfd",
+ "serde",
+ "serde_json",
+ "winresource",
+]
+
+[[package]]
 name = "makercraft-c2d"
 version = "0.1.0"
 dependencies = [
  "flate2",
+ "makercraft-ext-api",
  "makercraft-geom",
  "rusqlite",
  "serde_json",
