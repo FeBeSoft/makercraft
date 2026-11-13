@@ -39,7 +39,7 @@ Pour chaque projet : version épinglée, dernier tag amont, nombre de commits d'
 chaque fichier listé dans `[[port]]`, s'il a changé depuis la version portée (avec la commande
 `git diff` à lancer).
 
-## Cas 1 — CadCraft, SolidCraft (dépendances)
+## Cas 1 - CadCraft, SolidCraft (dépendances)
 
 1. Choisir le nouveau tag (de préférence une release, pas `main`).
 2. Mettre à jour `tag = "…"` dans `Cargo.toml` **et** `pinned = "…"` dans `upstream.toml`.
@@ -54,7 +54,7 @@ Retirer le patch dès qu'il est accepté.
 
 Cadence conseillée : une fois par mois, ou quand une release apporte un correctif utile.
 
-## Cas 2 — LaserGRBL, Candle, UGS (portages GPL)
+## Cas 2 - LaserGRBL, Candle, UGS (portages GPL)
 
 Le code est traduit, il ne peut pas se mettre à jour automatiquement. La traçabilité passe par
 `upstream.toml` : chaque `[[port]]` relie **notre fichier** au **fichier source** porté.

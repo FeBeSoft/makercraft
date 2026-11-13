@@ -18,13 +18,37 @@ GPL-3.0-or-later (voir `LICENSE`). Les composants MIT/Apache intégrés gardent 
 
 ```
 crates/core/   noyau sans métier : geom, ext-api (contrat d'extension, commandes, hôte)
-crates/ext/    extensions : machine (dao, cao, cam à venir)
-apps/          makercraft-send (console + envoi de G-code), makercraft-cli (commandes des extensions)
-               l'app graphique viendra avec l'extension dao
+crates/ext/    extensions : machine, c2d, cam, dao (CadCraft), cao (SolidCraft), galaad, tooldb
+apps/          makercraft (application de bureau), c2d_to_nc, makercraft-send (console + envoi
+               de G-code), makercraft-cli (commandes des extensions), makercraft-c2d, makercraft-outils
 assets/        branding : icône (.ico, .png) et illustration « à propos »
 xtask/         maintenance : cargo xtask ci | cargo xtask upstream [--fetch]
 upstream.toml  projets amont suivis et fichiers portés
 ```
+
+## Application MakerCraft (v0.1)
+
+```
+cargo run -p makercraft                       # ou : makercraft.exe "projet.c2d"
+cargo build --release -p makercraft           # -> target\release\makercraft.exe
+```
+
+Le menu **Atelier** (ou la barre sous les menus) change d'atelier :
+
+| Atelier | Contenu de la v0.1 |
+|---|---|
+| CNC - DAO / CAO | vue 2D (molette : zoom, glisser : déplacer, grille, origine) d'un projet Carbide Create `.c2d` (brut, formes, calques), d'un dessin DXF (lu par CadCraft) ou de l'encombrement d'un modèle STEP (lu par le noyau SolidCraft) |
+| CNC - FAO fraiseuse | parcours du `.c2d` par outil, vérifications, trajectoires dans la vue 2D, export des `.nc` |
+| CNC - Usinage 3D, Gravure d'images | à venir |
+| Laser, PCB | à venir |
+| Machines | Grbl 1.1 / grblHAL par l'émulateur (choix par défaut) ou un port série : état et position, déplacement manuel, origine, zéro pièce, envoi d'un `.nc` avec progression, pause, reprise, arrêt, console |
+
+Menu **Extensions** : toutes les commandes des extensions chargées, exécutables avec leurs
+paramètres JSON. **Fichier > Préférences** : unités (mm, pouce), thème clair ou sombre, dossiers
+récents (`%APPDATA%\FeBe\MakerCraft\preferences.json`). **Aide > À propos** : version et extensions.
+
+Sûreté : avant d'envoyer un programme à une vraie machine, MakerCraft demande confirmation ;
+**Arrêt** fait une pause puis un reset de la carte.
 
 ## Piloter une machine (extension `machine`)
 
@@ -69,7 +93,7 @@ MakerCraft relit le dessin, les outils et les réglages des parcours, et recalcu
 trajectoires : découpe (extérieur/intérieur, passes), poche (anneaux concentriques,
 surépaisseur), perçage (débourrage), V-carve **approché** par une gravure sur le trait.
 Pas encore : attaches, rampes, V-carve à profondeur variable, parcours 3D, arcs G2/G3.
-Zéro : X0 Y0 coin avant gauche, Z0 dessus du brut — à refaire à chaque changement d'outil.
+Zéro : X0 Y0 coin avant gauche, Z0 dessus du brut - à refaire à chaque changement d'outil.
 
 Détails : `docs/architecture.md`. Mises à jour amont : `UPSTREAM.md`.
 

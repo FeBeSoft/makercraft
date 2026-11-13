@@ -2,6 +2,18 @@
 
 Statut : proposition (2026-11-11). Complète `architecture.md`.
 
+> **Découpage retenu (2026-11-13)** : quatre familles au premier niveau du menu « Atelier »,
+> - **CNC**, avec ses sous-ateliers DAO / CAO, FAO fraiseuse, Usinage 3D, Gravure d'images ;
+> - **Laser** ;
+> - **PCB** (complément CNC) ;
+> - **Machines** : infrastructure générique (laser, fraiseuse, tour...) pour le pilotage et les
+>   périphériques.
+>
+> Les noms Dessin / Fabrication / Pilotage ci-dessous correspondent à CNC - DAO / CAO,
+> CNC - FAO fraiseuse et Machines. Dans la v0.1, ces ateliers sont des modules de
+> `apps/makercraft` ; le passage en crates `crates/ateliers/*` avec le contrat `Atelier` reste
+> le plan pour les coquilles autonomes.
+
 Objectif : chaque atelier (Dessin, Fabrication, Pilotage, PCB...) peut fonctionner **seul**, dans une
 petite application dédiée, et s'intègre **automatiquement** à MakerCraft quand il y est présent,
 comme un atelier de plus dans le sélecteur. Un projet commencé dans l'un s'ouvre dans l'autre.
