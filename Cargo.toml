@@ -27,19 +27,19 @@ serde_json = "1"
 toml = "1"
 serialport = "4"
 ctrlc = "3"
-# icône et version dans les .exe Windows (build.rs des apps)
+# icÃ´ne et version dans les .exe Windows (build.rs des apps)
 winresource = "0.1"
-# lecture des projets Carbide Create (.c2d = SQLite + JSON compressé zlib)
+# lecture des projets Carbide Create (.c2d = SQLite + JSON compressÃ© zlib)
 rusqlite = { version = "0.37", features = ["bundled"] }
 flate2 = "1"
-# géométrie 2D pour la FAO : décalages d'outil (buffer) et booléens, Rust pur (MIT/Apache)
+# gÃ©omÃ©trie 2D pour la FAO : dÃ©calages d'outil (buffer) et boolÃ©ens, Rust pur (MIT/Apache)
 geo = "0.33"
-# interface graphique (même pile que CadCraft / SolidCraft)
-eframe = "0.36"
+# interface graphique (mÃªme pile que CadCraft / SolidCraft)
+eframe = "0.37"
 rfd = "0.17"
 
-# --- projets amont (MIT/Apache), épinglés : voir UPSTREAM.md ---
-# Décommentés au branchement des extensions dao (CadCraft) et cao (SolidCraft).
+# --- projets amont (MIT/Apache), Ã©pinglÃ©s : voir UPSTREAM.md ---
+# DÃ©commentÃ©s au branchement des extensions dao (CadCraft) et cao (SolidCraft).
 # cadcraft-engine   = { git = "https://github.com/storytold/cadcraft", tag = "v0.8.0" }
 # cadcraft-io       = { git = "https://github.com/storytold/cadcraft", tag = "v0.8.0" }
 # solidcraft-kernel = { git = "https://github.com/bherbruck/solidcraft", tag = "v0.15.0" }
@@ -65,5 +65,5 @@ opt-level = 3
 lto = "thin"
 codegen-units = 16
 
-# Quand SolidCraft sera branché, recopier ici ses [patch.crates-io] (truck-*, matext4cgmath,
+# Quand SolidCraft sera branchÃ©, recopier ici ses [patch.crates-io] (truck-*, matext4cgmath,
 # egui-wgpu) : un patch ne s'applique qu'au workspace racine. Voir UPSTREAM.md.

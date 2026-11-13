@@ -394,7 +394,7 @@ impl App {
         let shown = widgets::elide_start(&text, max, |s| widgets::text_width(p, s, &font));
         p.text(pos2(r.left() + 34.0, r.center().y), Align2::LEFT_CENTER, shown, font, pal.weak2);
         if let Some(Ok(files)) = &self.exported {
-            let resp = ui.interact(r, ui.id().with("etat"), Sense::hover());
+            let resp = ui.interact(r, ui.scope_id().with("etat"), Sense::hover());
             resp.on_hover_ui(|ui| {
                 for f in files {
                     ui.label(RichText::new(file_name(f)).font(mono(12.0)));

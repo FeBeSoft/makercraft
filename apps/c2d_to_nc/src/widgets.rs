@@ -3,7 +3,7 @@
 
 use eframe::egui::{
     self, Align2, Color32, CornerRadius, CursorIcon, FontFamily, FontId, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui,
-    WidgetInfo, WidgetType, epaint::Shadow, pos2, vec2,
+    Role, WidgetInfo, epaint::Shadow, pos2, vec2,
 };
 
 use crate::icons::rounded_path;
@@ -78,9 +78,9 @@ pub fn dashed_rect(p: &Painter, rect: Rect, radius: f32, stroke: Stroke, dash: f
 /// Zone cliquable avec nom accessible ; renvoie la réponse (survol, clic).
 pub fn hit(ui: &Ui, rect: Rect, label: &str, enabled: bool) -> Response {
     let sense = if enabled { Sense::click() } else { Sense::hover() };
-    let resp = ui.interact(rect, ui.id().with(("bouton", label)), sense);
+    let resp = ui.interact(rect, ui.scope_id().with(("bouton", label)), sense);
     let l = label.to_owned();
-    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, enabled, &l));
+    resp.widget_info(|| WidgetInfo::labeled(Role::Button, enabled, &l));
     if enabled { resp.on_hover_cursor(CursorIcon::PointingHand) } else { resp }
 }
 
@@ -138,7 +138,7 @@ pub fn toggle(ui: &mut Ui, on: bool, label: &str, pal: &Palette) -> Response {
     let state = on;
     let l = label.to_owned();
     let enabled = ui.is_enabled();
-    resp.widget_info(|| WidgetInfo::selected(WidgetType::Checkbox, enabled, state, &l));
+    resp.widget_info(|| WidgetInfo::selected(Role::CheckBox, enabled, state, &l));
     let resp = resp.on_hover_cursor(CursorIcon::PointingHand);
     let t = ui.ctx().animate_bool_responsive(resp.id, state);
     let p = ui.painter();
