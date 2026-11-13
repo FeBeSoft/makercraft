@@ -1,0 +1,16 @@
+[package]
+name = "makercraft-dao"
+description = "MakerCraft : DAO 2D, adaptateur CadCraft (lecture DXF en contours)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+makercraft-geom.workspace = true
+makercraft-ext-api.workspace = true
+cadcraft-dxf.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

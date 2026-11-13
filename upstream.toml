@@ -4,19 +4,22 @@
 # kind = "dependency" : crates Rust utilisées telles quelles (git + tag épinglé dans Cargo.toml).
 # kind = "port"       : code GPL traduit en Rust ; on suit les fichiers listés dans [[port]].
 
+# Versions : dernière release stable GitHub (même règle que craft-launcher), vérifiée le 2026-11-13.
+# Seuls des crates sans interface graphique sont liés (voir UPSTREAM.md).
+
 [[repo]]
 name = "cadcraft"
 url = "https://github.com/storytold/cadcraft"
 path = "../upstream/cadcraft"
-pinned = "v0.8.0"
+pinned = "v0.20.1"   # crate lié : cadcraft-dxf (extension dao)
 kind = "dependency"
 license = "MIT OR Apache-2.0"
 
 [[repo]]
 name = "solidcraft"
-url = "https://github.com/bherbruck/solidcraft"
+url = "https://github.com/tangency-labs/solidcraft"   # ex bherbruck/solidcraft
 path = "../upstream/solidcraft"
-pinned = "v0.15.0"
+pinned = "v0.41.0"   # crate lié : solidcraft-kernel (extension cao)
 kind = "dependency"
 license = "MIT OR Apache-2.0"
 

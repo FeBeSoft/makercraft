@@ -5,11 +5,29 @@ Ne jamais y modifier de fichier.
 
 | Projet | Licence | Usage | Version épinglée |
 |---|---|---|---|
-| CadCraft | MIT/Apache | dépendance Rust (extension dao) | v0.8.0 |
-| SolidCraft | MIT/Apache | dépendance Rust (extension cao) | v0.15.0 |
+| CadCraft | MIT/Apache | dépendance Rust : `cadcraft-dxf` (extension dao) | v0.20.1 |
+| SolidCraft | MIT/Apache | dépendance Rust : `solidcraft-kernel` (extension cao) | v0.41.0 |
 | LaserGRBL | GPLv3 | portage C# → Rust (machine, cam laser) | v7.14.1 |
 | Candle | GPLv3 | portage C++ → Rust (G-code, heightmap) | c04e6f2 |
 | UGS | GPLv3 | portage Java → Rust (architecture contrôleur) | v2.1.27 |
+
+## Greffe de CadCraft et SolidCraft (sans modifier leurs sources)
+
+- **Version** : la dernière release stable publiée sur GitHub, comme le fait `craft-launcher`
+  (`GET /repos/<repo>/releases/latest`, ni pré-version ni nightly). Le lanceur ne connaît pas
+  MakerCraft : la « validation avec MakerCraft » est notre `cargo xtask ci` vert sur ce tag.
+- **Mode** : dépendances git épinglées sur le tag, compilées telles quelles. Ni copie, ni fork,
+  ni `[patch]` : on ne touche pas à leurs sources.
+- **Crates liés** : uniquement des crates **sans interface graphique**, `cadcraft-dxf` (lecture DXF)
+  et `solidcraft-kernel` (noyau B-rep, STEP, mesures). Les crates egui des deux projets ne
+  peuvent pas cohabiter dans un même exécutable : CadCraft remplace toute la famille egui et
+  winit par des forks storytold, SolidCraft remplace `egui-wgpu` et `winit` par ses propres
+  copies (`vendor/`). MakerCraft dessine donc ses propres vues avec egui 0.37 standard.
+- **Adaptateurs** : `crates/ext/dao` et `crates/ext/cao` traduisent leurs types en types
+  MakerCraft ; le reste de MakerCraft ne voit jamais un type CadCraft ou SolidCraft.
+- **Coût** : la première compilation du noyau SolidCraft est longue (environ 20 min en
+  `opt-level = 2`), ensuite elle reste en cache. Le binaire peut être construit sans lui :
+  `cargo build -p makercraft --no-default-features --features dao`.
 
 ## Voir où on en est
 
@@ -25,9 +43,10 @@ chaque fichier listé dans `[[port]]`, s'il a changé depuis la version portée 
 
 1. Choisir le nouveau tag (de préférence une release, pas `main`).
 2. Mettre à jour `tag = "…"` dans `Cargo.toml` **et** `pinned = "…"` dans `upstream.toml`.
-3. SolidCraft : comparer ses `[patch.crates-io]` (son `Cargo.toml`) avec les nôtres et les recopier.
+3. Vérifier que les crates liés restent sans interface graphique : `cargo tree -p makercraft-dao -i egui`
+   et `cargo tree -p makercraft-cao -i egui` ne doivent rien trouver.
 4. `cargo update`, puis `cargo xtask ci`. Corriger uniquement nos adaptateurs (`crates/ext/dao`, `crates/ext/cao`).
-5. Commit : `amont: cadcraft v0.8.0 → v0.9.0`.
+5. Commit : `amont: cadcraft v0.20.1 -> v0.21.0`.
 
 Un correctif dans leur code est indispensable ? Fork GitHub, branche `makercraft-patches`,
 `[patch."https://github.com/…"]` vers le fork dans notre `Cargo.toml`, et pull request en amont.

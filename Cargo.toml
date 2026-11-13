@@ -19,6 +19,8 @@ makercraft-c2d = { path = "crates/ext/c2d" }
 makercraft-cam = { path = "crates/ext/cam" }
 makercraft-galaad = { path = "crates/ext/galaad" }
 makercraft-tooldb = { path = "crates/ext/tooldb" }
+makercraft-dao = { path = "crates/ext/dao" }
+makercraft-cao = { path = "crates/ext/cao" }
 
 # --- fondations ---
 thiserror = "2"
@@ -27,23 +29,23 @@ serde_json = "1"
 toml = "1"
 serialport = "4"
 ctrlc = "3"
-# icÃ´ne et version dans les .exe Windows (build.rs des apps)
+# icône et version dans les .exe Windows (build.rs des apps)
 winresource = "0.1"
-# lecture des projets Carbide Create (.c2d = SQLite + JSON compressÃ© zlib)
+# lecture des projets Carbide Create (.c2d = SQLite + JSON compressé zlib)
 rusqlite = { version = "0.37", features = ["bundled"] }
 flate2 = "1"
-# gÃ©omÃ©trie 2D pour la FAO : dÃ©calages d'outil (buffer) et boolÃ©ens, Rust pur (MIT/Apache)
+# géométrie 2D pour la FAO : décalages d'outil (buffer) et booléens, Rust pur (MIT/Apache)
 geo = "0.33"
-# interface graphique (mÃªme pile que CadCraft / SolidCraft)
+# interface graphique (même pile que CadCraft / SolidCraft)
 eframe = "0.37"
 rfd = "0.17"
 
-# --- projets amont (MIT/Apache), Ã©pinglÃ©s : voir UPSTREAM.md ---
-# DÃ©commentÃ©s au branchement des extensions dao (CadCraft) et cao (SolidCraft).
-# cadcraft-engine   = { git = "https://github.com/storytold/cadcraft", tag = "v0.8.0" }
-# cadcraft-io       = { git = "https://github.com/storytold/cadcraft", tag = "v0.8.0" }
-# solidcraft-kernel = { git = "https://github.com/bherbruck/solidcraft", tag = "v0.15.0" }
-# solidcraft-engine = { git = "https://github.com/bherbruck/solidcraft", tag = "v0.15.0" }
+# --- projets amont (MIT/Apache), épinglés sur leur dernière release stable : voir UPSTREAM.md ---
+# Seuls des crates SANS interface graphique sont liés : les crates egui de CadCraft et de
+# SolidCraft remplacent egui-wgpu et winit par des copies différentes, incompatibles entre elles.
+# Ni patch ni modification de leurs sources : ils sont compilés tels quels.
+cadcraft-dxf      = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
+solidcraft-kernel = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.41.0" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -65,5 +67,6 @@ opt-level = 3
 lto = "thin"
 codegen-units = 16
 
-# Quand SolidCraft sera branchÃ©, recopier ici ses [patch.crates-io] (truck-*, matext4cgmath,
-# egui-wgpu) : un patch ne s'applique qu'au workspace racine. Voir UPSTREAM.md.
+# Aucun [patch] amont nécessaire : les crates liés (cadcraft-dxf, solidcraft-kernel) n'en
+# dépendent pas. Si un crate graphique de CadCraft ou de SolidCraft devait être lié un jour,
+# ses [patch.crates-io] seraient à recopier ici (un patch ne s'applique qu'au workspace racine).
