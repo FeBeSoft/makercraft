@@ -2048,8 +2048,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "makercraft-galaad"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "makercraft-geom"
 version = "0.1.0"
+
+[[package]]
+name = "makercraft-outils"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "makercraft-tooldb",
+ "winresource",
+]
 
 [[package]]
 name = "makercraft-send"
@@ -2058,6 +2074,16 @@ dependencies = [
  "ctrlc",
  "makercraft-ext-machine",
  "winresource",
+]
+
+[[package]]
+name = "makercraft-tooldb"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "thiserror 2.0.21",
+ "toml",
 ]
 
 [[package]]

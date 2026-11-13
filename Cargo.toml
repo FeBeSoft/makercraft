@@ -17,6 +17,8 @@ makercraft-ext-api = { path = "crates/core/ext-api" }
 makercraft-ext-machine = { path = "crates/ext/machine" }
 makercraft-c2d = { path = "crates/ext/c2d" }
 makercraft-cam = { path = "crates/ext/cam" }
+makercraft-galaad = { path = "crates/ext/galaad" }
+makercraft-tooldb = { path = "crates/ext/tooldb" }
 
 # --- fondations ---
 thiserror = "2"

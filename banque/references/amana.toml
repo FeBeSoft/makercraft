@@ -1,0 +1,23 @@
+# Charges par dent Amana Tool (fraises helicoidales carbure, defonceuses industrielles a 18 000 tr/min).
+# Sert de BORNE HAUTE "machine rigide" pour le recoupement, pas de valeur par defaut.
+# Source : Amana Tool, "Solid Carbide Spektra Coated Spiral Plunge Speed and Feed Chart"
+# Regle Amana : passe 1 x D = charge nominale ; 2 x D -> -25 % ; 3 x D -> -50 %.
+
+source = "amana"
+rpm_reference = 18000
+depth_rule = [[1.0, 1.0], [2.0, 0.75], [3.0, 0.5]]   # [passe x D, coefficient sur fz]
+
+# fz en mm/dent [min, max], convertis depuis les pouces (1" = 25.4 mm)
+[[row]]
+key = "spirale_2d_bois"
+materials = ["bois_tendre", "bois_dur", "bois"]
+diameters_mm = [3.175, 6.35, 12.7]
+fz_min = [0.076, 0.127, 0.178]
+fz_max = [0.127, 0.178, 0.229]
+
+[[row]]
+key = "spirale_2d_mdf"
+materials = ["mdf"]
+diameters_mm = [3.175, 6.35, 12.7]
+fz_min = [0.127, 0.152, 0.203]
+fz_max = [0.178, 0.203, 0.254]

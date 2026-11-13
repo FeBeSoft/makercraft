@@ -1,0 +1,91 @@
+# Materiaux normalises (id -> libelle, alias des sources)
+
+[[material]]
+id = "mdf"
+name = "MDF"
+aliases = ["MDF"]
+
+[[material]]
+id = "bois_tendre"
+name = "Bois tendre (resineux)"
+aliases = ["Softwood"]
+
+[[material]]
+id = "bois_dur"
+name = "Bois dur (feuillus)"
+aliases = ["Hardwood"]
+
+[[material]]
+id = "bois"
+name = "Bois (generique)"
+aliases = ["Timbers", "Wood"]
+
+[[material]]
+id = "mousse"
+name = "Mousses (PU, PS, PVC expanse)"
+aliases = ["Foams", "Foam"]
+
+[[material]]
+id = "pmma"
+name = "Acrylique / PMMA"
+aliases = ["Acrylic"]
+
+[[material]]
+id = "plastique"
+name = "Plastiques (generique)"
+aliases = ["Plastics", "Plastic"]
+
+[[material]]
+id = "plastique_tendre"
+name = "Plastique tendre (PE, PP, PVC souple)"
+aliases = ["Soft plastic"]
+
+[[material]]
+id = "plastique_dur"
+name = "Plastique dur (PVC rigide, ABS, POM)"
+aliases = ["Hard plastic"]
+
+[[material]]
+id = "alu_fonte"
+name = "Aluminium de fonderie"
+aliases = ["Cast aluminium"]
+
+[[material]]
+id = "acier"
+name = "Acier"
+aliases = ["Steel"]
+
+[[material]]
+id = "alu"
+name = "Aluminium"
+aliases = ["Aluminium", "Aluminum"]
+
+[[material]]
+id = "laiton"
+name = "Laiton"
+aliases = ["Brass"]
+
+[[material]]
+id = "alliages"
+name = "Alliages non ferreux (generique)"
+aliases = ["Alloys"]
+
+[[material]]
+id = "pcb"
+name = "Circuit imprime FR4"
+aliases = ["PCB"]
+
+[[material]]
+id = "composite"
+name = "Composites (fibre de verre, carbone)"
+aliases = ["Fibreglass", "Fiberglass", "Carbon Fiber", "Carbon Fibre"]
+
+[[material]]
+id = "pierre"
+name = "Pierre / marbre"
+aliases = ["Stone", "Marble"]
+
+[[material]]
+id = "generique"
+name = "Non precise"
+aliases = []

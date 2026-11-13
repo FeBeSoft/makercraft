@@ -1,0 +1,29 @@
+# Classes de machines : bornent la broche et reduisent les valeurs fabricant selon la rigidite.
+# fz_factor : coefficient sur la charge par dent ; depth_factor : coefficient sur la profondeur conseillee.
+
+[[machine]]
+id = "cnc3018"
+name = "Petite fraiseuse peu rigide (3018 Pro, moteur 775)"
+rpm_min = 1000
+rpm_max = 10000
+fz_factor = 0.6
+depth_factor = 0.25
+max_diameter_mm = 6
+
+[[machine]]
+id = "defonceuse"
+name = "Portique a defonceuse (Shapeoko, Isel/Galaad, Kress, Makita)"
+rpm_min = 10000
+rpm_max = 30000
+fz_factor = 0.8
+depth_factor = 0.5
+max_diameter_mm = 12
+
+[[machine]]
+id = "broche_pro"
+name = "Portique rigide a electrobroche (6040, 1.5-2.2 kW)"
+rpm_min = 6000
+rpm_max = 24000
+fz_factor = 1.0
+depth_factor = 1.0
+max_diameter_mm = 12

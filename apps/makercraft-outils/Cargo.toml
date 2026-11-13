@@ -1,0 +1,17 @@
+[package]
+name = "makercraft-outils"
+description = "MakerCraft : bibliothèque d'outils coupants et paramètres de coupe"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+makercraft-tooldb.workspace = true
+eframe.workspace = true
+
+[build-dependencies]
+winresource.workspace = true
+
+[lints]
+workspace = true

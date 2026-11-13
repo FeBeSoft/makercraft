@@ -1,0 +1,251 @@
+# Catalogue curé : géométries d'outils courants (pas de paramètres de coupe stockés).
+# Les paramètres sont calculés par makercraft-tooldb à partir de references/sorotec.toml,
+# du matériau et de la classe de machine (machines.toml).
+# type : flat, ballnose, bullnose, vbit, engraver, tapered_ballnose, drill
+# Champs : id, name, type, diameter_mm, flutes, [angle_deg, tip_diameter_mm, flute_length_mm, shank_mm]
+
+[[tool]]
+id = "flat-1f-1"
+name = "Fraise 1 dent Ø1"
+type = "flat"
+diameter_mm = 1.0
+flutes = 1
+flute_length_mm = 4
+shank_mm = 3.175
+
+[[tool]]
+id = "flat-1f-2"
+name = "Fraise 1 dent Ø2"
+type = "flat"
+diameter_mm = 2.0
+flutes = 1
+flute_length_mm = 8
+shank_mm = 3.175
+
+[[tool]]
+id = "flat-1f-3.175"
+name = "Fraise 1 dent Ø3.175 (1/8\")"
+type = "flat"
+diameter_mm = 3.175
+flutes = 1
+flute_length_mm = 12
+shank_mm = 3.175
+
+[[tool]]
+id = "flat-1f-4"
+name = "Fraise 1 dent Ø4"
+type = "flat"
+diameter_mm = 4.0
+flutes = 1
+flute_length_mm = 15
+shank_mm = 4
+
+[[tool]]
+id = "flat-1f-6"
+name = "Fraise 1 dent Ø6"
+type = "flat"
+diameter_mm = 6.0
+flutes = 1
+flute_length_mm = 22
+shank_mm = 6
+
+[[tool]]
+id = "flat-2f-1"
+name = "Fraise 2 dents Ø1"
+type = "flat"
+diameter_mm = 1.0
+flutes = 2
+flute_length_mm = 4
+shank_mm = 3.175
+
+[[tool]]
+id = "flat-2f-1.5"
+name = "Fraise 2 dents Ø1.5"
+type = "flat"
+diameter_mm = 1.5
+flutes = 2
+flute_length_mm = 6
+shank_mm = 3.175
+
+[[tool]]
+id = "flat-2f-2"
+name = "Fraise 2 dents Ø2"
+type = "flat"
+diameter_mm = 2.0
+flutes = 2
+flute_length_mm = 8
+shank_mm = 3.175
+
+[[tool]]
+id = "flat-2f-3"
+name = "Fraise 2 dents Ø3"
+type = "flat"
+diameter_mm = 3.0
+flutes = 2
+flute_length_mm = 12
+shank_mm = 3
+
+[[tool]]
+id = "flat-2f-3.175"
+name = "Fraise 2 dents Ø3.175 (1/8\")"
+type = "flat"
+diameter_mm = 3.175
+flutes = 2
+flute_length_mm = 12
+shank_mm = 3.175
+
+[[tool]]
+id = "flat-2f-4"
+name = "Fraise 2 dents Ø4"
+type = "flat"
+diameter_mm = 4.0
+flutes = 2
+flute_length_mm = 15
+shank_mm = 4
+
+[[tool]]
+id = "flat-2f-5"
+name = "Fraise 2 dents Ø5"
+type = "flat"
+diameter_mm = 5.0
+flutes = 2
+flute_length_mm = 17
+shank_mm = 5
+
+[[tool]]
+id = "flat-2f-6"
+name = "Fraise 2 dents Ø6"
+type = "flat"
+diameter_mm = 6.0
+flutes = 2
+flute_length_mm = 22
+shank_mm = 6
+
+[[tool]]
+id = "flat-2f-8"
+name = "Fraise 2 dents Ø8"
+type = "flat"
+diameter_mm = 8.0
+flutes = 2
+flute_length_mm = 25
+shank_mm = 8
+
+[[tool]]
+id = "flat-3f-6"
+name = "Fraise 3 dents Ø6"
+type = "flat"
+diameter_mm = 6.0
+flutes = 3
+flute_length_mm = 20
+shank_mm = 6
+
+[[tool]]
+id = "ball-2f-1"
+name = "Fraise hémisphérique 2 dents Ø1"
+type = "ballnose"
+diameter_mm = 1.0
+flutes = 2
+flute_length_mm = 4
+shank_mm = 3.175
+
+[[tool]]
+id = "ball-2f-2"
+name = "Fraise hémisphérique 2 dents Ø2"
+type = "ballnose"
+diameter_mm = 2.0
+flutes = 2
+flute_length_mm = 8
+shank_mm = 3.175
+
+[[tool]]
+id = "ball-2f-3.175"
+name = "Fraise hémisphérique 2 dents Ø3.175 (1/8\")"
+type = "ballnose"
+diameter_mm = 3.175
+flutes = 2
+flute_length_mm = 12
+shank_mm = 3.175
+
+[[tool]]
+id = "ball-2f-6"
+name = "Fraise hémisphérique 2 dents Ø6"
+type = "ballnose"
+diameter_mm = 6.0
+flutes = 2
+flute_length_mm = 20
+shank_mm = 6
+
+[[tool]]
+id = "vbit-30-3.175"
+name = "V-bit 30° Ø3.175"
+type = "vbit"
+diameter_mm = 3.175
+flutes = 1
+angle_deg = 30
+tip_diameter_mm = 0.2
+shank_mm = 3.175
+
+[[tool]]
+id = "vbit-60-6.35"
+name = "V-bit 60° Ø6.35 (1/4\")"
+type = "vbit"
+diameter_mm = 6.35
+flutes = 2
+angle_deg = 60
+shank_mm = 6.35
+
+[[tool]]
+id = "vbit-90-6.35"
+name = "V-bit 90° Ø6.35 (1/4\")"
+type = "vbit"
+diameter_mm = 6.35
+flutes = 2
+angle_deg = 90
+shank_mm = 6.35
+
+[[tool]]
+id = "vbit-90-12.7"
+name = "V-bit 90° Ø12.7 (1/2\")"
+type = "vbit"
+diameter_mm = 12.7
+flutes = 2
+angle_deg = 90
+shank_mm = 6.35
+
+[[tool]]
+id = "engr-20-0.1"
+name = "Pointe à graver 20° pointe 0.1 (PCB)"
+type = "engraver"
+diameter_mm = 3.175
+flutes = 1
+angle_deg = 20
+tip_diameter_mm = 0.1
+shank_mm = 3.175
+
+[[tool]]
+id = "engr-30-0.2"
+name = "Pointe à graver 30° pointe 0.2"
+type = "engraver"
+diameter_mm = 3.175
+flutes = 1
+angle_deg = 30
+tip_diameter_mm = 0.2
+shank_mm = 3.175
+
+[[tool]]
+id = "drill-0.8"
+name = "Foret carbure Ø0.8 (PCB)"
+type = "drill"
+diameter_mm = 0.8
+flutes = 2
+angle_deg = 130
+shank_mm = 3.175
+
+[[tool]]
+id = "drill-1.0"
+name = "Foret carbure Ø1.0 (PCB)"
+type = "drill"
+diameter_mm = 1.0
+flutes = 2
+angle_deg = 130
+shank_mm = 3.175

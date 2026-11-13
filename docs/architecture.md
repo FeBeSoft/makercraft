@@ -13,6 +13,7 @@
 | L3 | `ext/dao` | adaptateur CadCraft (dessin 2D, DXF/DWG/SVG/PDF) | à faire |
 | L3 | `ext/cao` | adaptateur SolidCraft (B-rep truck, STEP, 3MF) | à faire |
 | L3 | `ext/c2d` | lecture des projets Carbide Create `.c2d` (formes, calques, outils, parcours) | ✅ |
+| L3 | `ext/galaad` | lecture des dessins Galaad 3 `.gal` / `.gli` / `.cub` (géométrie, outils, attributs d'usinage) ; format : `reference/galaad-format-gal.md` | 🟡 lecture |
 | L3 | `ext/cam` | FAO 2.5D : découpe, poche, perçage, gravure ; G-code Grbl ASCII ; aperçu SVG | 🟡 v0.1 (laser, attaches, V-carve vrai à faire) |
 | L3 | `ext/machine` | transports (série, TCP, émulateur), protocole Grbl 1.1/grblHAL, contrôleur et streaming, codes d'erreur | ✅ v0.1 (aperçu G-code à faire) |
 | L4 | `ui/shell` | egui : menus et panneaux construits depuis le registre | à faire |

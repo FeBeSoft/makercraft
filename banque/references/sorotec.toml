@@ -1,0 +1,93 @@
+# Valeurs indicatives Sorotec (fraises carbure monobloc), utilisees comme modele de calcul.
+# Source : Sorotec GmbH, "Cutting parameters - Calculation and practical hints" v1.0.1
+# https://webseite.sorotec.de/download/fraesparameter/schnittwerte_en.pdf
+# Formules : n = vc x 1000 / (pi x D)    vf = n x z x fz
+# Sorotec : valeurs d'orientation, variables selon la machine et son environnement.
+
+source = "sorotec"
+url = "https://webseite.sorotec.de/download/fraesparameter/schnittwerte_en.pdf"
+version = "1.0.1"
+diameters_mm = [1, 2, 3, 4, 5, 6, 8, 10, 12]
+
+# vc en m/min, fz en mm/dent pour chaque diametre de diameters_mm
+# depth_x_d : profondeur de rainure conseillee (x D)
+[[row]]
+key = "alu_fonte"
+label = "Aluminium de fonderie (>6% Si)"
+vc = 500
+fz = [0.010, 0.010, 0.010, 0.015, 0.015, 0.025, 0.030, 0.038, 0.050]
+depth_x_d = 0.5
+
+[[row]]
+key = "alu"
+label = "Aluminium corroye (alliage)"
+vc = 500
+fz = [0.010, 0.020, 0.025, 0.050, 0.050, 0.050, 0.064, 0.080, 0.100]
+depth_x_d = 0.5
+
+[[row]]
+key = "plastique_tendre"
+label = "Plastique tendre"
+vc = 600
+fz = [0.025, 0.030, 0.035, 0.045, 0.065, 0.090, 0.100, 0.200, 0.300]
+depth_x_d = 2.0
+
+[[row]]
+key = "plastique_dur"
+label = "Plastique dur"
+vc = 550
+fz = [0.015, 0.020, 0.025, 0.050, 0.060, 0.080, 0.089, 0.100, 0.150]
+depth_x_d = 2.0
+
+[[row]]
+key = "bois_dur"
+label = "Bois dur"
+vc = 450
+fz = [0.020, 0.025, 0.030, 0.035, 0.045, 0.055, 0.065, 0.080, 0.090]
+depth_x_d = 2.0
+
+[[row]]
+key = "bois_tendre"
+label = "Bois tendre"
+vc = 500
+fz = [0.025, 0.030, 0.035, 0.040, 0.050, 0.060, 0.070, 0.085, 0.100]
+depth_x_d = 2.0
+
+[[row]]
+key = "mdf"
+label = "MDF"
+vc = 450
+fz = [0.030, 0.040, 0.045, 0.050, 0.060, 0.070, 0.080, 0.090, 0.110]
+depth_x_d = 2.0
+
+[[row]]
+key = "laiton"
+label = "Laiton, cuivre, bronze"
+vc = 365
+fz = [0.015, 0.020, 0.025, 0.025, 0.030, 0.050, 0.056, 0.065, 0.080]
+depth_x_d = 0.5
+
+[[row]]
+key = "acier"
+label = "Acier"
+vc = 90
+fz = [0.010, 0.010, 0.012, 0.025, 0.030, 0.038, 0.045, 0.050, 0.080]
+depth_x_d = 0.5
+
+# Materiaux MakerCraft sans ligne Sorotec dediee -> ligne utilisee (choix prudent).
+# pcb, composite, pierre : pas de donnees Sorotec, pas de calcul automatique.
+[map]
+bois = "bois_dur"
+pmma = "plastique_dur"
+plastique = "plastique_dur"
+mousse = "plastique_tendre"
+# alliages : volontairement non relie (CNC3D "Alloys" = alliages durs, pas de l'alu)
+
+# Profondeur conseillee propre a un materiau (Sorotec : mousse dure jusqu'a 5 x D)
+[depth_override_x_d]
+mousse = 5.0
+
+[hints]
+stepover_contour_pct = 25
+lubrification_ne = "Micro-lubrification conseillee sur les non-ferreux"
+pmma = "Eau savonneuse : tres bon etat de surface sur l'acrylique"
