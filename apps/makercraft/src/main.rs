@@ -6,12 +6,14 @@
 // pas de console noire derrière la fenêtre (sauf en debug, pour voir les messages)
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod about;
 mod app;
 mod ateliers;
 mod hote;
 mod icons;
 mod options;
 mod prefs;
+mod ribbon;
 mod switcher;
 mod theme;
 mod view2d;

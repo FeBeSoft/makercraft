@@ -1,0 +1,273 @@
+//! Ruban, sur le modèle de SolidCraft et DraftSight : une rangée d'onglets, puis des groupes
+//! nommés (nom en bas, séparateurs verticaux) de grands boutons à icône, libellé dessous, et de
+//! petits boutons empilés par trois. Les onglets sont fournis par l'atelier actif ; un clic
+//! renvoie l'identifiant de la commande, que l'application transmet à l'atelier.
+//! Le ruban se replie (double-clic sur l'onglet actif ou chevron à droite).
+
+use eframe::egui::{self, Align, Align2, Color32, CornerRadius, Rect, Sense, Stroke, Ui, pos2, vec2};
+
+use crate::icons::{self, Icon};
+use crate::theme::{self, Palette};
+
+/// Hauteur de la rangée d'onglets.
+pub const TAB_ROW_H: f32 = 30.0;
+/// Hauteur d'un groupe (boutons).
+pub const GROUP_H: f32 = 86.0;
+/// Hauteur du nom de groupe, sous les boutons.
+pub const SECTION_H: f32 = 20.0;
+/// Hauteur du corps du ruban déplié.
+pub const BODY_H: f32 = GROUP_H + SECTION_H;
+
+const LARGE_MIN_W: f32 = 54.0;
+const LARGE_MAX_W: f32 = 76.0;
+const SMALL_H: f32 = 25.0;
+
+/// Couleur d'une commande : conception en bleu, composants et production en orange.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tone {
+    Plain,
+    Design,
+    Component,
+    Danger,
+}
+
+pub struct Item {
+    pub id: &'static str,
+    pub label: &'static str,
+    pub icon: Icon,
+    pub large: bool,
+    pub enabled: bool,
+    /// Bascule : `Some(état)`.
+    pub checked: Option<bool>,
+    pub tone: Tone,
+    pub tip: String,
+}
+
+impl Item {
+    pub fn large(id: &'static str, label: &'static str, icon: Icon) -> Self {
+        Self { id, label, icon, large: true, enabled: true, checked: None, tone: Tone::Plain, tip: String::new() }
+    }
+
+    pub fn small(id: &'static str, label: &'static str, icon: Icon) -> Self {
+        Self { large: false, ..Self::large(id, label, icon) }
+    }
+
+    pub fn enabled(mut self, on: bool) -> Self {
+        self.enabled = on;
+        self
+    }
+
+    pub fn checked(mut self, on: bool) -> Self {
+        self.checked = Some(on);
+        self
+    }
+
+    pub fn tone(mut self, t: Tone) -> Self {
+        self.tone = t;
+        self
+    }
+
+    pub fn tip(mut self, t: impl Into<String>) -> Self {
+        self.tip = t.into();
+        self
+    }
+}
+
+pub struct Group {
+    pub label: &'static str,
+    pub items: Vec<Item>,
+}
+
+pub struct Tab {
+    pub label: &'static str,
+    pub groups: Vec<Group>,
+    /// Texte affiché quand l'onglet n'a aucun groupe.
+    pub empty_note: &'static str,
+}
+
+impl Tab {
+    pub fn new(label: &'static str, groups: Vec<Group>) -> Self {
+        Self { label, groups, empty_note: "" }
+    }
+}
+
+#[derive(Default)]
+pub struct Ribbon {
+    pub tab: usize,
+    pub collapsed: bool,
+}
+
+fn tone_color(pal: &Palette, t: Tone) -> Color32 {
+    match t {
+        Tone::Plain => pal.text,
+        Tone::Design => pal.blue,
+        Tone::Component => pal.orange,
+        Tone::Danger => pal.red,
+    }
+}
+
+impl Ribbon {
+    /// Rangée d'onglets dans `r` ; `accent` est la couleur de l'atelier actif.
+    pub fn tabs_ui(&mut self, ui: &mut Ui, r: Rect, pal: &Palette, tabs: &[Tab], accent: Color32) {
+        if self.tab >= tabs.len() {
+            self.tab = 0;
+        }
+        let p = ui.painter().clone();
+        let font = theme::regular(13.5);
+        let mut x = r.left() + 6.0;
+        for (i, t) in tabs.iter().enumerate() {
+            let w = p.layout_no_wrap(t.label.to_owned(), font.clone(), pal.text).size().x + 26.0;
+            let tr = Rect::from_min_size(pos2(x, r.top()), vec2(w, r.height()));
+            let resp = ui.interact(tr, ui.scope_id().with(("onglet-ruban", i)), Sense::click());
+            resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, true, i == self.tab, t.label));
+            let active = i == self.tab;
+            if resp.hovered() && !active {
+                p.rect_filled(tr.shrink2(vec2(2.0, 4.0)), CornerRadius::same(6), pal.hover);
+            }
+            p.text(tr.center(), Align2::CENTER_CENTER, t.label, if active { theme::bold(13.5) } else { font.clone() }, if active { pal.text } else { pal.weak });
+            if active && !self.collapsed {
+                p.rect_filled(Rect::from_min_max(pos2(tr.left() + 8.0, tr.bottom() - 3.0), pos2(tr.right() - 8.0, tr.bottom())), CornerRadius::same(2), accent);
+            }
+            if resp.double_clicked() && active {
+                self.collapsed = !self.collapsed;
+            } else if resp.clicked() {
+                if active && self.collapsed {
+                    self.collapsed = false;
+                }
+                self.tab = i;
+                if !active {
+                    self.collapsed = false;
+                }
+            }
+            x = tr.right() + 2.0;
+        }
+        // chevron : replier / déplier
+        let cr = Rect::from_center_size(pos2(r.right() - 18.0, r.center().y), vec2(26.0, 22.0));
+        let label = if self.collapsed { "Déplier le ruban" } else { "Replier le ruban" };
+        let resp = ui.interact(cr, ui.scope_id().with("replier-ruban"), Sense::click()).on_hover_text(label);
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, label));
+        if resp.hovered() {
+            p.rect_filled(cr, CornerRadius::same(6), pal.hover);
+        }
+        icons::paint(&p, Rect::from_center_size(cr.center(), vec2(14.0, 14.0)), if self.collapsed { Icon::Expand } else { Icon::Collapse }, pal.weak);
+        if resp.clicked() {
+            self.collapsed = !self.collapsed;
+        }
+    }
+
+    /// Corps du ruban (groupes de l'onglet actif) dans `r`. Renvoie la commande cliquée.
+    pub fn body_ui(&self, ui: &mut Ui, r: Rect, pal: &Palette, tabs: &[Tab]) -> Option<&'static str> {
+        let tab = tabs.get(self.tab)?;
+        let p = ui.painter().clone();
+        if tab.groups.is_empty() {
+            p.text(pos2(r.left() + 18.0, r.center().y), Align2::LEFT_CENTER, tab.empty_note, theme::regular(13.0), pal.weak);
+            return None;
+        }
+        let mut clicked = None;
+        let mut x = r.left() + 6.0;
+        let top = r.top() + 4.0;
+        for g in &tab.groups {
+            let start = x;
+            let mut i = 0;
+            while i < g.items.len() {
+                let it = &g.items[i];
+                if it.large {
+                    let w = large_width(&p, it.label);
+                    let br = Rect::from_min_size(pos2(x, top), vec2(w, GROUP_H - 8.0));
+                    if button(ui, &p, pal, br, it, true) {
+                        clicked = Some(it.id);
+                    }
+                    x = br.right() + 2.0;
+                    i += 1;
+                } else {
+                    // colonne de petits boutons (trois au plus)
+                    let col: Vec<&Item> = g.items[i..].iter().take_while(|it| !it.large).take(3).collect();
+                    let font = theme::regular(12.5);
+                    let w = col.iter().map(|it| p.layout_no_wrap(it.label.to_owned(), font.clone(), pal.text).size().x).fold(0.0, f32::max) + 36.0;
+                    let ch = col.len() as f32 * SMALL_H + (col.len().saturating_sub(1)) as f32 * 2.0;
+                    let mut y = top + ((GROUP_H - 8.0) - ch) / 2.0;
+                    for it in &col {
+                        let br = Rect::from_min_size(pos2(x, y), vec2(w, SMALL_H));
+                        if button(ui, &p, pal, br, it, false) {
+                            clicked = Some(it.id);
+                        }
+                        y += SMALL_H + 2.0;
+                    }
+                    x += w + 2.0;
+                    i += col.len();
+                }
+            }
+            let end = x.max(start + 40.0);
+            let gr = Rect::from_min_max(pos2(start, r.top() + GROUP_H), pos2(end, r.bottom()));
+            let mut job = egui::text::LayoutJob::simple_singleline(g.label.to_owned(), theme::regular(11.5), pal.dim);
+            job.halign = Align::Center;
+            p.galley(pos2(gr.center().x, gr.top() + 2.0), p.layout_job(job), pal.dim);
+            x = end + 8.0;
+            p.vline(x - 4.0, (r.top() + 8.0)..=(r.bottom() - 8.0), Stroke::new(1.0, pal.bar_line));
+            x += 4.0;
+        }
+        clicked
+    }
+}
+
+fn large_width(p: &egui::Painter, label: &str) -> f32 {
+    let w = p.layout_no_wrap(label.to_owned(), theme::regular(12.5), Color32::WHITE).size().x + 16.0;
+    w.clamp(LARGE_MIN_W, LARGE_MAX_W)
+}
+
+/// Dessine un bouton du ruban ; renvoie vrai s'il a été cliqué.
+fn button(ui: &Ui, p: &egui::Painter, pal: &Palette, r: Rect, it: &Item, large: bool) -> bool {
+    let resp = ui.interact(r, ui.scope_id().with(("ruban", it.id)), if it.enabled { Sense::click() } else { Sense::hover() });
+    resp.widget_info(|| match it.checked {
+        Some(on) => egui::WidgetInfo::selected(egui::Role::CheckBox, it.enabled, on, it.label),
+        None => egui::WidgetInfo::labeled(egui::Role::Button, it.enabled, it.label),
+    });
+    let accent = tone_color(pal, it.tone);
+    let on = it.checked == Some(true);
+    if on {
+        p.rect_filled(r, CornerRadius::same(7), theme::mix(pal.bar, pal.blue, 0.2));
+        p.rect_stroke(r, CornerRadius::same(7), Stroke::new(1.0, theme::mix(pal.bar, pal.blue, 0.5)), egui::StrokeKind::Inside);
+    } else if it.enabled && resp.hovered() {
+        p.rect_filled(r, CornerRadius::same(7), pal.hover);
+    }
+    let (icon_c, text_c) = if !it.enabled {
+        (theme::alpha(pal.dim, 0.7), pal.dim)
+    } else if on {
+        (pal.blue, pal.text)
+    } else {
+        (accent, pal.text)
+    };
+    if large {
+        icons::paint(p, Rect::from_center_size(pos2(r.center().x, r.top() + 24.0), vec2(28.0, 28.0)), it.icon, icon_c);
+        let mut job = egui::text::LayoutJob::simple(it.label.to_owned(), theme::regular(12.5), text_c, r.width() - 6.0);
+        job.halign = Align::Center;
+        job.wrap.max_rows = 2;
+        p.galley(pos2(r.center().x, r.top() + 44.0), p.layout_job(job), text_c);
+    } else {
+        icons::paint(p, Rect::from_center_size(pos2(r.left() + 14.0, r.center().y), vec2(16.0, 16.0)), it.icon, icon_c);
+        p.text(pos2(r.left() + 28.0, r.center().y), Align2::LEFT_CENTER, it.label, theme::regular(12.5), text_c);
+    }
+    let resp = if it.tip.is_empty() { resp } else { resp.on_hover_text(&it.tip) };
+    it.enabled && resp.clicked()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builders_set_fields() {
+        let it = Item::small("a.b", "Libellé", Icon::Fit).enabled(false).checked(true).tone(Tone::Component).tip("aide");
+        assert!(!it.large && !it.enabled);
+        assert_eq!(it.checked, Some(true));
+        assert_eq!(it.tone, Tone::Component);
+        assert_eq!(it.tip, "aide");
+        assert!(Item::large("a.c", "X", Icon::Open).large);
+    }
+
+    #[test]
+    fn heights_follow_solidcraft() {
+        assert!((BODY_H - 106.0).abs() < f32::EPSILON);
+        assert!((TAB_ROW_H - 30.0).abs() < f32::EPSILON);
+    }
+}

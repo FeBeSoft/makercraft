@@ -14,6 +14,7 @@ use makercraft_geom::{Bounds2, Vec2};
 use super::Atelier;
 use crate::icons::Icon;
 use crate::prefs::Units;
+use crate::ribbon::{Group, Item, Tab, Tone};
 use crate::theme::{self, Palette};
 use crate::view2d::{View2d, Xform};
 use crate::widgets::{self, Kind};
@@ -214,6 +215,86 @@ impl Cnc {
         Ok(msg)
     }
 
+    fn c2d(&self) -> Option<&C2dDoc> {
+        match self.doc.as_ref().map(|d| &d.kind) {
+            Some(DocKind::C2d(c)) => Some(c),
+            _ => None,
+        }
+    }
+
+    /// Onglets du ruban pour l'atelier `at` (DAO/CAO ou FAO).
+    pub fn ribbon(&self, at: Atelier) -> Vec<Tab> {
+        let has = self.doc.is_some();
+        let c2d = self.c2d().is_some();
+        let fao = at == Atelier::CncFao;
+        let mut view = vec![Item::large("cnc.ajuster", "Ajuster", Icon::Fit).enabled(has).tip("Ajuster la vue au document")];
+        if fao {
+            view.push(Item::small("cnc.trajectoires", "Trajectoires", Icon::Paths).enabled(c2d).checked(self.show_paths).tip("Afficher les trajectoires d'usinage"));
+            view.push(Item::small("cnc.rapides", "Rapides", Icon::Rapids).enabled(c2d).checked(self.show_rapids).tip("Afficher les déplacements rapides"));
+        }
+        let mut tabs = vec![Tab::new(
+            "Accueil",
+            vec![
+                Group { label: "Fichier", items: vec![Item::large("cnc.ouvrir", "Ouvrir", Icon::Open).tone(Tone::Design).tip("Ouvrir un projet .c2d, un dessin DXF ou un modèle STEP (Ctrl+O)")] },
+                Group { label: "Vue", items: view },
+            ],
+        )];
+        if fao {
+            let ok = self.c2d().is_some_and(|c| !blocking(c));
+            tabs.push(Tab::new(
+                "Usinage",
+                vec![Group {
+                    label: "G-code",
+                    items: vec![
+                        Item::large("cnc.exporter", "Exporter .nc", Icon::Export).tone(Tone::Component).enabled(ok).tip(if c2d && !ok {
+                            "Export impossible : corriger les points en rouge"
+                        } else {
+                            "Écrire les fichiers G-code pour Grbl"
+                        }),
+                        Item::small("cnc.un_fichier", "Un seul fichier", Icon::File).enabled(c2d).checked(self.single).tip("Pause M0 aux changements d'outil"),
+                        Item::small("cnc.svg", "Aperçu SVG", Icon::Image).enabled(c2d).checked(self.svg).tip("Écrire aussi un aperçu SVG"),
+                    ],
+                }],
+            ));
+        }
+        tabs
+    }
+
+    /// Exécute une commande du ruban.
+    pub fn command(&mut self, id: &str, req: &mut Vec<Request>) {
+        match id {
+            "cnc.ouvrir" => req.push(Request::OpenDialog),
+            "cnc.ajuster" => {
+                if let Some(d) = &self.doc {
+                    self.view.fit(d.bounds());
+                }
+            }
+            "cnc.trajectoires" => self.show_paths = !self.show_paths,
+            "cnc.rapides" => self.show_rapids = !self.show_rapids,
+            "cnc.un_fichier" => self.single = !self.single,
+            "cnc.svg" => self.svg = !self.svg,
+            "cnc.exporter" => self.export_dialog(req),
+            _ => {}
+        }
+    }
+
+    /// Demande le dossier puis écrit les .nc du projet ouvert.
+    fn export_dialog(&mut self, req: &mut Vec<Request>) {
+        let Some(Doc { kind: DocKind::C2d(c), path }) = &self.doc else { return };
+        if blocking(c) {
+            return;
+        }
+        let dir = path.parent().map(Path::to_path_buf).unwrap_or_default();
+        let Some(out) = rfd::FileDialog::new().set_title("Dossier des fichiers .nc").set_directory(&dir).pick_folder() else { return };
+        let r = write_outputs(&c.job, &out, self.single, self.svg);
+        req.push(Request::Status(match &r {
+            Ok(f) => format!("{} fichier(s) .nc écrit(s) dans {}", f.len(), out.display()),
+            Err(e) => format!("Échec de l'export : {e}"),
+        }));
+        req.push(Request::RecentDir(out));
+        self.exported = Some(r);
+    }
+
     pub fn ui(&mut self, ui: &mut Ui, pal: &Palette, units: Units, at: Atelier, req: &mut Vec<Request>) {
         let full = ui.available_rect_before_wrap();
         ui.allocate_rect(full, Sense::hover());
@@ -232,23 +313,6 @@ impl Cnc {
         });
 
         let mut main_ui = ui.new_child(UiBuilder::new().max_rect(main));
-        main_ui.horizontal(|ui| {
-            if widgets::button(ui, pal, Some(Icon::Open), "Ouvrir...", Kind::Primary, true).clicked() {
-                req.push(Request::OpenDialog);
-            }
-            let can_fit = self.doc.is_some();
-            if widgets::button(ui, pal, Some(Icon::Fit), "Ajuster la vue", Kind::Plain, can_fit).clicked()
-                && let Some(d) = &self.doc
-            {
-                self.view.fit(d.bounds());
-            }
-            if at == Atelier::CncFao && matches!(self.doc.as_ref().map(|d| &d.kind), Some(DocKind::C2d(_))) {
-                ui.add_space(8.0);
-                ui.checkbox(&mut self.show_paths, "Trajectoires");
-                ui.checkbox(&mut self.show_rapids, "Déplacements rapides");
-            }
-        });
-        main_ui.add_space(10.0);
         let show_paths = at == Atelier::CncFao && self.show_paths;
         let show_rapids = at == Atelier::CncFao && self.show_rapids;
         let (doc, hidden, selected) = (&self.doc, &self.hidden_layers, self.selected);
@@ -353,7 +417,7 @@ impl Cnc {
 
     fn fao_panel(&mut self, ui: &mut Ui, pal: &Palette, units: Units, req: &mut Vec<Request>) {
         self.doc_card(ui, pal, units);
-        let Some(Doc { kind: DocKind::C2d(c), path }) = &self.doc else {
+        let Some(Doc { kind: DocKind::C2d(c), .. }) = &self.doc else {
             widgets::card(ui, pal, Some("Parcours"), |ui| {
                 ui.label(
                     RichText::new("La FAO de cette version part d'un projet Carbide Create (.c2d) : ouvrez-en un avec Fichier > Ouvrir.").color(pal.weak),
@@ -361,7 +425,6 @@ impl Cnc {
             });
             return;
         };
-        let dir = path.parent().map(Path::to_path_buf).unwrap_or_default();
         // parcours groupés par outil
         let mut clicked = None;
         widgets::card(ui, pal, Some("Parcours"), |ui| {
@@ -395,8 +458,8 @@ impl Cnc {
                 widgets::status_line(ui, pal, icon, color, &ch.text);
             }
         });
-        let blocking = c.checks.iter().any(|ch| ch.level == Level::Error) || c.job.groups.is_empty();
-        let mut export_to: Option<PathBuf> = None;
+        let blocking = blocking(c);
+        let mut export = false;
         widgets::card(ui, pal, Some("Export G-code"), |ui| {
             ui.checkbox(&mut self.single, "Un seul fichier (pause M0 aux changements d'outil)");
             ui.checkbox(&mut self.svg, "Écrire aussi un aperçu SVG");
@@ -409,7 +472,7 @@ impl Cnc {
             if blocking {
                 b.on_hover_text("Export impossible : corriger les points en rouge");
             } else if b.clicked() {
-                export_to = rfd::FileDialog::new().set_title("Dossier des fichiers .nc").set_directory(&dir).pick_folder();
+                export = true;
             }
             match &self.exported {
                 Some(Ok(files)) => widgets::status_line(ui, pal, Icon::Ok, pal.ok, &format!("{} fichier(s) écrit(s)", files.len())),
@@ -417,16 +480,15 @@ impl Cnc {
                 None => {}
             }
         });
-        if let Some(out) = export_to {
-            let r = write_outputs(&c.job, &out, self.single, self.svg);
-            req.push(Request::Status(match &r {
-                Ok(f) => format!("{} fichier(s) .nc écrit(s) dans {}", f.len(), out.display()),
-                Err(e) => format!("Échec de l'export : {e}"),
-            }));
-            req.push(Request::RecentDir(out));
-            self.exported = Some(r);
+        if export {
+            self.export_dialog(req);
         }
     }
+}
+
+/// Vrai si l'export est impossible (erreur bloquante ou rien à produire).
+fn blocking(c: &C2dDoc) -> bool {
+    c.checks.iter().any(|ch| ch.level == Level::Error) || c.job.groups.is_empty()
 }
 
 /// Étiquette courte d'un outil : « T302 - V 30° - D6.35 » (le détail est dans l'info-bulle).

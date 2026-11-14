@@ -34,6 +34,21 @@ pub enum Icon {
     Soon,
     Unlock,
     Zero,
+    Save,
+    Undo,
+    Redo,
+    /// Trajectoires d'usinage.
+    Paths,
+    /// Déplacements rapides (tirets).
+    Rapids,
+    /// Un seul fichier.
+    File,
+    /// Image (aperçu SVG).
+    Image,
+    /// Chevron vers le haut (replier le ruban).
+    Collapse,
+    /// Chevron vers le bas (déplier).
+    Expand,
 }
 
 /// Point relatif au carré `r` : (0,0) coin haut gauche, (1,1) coin bas droit.
@@ -181,5 +196,39 @@ pub fn paint(p: &Painter, r: Rect, icon: Icon, c: Color32) {
             line(p, r, &[(0.5, 0.04), (0.5, 0.96)], Stroke::new(w * 0.7, c));
             line(p, r, &[(0.04, 0.5), (0.96, 0.5)], Stroke::new(w * 0.7, c));
         }
+        Icon::Save => {
+            line(p, r, &[(0.12, 0.1), (0.72, 0.1), (0.9, 0.28), (0.9, 0.9), (0.12, 0.9), (0.12, 0.1)], s);
+            line(p, r, &[(0.3, 0.1), (0.3, 0.34), (0.66, 0.34), (0.66, 0.1)], s);
+            p.rect_stroke(Rect::from_min_max(at(r, 0.28, 0.56), at(r, 0.74, 0.9)), CornerRadius::same(1), s, StrokeKind::Middle);
+        }
+        Icon::Undo | Icon::Redo => {
+            let f = |x: f32| if icon == Icon::Undo { x } else { 1.0 - x };
+            line(p, r, &[(f(0.2), 0.42), (f(0.62), 0.42), (f(0.82), 0.52), (f(0.86), 0.68), (f(0.78), 0.82), (f(0.6), 0.88)], s);
+            line(p, r, &[(f(0.38), 0.22), (f(0.18), 0.42), (f(0.38), 0.62)], s);
+        }
+        Icon::Paths => {
+            line(p, r, &[(0.1, 0.85), (0.1, 0.35), (0.35, 0.15), (0.65, 0.15), (0.9, 0.35), (0.9, 0.85)], s);
+            line(p, r, &[(0.3, 0.85), (0.3, 0.45), (0.5, 0.35), (0.7, 0.45), (0.7, 0.85)], s);
+        }
+        Icon::Rapids => {
+            for i in 0..4 {
+                let a = 0.08 + i as f32 * 0.24;
+                line(p, r, &[(a, 0.8 - a * 0.6), (a + 0.14, 0.8 - (a + 0.14) * 0.6)], s);
+            }
+            poly(p, r, &[(0.92, 0.18), (0.66, 0.2), (0.8, 0.42)], c);
+        }
+        Icon::File => {
+            line(p, r, &[(0.2, 0.06), (0.62, 0.06), (0.82, 0.26), (0.82, 0.94), (0.2, 0.94), (0.2, 0.06)], s);
+            line(p, r, &[(0.62, 0.06), (0.62, 0.26), (0.82, 0.26)], s);
+            line(p, r, &[(0.34, 0.5), (0.68, 0.5)], s);
+            line(p, r, &[(0.34, 0.68), (0.68, 0.68)], s);
+        }
+        Icon::Image => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.08, 0.16), at(r, 0.92, 0.84)), cr, s, StrokeKind::Middle);
+            line(p, r, &[(0.14, 0.78), (0.4, 0.48), (0.58, 0.66), (0.7, 0.54), (0.86, 0.72)], s);
+            p.circle_filled(at(r, 0.7, 0.34), w * 1.3, c);
+        }
+        Icon::Collapse => line(p, r, &[(0.2, 0.64), (0.5, 0.34), (0.8, 0.64)], s),
+        Icon::Expand => line(p, r, &[(0.2, 0.36), (0.5, 0.66), (0.8, 0.36)], s),
     }
 }

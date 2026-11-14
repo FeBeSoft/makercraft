@@ -16,6 +16,7 @@ use makercraft_ext_machine::{Controller, ControllerOptions, Event, MachineState,
 
 use crate::icons::Icon;
 use crate::prefs::Units;
+use crate::ribbon::{Group, Item, Tab, Tone};
 use crate::theme::{self, Palette};
 use crate::widgets::{self, Kind};
 
@@ -231,6 +232,111 @@ impl Machines {
         self.log(format!("Envoi de {name}"));
     }
 
+    /// Onglets du ruban de l'atelier.
+    pub fn ribbon(&self) -> Vec<Tab> {
+        let connected = self.connected();
+        let running = self.run == Run::Running;
+        let on = connected && !running;
+        let link = if connected {
+            Item::large("machine.deconnecter", "Déconnecter", Icon::Unplug).tip("Fermer la liaison avec la machine")
+        } else {
+            let what = if self.emulator { "l'émulateur".to_owned() } else if self.port.is_empty() { "la machine (aucun port choisi)".to_owned() } else { format!("{} à {} bauds", self.port, self.baud) };
+            Item::large("machine.connecter", "Connecter", Icon::Plug).tone(Tone::Component).tip(format!("Se connecter à {what}"))
+        };
+        vec![Tab::new(
+            "Machine",
+            vec![
+                Group { label: "Connexion", items: vec![link] },
+                Group {
+                    label: "Programme",
+                    items: vec![
+                        Item::large("machine.ouvrir", "Ouvrir .nc", Icon::Open).tone(Tone::Design).enabled(!running).tip("Charger un programme G-code"),
+                        Item::large("machine.demarrer", "Démarrer", Icon::Play).tone(Tone::Component).enabled(on && self.program.is_some()).tip("Envoyer le programme chargé"),
+                        Item::small("machine.pause", "Pause", Icon::Pause).enabled(running && !self.paused),
+                        Item::small("machine.reprise", "Reprise", Icon::Play).enabled(running && self.paused),
+                        Item::large("machine.arret", "Arrêt", Icon::Stop).tone(Tone::Danger).enabled(connected).tip("Arrêt immédiat : pause puis reset de la carte"),
+                    ],
+                },
+                Group {
+                    label: "Commandes",
+                    items: vec![
+                        Item::small("machine.origine", "Origine ($H)", Icon::Home).enabled(on).tip("Prise d'origine machine"),
+                        Item::small("machine.deverrouiller", "Déverrouiller ($X)", Icon::Unlock).enabled(on).tip("Lever l'alarme"),
+                        Item::small("machine.zero", "Zéro pièce XYZ", Icon::Zero).enabled(on).tip("La position actuelle devient X0 Y0 Z0"),
+                    ],
+                },
+            ],
+        )]
+    }
+
+    /// Exécute une commande (ruban ou cartes de l'atelier).
+    pub fn command(&mut self, id: &str, req: &mut Vec<Request>) {
+        let running = self.run == Run::Running;
+        match id {
+            "machine.connecter" if !self.connected() => {
+                let r = self.connect();
+                if r.is_ok() && !self.emulator {
+                    req.push(Request::Port(self.port.clone(), self.baud));
+                }
+                req.push(Request::Status(r.unwrap_or_else(|e| format!("Connexion impossible : {e}"))));
+            }
+            "machine.deconnecter" => {
+                self.disconnect();
+                req.push(Request::Status("Machine déconnectée".into()));
+            }
+            "machine.ouvrir" if !running => {
+                if let Some(p) = rfd::FileDialog::new().add_filter("G-code", &["nc", "gcode", "ngc", "tap", "txt"]).pick_file() {
+                    req.push(Request::Status(self.load_program(&p).unwrap_or_else(|e| format!("Programme illisible : {e}"))));
+                }
+            }
+            "machine.demarrer" if self.connected() && !running && self.program.is_some() => {
+                if self.emulator {
+                    self.start();
+                } else {
+                    self.confirm = true;
+                }
+            }
+            "machine.pause" if running && !self.paused => {
+                if let Some(c) = &self.ctrl {
+                    c.hold();
+                    self.paused = true;
+                }
+            }
+            "machine.reprise" if running && self.paused => {
+                if let Some(c) = &self.ctrl {
+                    c.cycle_start();
+                    self.paused = false;
+                }
+            }
+            "machine.arret" => {
+                if let Some(c) = &self.ctrl {
+                    c.emergency_stop();
+                    if running {
+                        self.run = Run::Aborted;
+                    }
+                    self.paused = false;
+                    self.log("Arrêt demandé (pause + reset)");
+                }
+            }
+            "machine.origine" if !running => {
+                if let Some(c) = &self.ctrl {
+                    c.home();
+                }
+            }
+            "machine.deverrouiller" if !running => {
+                if let Some(c) = &self.ctrl {
+                    c.unlock();
+                }
+            }
+            "machine.zero" if !running => {
+                if let Some(c) = &self.ctrl {
+                    c.set_work_zero(true, true, true);
+                }
+            }
+            _ => {}
+        }
+    }
+
     pub fn ui(&mut self, ui: &mut Ui, pal: &Palette, units: Units, req: &mut Vec<Request>) {
         let full = ui.available_rect_before_wrap();
         ui.allocate_rect(full, Sense::hover());
@@ -281,15 +387,10 @@ impl Machines {
             ui.add_space(4.0);
             if busy {
                 if widgets::button(ui, pal, Some(Icon::Unplug), "Déconnecter", Kind::Plain, true).clicked() {
-                    self.disconnect();
-                    req.push(Request::Status("Machine déconnectée".into()));
+                    self.command("machine.deconnecter", req);
                 }
             } else if widgets::button(ui, pal, Some(Icon::Plug), "Connecter", Kind::Component, true).clicked() {
-                let r = self.connect();
-                if r.is_ok() && !self.emulator {
-                    req.push(Request::Port(self.port.clone(), self.baud));
-                }
-                req.push(Request::Status(r.unwrap_or_else(|e| format!("Connexion impossible : {e}"))));
+                self.command("machine.connecter", req);
             }
         });
     }
@@ -381,20 +482,14 @@ impl Machines {
                 c.jog(x * self.step, y * self.step, z * self.step, self.feed);
             }
             ui.horizontal_wrapped(|ui| {
-                if widgets::button(ui, pal, Some(Icon::Home), "Origine ($H)", Kind::Plain, on).clicked()
-                    && let Some(c) = &self.ctrl
-                {
-                    c.home();
-                }
-                if widgets::button(ui, pal, Some(Icon::Unlock), "Déverrouiller ($X)", Kind::Plain, on).clicked()
-                    && let Some(c) = &self.ctrl
-                {
-                    c.unlock();
-                }
-                if widgets::button(ui, pal, Some(Icon::Zero), "Zéro pièce XYZ", Kind::Plain, on).clicked()
-                    && let Some(c) = &self.ctrl
-                {
-                    c.set_work_zero(true, true, true);
+                for (id, icon, label) in [
+                    ("machine.origine", Icon::Home, "Origine ($H)"),
+                    ("machine.deverrouiller", Icon::Unlock, "Déverrouiller ($X)"),
+                    ("machine.zero", Icon::Zero, "Zéro pièce XYZ"),
+                ] {
+                    if widgets::button(ui, pal, Some(icon), label, Kind::Plain, on).clicked() {
+                        self.command(id, &mut Vec::new());
+                    }
                 }
             });
         });
@@ -404,10 +499,8 @@ impl Machines {
         widgets::card(ui, pal, Some("Programme"), |ui| {
             ui.horizontal(|ui| {
                 let can_load = self.run != Run::Running;
-                if widgets::button(ui, pal, Some(Icon::Open), "Ouvrir un .nc...", Kind::Plain, can_load).clicked()
-                    && let Some(p) = rfd::FileDialog::new().add_filter("G-code", &["nc", "gcode", "ngc", "tap", "txt"]).pick_file()
-                {
-                    req.push(Request::Status(self.load_program(&p).unwrap_or_else(|e| format!("Programme illisible : {e}"))));
+                if widgets::button(ui, pal, Some(Icon::Open), "Ouvrir un .nc...", Kind::Plain, can_load).clicked() {
+                    self.command("machine.ouvrir", req);
                 }
                 match &self.program {
                     Some(p) => {
@@ -434,33 +527,16 @@ impl Machines {
             let running = self.run == Run::Running;
             ui.horizontal(|ui| {
                 if widgets::button(ui, pal, Some(Icon::Play), "Démarrer", Kind::Component, connected && !running && self.program.is_some()).clicked() {
-                    if self.emulator {
-                        self.start();
-                    } else {
-                        self.confirm = true;
-                    }
+                    self.command("machine.demarrer", req);
                 }
-                if widgets::button(ui, pal, Some(Icon::Pause), "Pause", Kind::Plain, running && !self.paused).clicked()
-                    && let Some(c) = &self.ctrl
-                {
-                    c.hold();
-                    self.paused = true;
+                if widgets::button(ui, pal, Some(Icon::Pause), "Pause", Kind::Plain, running && !self.paused).clicked() {
+                    self.command("machine.pause", req);
                 }
-                if widgets::button(ui, pal, Some(Icon::Play), "Reprise", Kind::Plain, running && self.paused).clicked()
-                    && let Some(c) = &self.ctrl
-                {
-                    c.cycle_start();
-                    self.paused = false;
+                if widgets::button(ui, pal, Some(Icon::Play), "Reprise", Kind::Plain, running && self.paused).clicked() {
+                    self.command("machine.reprise", req);
                 }
-                if widgets::button(ui, pal, Some(Icon::Stop), "Arrêt", Kind::Danger, connected).on_hover_text("Arrêt immédiat : pause puis reset de la carte").clicked()
-                    && let Some(c) = &self.ctrl
-                {
-                    c.emergency_stop();
-                    if running {
-                        self.run = Run::Aborted;
-                    }
-                    self.paused = false;
-                    self.log("Arrêt demandé (pause + reset)");
+                if widgets::button(ui, pal, Some(Icon::Stop), "Arrêt", Kind::Danger, connected).on_hover_text("Arrêt immédiat : pause puis reset de la carte").clicked() {
+                    self.command("machine.arret", req);
                 }
             });
         });

@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use eframe::egui::{
-    self, Align2, ColorImage, CornerRadius, Key, KeyboardShortcut, Modifiers, Rect, RichText, Sense, Stroke, TextureHandle, TextureOptions, Ui, UiBuilder, pos2,
+    self, Align2, Color32, ColorImage, CornerRadius, Key, KeyboardShortcut, Modifiers, Rect, RichText, Sense, Stroke, TextureHandle, TextureOptions, Ui, UiBuilder, pos2,
     vec2,
 };
 use makercraft_ext_api::{CommandSpec, Host};
@@ -16,16 +16,18 @@ use crate::hote::{self, CommandDialog};
 use crate::icons::{self, Icon};
 use crate::options::{self, Options, Page};
 use crate::prefs::{Prefs, ThemeChoice};
+use crate::ribbon::{self, Ribbon, Tab};
 use crate::switcher::Switcher;
 use crate::theme::{self, Palette};
 
 pub const ICON_PNG: &[u8] = include_bytes!("../../../assets/branding/makercraft-256.png");
 const ABOUT_JPG: &[u8] = include_bytes!("../../../assets/branding/makercraft-about.jpg");
 
-const TOP_H: f32 = 58.0;
+/// Barre d'accès rapide (logo, menus, document, état de la machine, options).
+const QUICK_H: f32 = 40.0;
 const STATUS_H: f32 = 30.0;
-/// Largeur réservée au sélecteur d'ateliers.
-const SWITCH_W: f32 = 300.0;
+/// Largeur du sélecteur d'ateliers, à gauche du ruban.
+const SWITCH_W: f32 = 104.0;
 
 pub struct App {
     prefs: Prefs,
@@ -35,6 +37,8 @@ pub struct App {
     menus: BTreeMap<String, Vec<CommandSpec>>,
     atelier: Atelier,
     switcher: Switcher,
+    ribbon: Ribbon,
+    logo: Option<TextureHandle>,
     cnc: cnc::Cnc,
     machines: machines::Machines,
     options: Options,
@@ -52,6 +56,8 @@ enum Action {
     Atelier(Atelier),
     Options(Page),
     Command(CommandSpec),
+    /// Commande du ruban de l'atelier actif.
+    Ribbon(&'static str),
     Quit,
 }
 
@@ -71,6 +77,8 @@ impl App {
             menus,
             atelier: atelier.unwrap_or(Atelier::CncDao),
             switcher: Switcher::default(),
+            ribbon: Ribbon::default(),
+            logo: None,
             cnc: cnc::Cnc::default(),
             machines,
             options: Options::default(),
@@ -103,6 +111,9 @@ impl App {
     }
 
     fn set_atelier(&mut self, at: Atelier) {
+        if at != self.atelier {
+            self.ribbon.tab = 0;
+        }
         self.atelier = at;
         if at == Atelier::Machines && self.machines.port.is_empty() {
             self.machines.refresh_ports();
@@ -153,6 +164,11 @@ impl App {
             return;
         }
         self.textures_tried = true;
+        if let Ok(img) = image::load_from_memory(ICON_PNG) {
+            let rgba = img.resize(64, 64, image::imageops::FilterType::Lanczos3).to_rgba8();
+            let size = [rgba.width() as usize, rgba.height() as usize];
+            self.logo = Some(ctx.load_texture("logo", ColorImage::from_rgba_unmultiplied(size, rgba.as_raw()), TextureOptions::LINEAR));
+        }
         if let Ok(img) = image::load_from_memory(ABOUT_JPG) {
             let rgba = img.to_rgba8();
             let size = [rgba.width() as usize, rgba.height() as usize];
@@ -167,6 +183,7 @@ impl App {
             Action::Atelier(at) => self.set_atelier(at),
             Action::Options(page) => self.options.show_page(&self.prefs, page),
             Action::Command(spec) => self.command = Some(CommandDialog::new(&spec)),
+            Action::Ribbon(id) => self.ribbon_command(id),
             Action::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
         }
     }
@@ -197,10 +214,13 @@ impl eframe::App for App {
 
         egui::CentralPanel::default().frame(egui::Frame::new().fill(pal.window)).show(ui, |ui| {
             let full = ui.max_rect();
-            let top = Rect::from_min_size(full.min, vec2(full.width(), TOP_H));
+            let quick = Rect::from_min_size(full.min, vec2(full.width(), QUICK_H));
+            let rib_h = if self.ribbon.collapsed { ribbon::TAB_ROW_H } else { ribbon::TAB_ROW_H + ribbon::BODY_H };
+            let rib = Rect::from_min_size(quick.left_bottom(), vec2(full.width(), rib_h));
             let status = Rect::from_min_max(pos2(full.left(), full.bottom() - STATUS_H), full.max);
-            let body = Rect::from_min_max(pos2(full.left() + 18.0, top.bottom() + 16.0), pos2(full.right() - 18.0, status.top() - 14.0));
-            self.top_bar(ui, top, pal, &mut actions);
+            let body = Rect::from_min_max(pos2(full.left() + 18.0, rib.bottom() + 16.0), pos2(full.right() - 18.0, status.top() - 14.0));
+            self.quick_bar(ui, quick, pal, &mut actions);
+            self.ribbon_area(ui, rib, pal, &mut actions);
             self.status_bar(ui, status, pal);
             let mut b = ui.new_child(UiBuilder::new().max_rect(body));
             self.body(&mut b, pal);
@@ -232,53 +252,139 @@ impl eframe::App for App {
 }
 
 impl App {
-    fn top_bar(&mut self, ui: &mut Ui, r: Rect, pal: &Palette, actions: &mut Vec<Action>) {
+    /// Barre d'accès rapide : logo et nom, menu Fichier, Ouvrir / Enregistrer / Annuler /
+    /// Rétablir, onglet du document ; à droite les menus Extensions et Aide, l'état de la
+    /// machine et les options.
+    fn quick_bar(&mut self, ui: &mut Ui, r: Rect, pal: &Palette, actions: &mut Vec<Action>) {
         let p = ui.painter().clone();
         p.rect_filled(r, CornerRadius::ZERO, pal.bar);
         p.hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, pal.bar_line));
-        // sélecteur d'ateliers, tout à gauche
-        let sw = Rect::from_min_size(pos2(r.left() + 10.0, r.top() + 6.0), vec2(SWITCH_W - 16.0, r.height() - 12.0));
-        if let Some(at) = self.switcher.ui(ui, sw, pal, self.atelier) {
-            actions.push(Action::Atelier(at));
+        let logo = Rect::from_min_size(pos2(r.left() + 12.0, r.center().y - 11.0), vec2(22.0, 22.0));
+        if let Some(t) = &self.logo {
+            p.image(t.id(), logo, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
         }
-        p.vline(r.left() + SWITCH_W + 2.0, (r.top() + 14.0)..=(r.bottom() - 14.0), Stroke::new(1.0, pal.bar_line));
-        // menus
-        let mr = Rect::from_min_max(pos2(r.left() + SWITCH_W + 14.0, r.top() + 12.0), pos2(r.right() - 330.0, r.bottom() - 12.0));
-        let mut m = ui.new_child(UiBuilder::new().max_rect(mr).layout(egui::Layout::left_to_right(egui::Align::Center)));
-        self.menus(&mut m, pal, actions);
-        // à droite : état de la machine, options
-        let gear = Rect::from_min_size(pos2(r.right() - 16.0 - 108.0, r.center().y - 17.0), vec2(108.0, 34.0));
-        let g = ui.interact(gear, ui.scope_id().with("options"), Sense::click());
+        let name = p.text(pos2(logo.right() + 8.0, r.center().y), Align2::LEFT_CENTER, "MakerCraft", theme::bold(14.5), pal.text);
+        p.vline(name.right() + 12.0, (r.top() + 11.0)..=(r.bottom() - 11.0), Stroke::new(1.0, pal.bar_line));
+        // à gauche
+        let left = Rect::from_min_max(pos2(name.right() + 18.0, r.top() + 5.0), pos2(r.center().x + 120.0, r.bottom() - 5.0));
+        let mut m = ui.new_child(UiBuilder::new().max_rect(left).layout(egui::Layout::left_to_right(egui::Align::Center)));
+        menu_style(&mut m, pal);
+        self.file_menu(&mut m, pal, actions);
+        m.add_space(6.0);
+        if quick_button(&mut m, pal, Icon::Open, "Ouvrir (Ctrl+O)", true) {
+            actions.push(Action::OpenDialog);
+        }
+        quick_button(&mut m, pal, Icon::Save, "Enregistrer : pas encore disponible", false);
+        quick_button(&mut m, pal, Icon::Undo, "Annuler : pas encore disponible", false);
+        quick_button(&mut m, pal, Icon::Redo, "Rétablir : pas encore disponible", false);
+        if self.atelier.family() == Family::Cnc
+            && let Some(n) = self.cnc.file_name()
+        {
+            m.add_space(12.0);
+            doc_tab(&mut m, pal, &n, self.atelier.family().accent(pal));
+        }
+        // à droite (de droite à gauche) : options, état de la machine, menus
+        let right = Rect::from_min_max(pos2(r.center().x + 130.0, r.top() + 5.0), pos2(r.right() - 12.0, r.bottom() - 5.0));
+        let mut rr = ui.new_child(UiBuilder::new().max_rect(right).layout(egui::Layout::right_to_left(egui::Align::Center)));
+        menu_style(&mut rr, pal);
+        let (gear, g) = rr.allocate_exact_size(vec2(100.0, 30.0), Sense::click());
         g.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Options"));
         p.rect_filled(gear, CornerRadius::same(8), if g.hovered() { pal.hover } else { pal.bar });
         p.rect_stroke(gear, CornerRadius::same(8), Stroke::new(1.0, pal.line2), egui::StrokeKind::Inside);
-        icons::paint(&p, Rect::from_min_size(pos2(gear.left() + 12.0, gear.center().y - 8.0), vec2(16.0, 16.0)), Icon::Machines, pal.weak);
-        p.text(pos2(gear.left() + 36.0, gear.center().y), Align2::LEFT_CENTER, "Options", theme::regular(14.0), pal.text);
+        icons::paint(&p, Rect::from_min_size(pos2(gear.left() + 11.0, gear.center().y - 8.0), vec2(16.0, 16.0)), Icon::Machines, pal.weak);
+        p.text(pos2(gear.left() + 34.0, gear.center().y), Align2::LEFT_CENTER, "Options", theme::regular(13.5), pal.text);
         if g.clicked() {
             actions.push(Action::Options(Page::General));
         }
+        rr.add_space(8.0);
         let connected = self.machines.connected();
-        let mc = if connected { pal.orange } else { pal.dim };
         let label = format!("Machine : {}", self.machines.state_label());
         let font = theme::regular(13.0);
         let tw = p.layout_no_wrap(label.clone(), font.clone(), pal.text).size().x;
-        let pill = Rect::from_min_size(pos2(gear.left() - 14.0 - tw - 34.0, r.center().y - 15.0), vec2(tw + 34.0, 30.0));
-        let pr = ui.interact(pill, ui.scope_id().with("etat-machine"), Sense::click());
+        let (pill, pr) = rr.allocate_exact_size(vec2(tw + 34.0, 28.0), Sense::click());
         pr.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &label));
         p.rect_filled(pill, CornerRadius::same(255), if pr.hovered() { pal.hover } else { pal.card });
         p.rect_stroke(pill, CornerRadius::same(255), Stroke::new(1.0, pal.card_line), egui::StrokeKind::Inside);
-        p.circle_filled(pos2(pill.left() + 15.0, pill.center().y), 4.0, mc);
+        p.circle_filled(pos2(pill.left() + 15.0, pill.center().y), 4.0, if connected { pal.orange } else { pal.dim });
         p.text(pos2(pill.left() + 26.0, pill.center().y), Align2::LEFT_CENTER, label, font, if connected { pal.text } else { pal.weak });
         if pr.clicked() {
             actions.push(Action::Atelier(Atelier::Machines));
         }
+        rr.add_space(10.0);
+        self.help_menu(&mut rr, actions);
+        self.extensions_menu(&mut rr, actions);
     }
 
-    fn menus(&self, m: &mut Ui, pal: &Palette, actions: &mut Vec<Action>) {
-        m.spacing_mut().button_padding = vec2(10.0, 5.0);
-        m.spacing_mut().item_spacing.x = 4.0;
-        m.visuals_mut().widgets.inactive.bg_stroke = Stroke::NONE;
-        m.visuals_mut().widgets.inactive.weak_bg_fill = pal.bar;
+    /// Ruban : grand sélecteur d'ateliers à gauche, onglets et groupes de l'atelier actif.
+    fn ribbon_area(&mut self, ui: &mut Ui, r: Rect, pal: &Palette, actions: &mut Vec<Action>) {
+        let p = ui.painter().clone();
+        p.rect_filled(r, CornerRadius::ZERO, pal.bar);
+        p.hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, pal.bar_line));
+        let sw = Rect::from_min_size(pos2(r.left() + 6.0, r.top() + 4.0), vec2(SWITCH_W - 12.0, r.height() - 8.0));
+        if let Some(at) = self.switcher.ui(ui, sw, pal, self.atelier) {
+            actions.push(Action::Atelier(at));
+        }
+        p.vline(r.left() + SWITCH_W, (r.top() + 6.0)..=(r.bottom() - 6.0), Stroke::new(1.0, pal.bar_line));
+        let tabs = self.ribbon_tabs();
+        let collapsed = self.ribbon.collapsed;
+        let tr = Rect::from_min_max(pos2(r.left() + SWITCH_W + 6.0, r.top()), pos2(r.right() - 6.0, r.top() + ribbon::TAB_ROW_H));
+        self.ribbon.tabs_ui(ui, tr, pal, &tabs, self.atelier.family().accent(pal));
+        if !collapsed {
+            p.hline(tr.left()..=r.right(), tr.bottom() - 0.5, Stroke::new(1.0, pal.bar_line));
+            let br = Rect::from_min_max(pos2(tr.left(), tr.bottom()), pos2(r.right() - 6.0, r.bottom()));
+            if let Some(id) = self.ribbon.body_ui(ui, br, pal, &tabs) {
+                actions.push(Action::Ribbon(id));
+            }
+        }
+    }
+
+    fn ribbon_tabs(&self) -> Vec<Tab> {
+        match self.atelier {
+            Atelier::CncDao | Atelier::CncFao => self.cnc.ribbon(self.atelier),
+            Atelier::Machines => self.machines.ribbon(),
+            _ => vec![Tab { label: "Accueil", groups: Vec::new(), empty_note: "Cet atelier arrive dans une prochaine version : son ruban est vide pour l'instant." }],
+        }
+    }
+
+    fn ribbon_command(&mut self, id: &str) {
+        if id.starts_with("cnc.") {
+            let mut req = Vec::new();
+            self.cnc.command(id, &mut req);
+            self.cnc_requests(req);
+        } else if id.starts_with("machine.") {
+            let mut req = Vec::new();
+            self.machines.command(id, &mut req);
+            self.machines_requests(req);
+        }
+    }
+
+    fn cnc_requests(&mut self, req: Vec<cnc::Request>) {
+        for r in req {
+            match r {
+                cnc::Request::OpenDialog => self.open_dialog(),
+                cnc::Request::RecentDir(d) => {
+                    self.prefs.add_recent_dir(&d);
+                    self.save_prefs();
+                }
+                cnc::Request::Status(s) => self.status = s,
+            }
+        }
+    }
+
+    fn machines_requests(&mut self, req: Vec<machines::Request>) {
+        for r in req {
+            match r {
+                machines::Request::Status(s) => self.status = s,
+                machines::Request::Port(port, baud) => {
+                    self.prefs.port = port;
+                    self.prefs.baud = baud;
+                    self.save_prefs();
+                }
+            }
+        }
+    }
+
+    fn file_menu(&self, m: &mut Ui, pal: &Palette, actions: &mut Vec<Action>) {
         m.menu_button("Fichier", |ui| {
             if ui.add(egui::Button::new("Ouvrir...").shortcut_text("Ctrl+O")).clicked() {
                 actions.push(Action::OpenDialog);
@@ -306,6 +412,9 @@ impl App {
                 ui.close();
             }
         });
+    }
+
+    fn extensions_menu(&self, m: &mut Ui, actions: &mut Vec<Action>) {
         m.menu_button("Extensions", |ui| {
             let mut groups: BTreeMap<&str, Vec<(&str, &CommandSpec)>> = BTreeMap::new();
             for (path, cmds) in &self.menus {
@@ -326,6 +435,9 @@ impl App {
                 });
             }
         });
+    }
+
+    fn help_menu(&self, m: &mut Ui, actions: &mut Vec<Action>) {
         m.menu_button("Aide", |ui| {
             if ui.button("À propos de MakerCraft").clicked() {
                 actions.push(Action::Options(Page::About));
@@ -365,32 +477,52 @@ impl App {
             Atelier::CncDao | Atelier::CncFao => {
                 let mut req = Vec::new();
                 self.cnc.ui(ui, pal, units, self.atelier, &mut req);
-                for r in req {
-                    match r {
-                        cnc::Request::OpenDialog => self.open_dialog(),
-                        cnc::Request::RecentDir(d) => {
-                            self.prefs.add_recent_dir(&d);
-                            self.save_prefs();
-                        }
-                        cnc::Request::Status(s) => self.status = s,
-                    }
-                }
+                self.cnc_requests(req);
             }
             Atelier::Machines => {
                 let mut req = Vec::new();
                 self.machines.ui(ui, pal, units, &mut req);
-                for r in req {
-                    match r {
-                        machines::Request::Status(s) => self.status = s,
-                        machines::Request::Port(port, baud) => {
-                            self.prefs.port = port;
-                            self.prefs.baud = baud;
-                            self.save_prefs();
-                        }
-                    }
-                }
+                self.machines_requests(req);
             }
             at => ateliers::soon_screen(ui, pal, at),
         }
+    }
+}
+
+/// Menus de la barre d'accès rapide : sans cadre, fond de la barre.
+fn menu_style(m: &mut Ui, pal: &Palette) {
+    m.spacing_mut().button_padding = vec2(10.0, 5.0);
+    m.spacing_mut().item_spacing.x = 4.0;
+    m.visuals_mut().widgets.inactive.bg_stroke = Stroke::NONE;
+    m.visuals_mut().widgets.inactive.weak_bg_fill = pal.bar;
+}
+
+/// Petit bouton à icône de la barre d'accès rapide ; renvoie vrai s'il a été cliqué.
+fn quick_button(ui: &mut Ui, pal: &Palette, icon: Icon, tip: &str, enabled: bool) -> bool {
+    let (r, resp) = ui.allocate_exact_size(vec2(30.0, 28.0), if enabled { Sense::click() } else { Sense::hover() });
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, tip));
+    let p = ui.painter();
+    if enabled && resp.hovered() {
+        p.rect_filled(r, CornerRadius::same(6), pal.hover);
+    }
+    icons::paint(p, Rect::from_center_size(r.center(), vec2(16.0, 16.0)), icon, if enabled { pal.text } else { theme::alpha(pal.dim, 0.7) });
+    let resp = resp.on_hover_text(tip);
+    enabled && resp.clicked()
+}
+
+/// Onglet du document ouvert.
+fn doc_tab(ui: &mut Ui, pal: &Palette, name: &str, accent: Color32) {
+    let shown: String = if name.chars().count() > 36 { format!("{}...", name.chars().take(34).collect::<String>()) } else { name.to_owned() };
+    let font = theme::regular(13.0);
+    let tw = ui.painter().layout_no_wrap(shown.clone(), font.clone(), pal.text).size().x;
+    let (r, resp) = ui.allocate_exact_size(vec2(tw + 40.0, 28.0), Sense::hover());
+    let p = ui.painter();
+    p.rect_filled(r, CornerRadius::same(7), pal.card);
+    p.rect_stroke(r, CornerRadius::same(7), Stroke::new(1.0, pal.card_line), egui::StrokeKind::Inside);
+    p.rect_filled(Rect::from_min_max(pos2(r.left() + 8.0, r.top()), pos2(r.right() - 8.0, r.top() + 2.0)), CornerRadius::same(1), accent);
+    icons::paint(p, Rect::from_min_size(pos2(r.left() + 10.0, r.center().y - 7.0), vec2(14.0, 14.0)), Icon::File, accent);
+    p.text(pos2(r.left() + 30.0, r.center().y), Align2::LEFT_CENTER, shown, font, pal.text);
+    if name.chars().count() > 36 {
+        resp.on_hover_text(name);
     }
 }

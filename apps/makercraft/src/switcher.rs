@@ -27,17 +27,30 @@ impl Switcher {
             p.rect_filled(rect, CornerRadius::same(9), pal.hover);
         }
         let accent = current.family().accent(pal);
-        let tile = Rect::from_min_size(pos2(rect.left() + 6.0, rect.center().y - 17.0), vec2(34.0, 34.0));
-        p.rect_filled(tile, CornerRadius::same(8), theme::mix(pal.card, accent, 0.18));
-        p.rect_stroke(tile, CornerRadius::same(8), Stroke::new(1.0, theme::mix(pal.card, accent, 0.45)), egui::StrokeKind::Inside);
-        icons::paint(p, tile.shrink(8.0), current.family().icon(), accent);
-        let x = tile.right() + 11.0;
-        p.text(pos2(x, rect.center().y - 9.0), Align2::LEFT_CENTER, "ATELIER", theme::bold(10.5), pal.dim);
-        let t = p.text(pos2(x, rect.center().y + 8.0), Align2::LEFT_CENTER, current.title(), theme::bold(14.5), pal.text);
-        // chevron
-        let c = pos2(t.right() + 12.0, rect.center().y + 8.0);
         let d = if self.open { -3.5 } else { 3.5 };
-        p.add(Shape::line(vec![c + vec2(-4.5, -d * 0.6), c + vec2(0.0, d * 0.6), c + vec2(4.5, -d * 0.6)], Stroke::new(1.6, pal.weak)));
+        let chevron = |c: egui::Pos2| p.add(Shape::line(vec![c + vec2(-4.0, -d * 0.6), c + vec2(0.0, d * 0.6), c + vec2(4.0, -d * 0.6)], Stroke::new(1.6, pal.weak)));
+        if rect.height() >= 80.0 {
+            // grand sélecteur du ruban : tuile, nom de l'atelier, « Atelier » et chevron
+            let tile = Rect::from_center_size(pos2(rect.center().x, rect.top() + 32.0), vec2(42.0, 42.0));
+            p.rect_filled(tile, CornerRadius::same(10), theme::mix(pal.card, accent, 0.18));
+            p.rect_stroke(tile, CornerRadius::same(10), Stroke::new(1.0, theme::mix(pal.card, accent, 0.45)), egui::StrokeKind::Inside);
+            icons::paint(p, tile.shrink(10.0), current.family().icon(), accent);
+            let mut job = egui::text::LayoutJob::simple(current.label().to_owned(), theme::bold(13.0), pal.text, rect.width() - 8.0);
+            job.halign = egui::Align::Center;
+            job.wrap.max_rows = 2;
+            let g = p.layout_job(job);
+            let gh = g.size().y;
+            p.galley(pos2(rect.center().x, tile.bottom() + 7.0), g, pal.text);
+            let y = tile.bottom() + 7.0 + gh + 10.0;
+            let t = p.text(pos2(rect.center().x - 5.0, y), Align2::CENTER_CENTER, "Atelier", theme::regular(11.5), pal.weak);
+            chevron(pos2(t.right() + 8.0, y));
+        } else {
+            let tile = Rect::from_min_size(pos2(rect.left() + 6.0, rect.center().y - 12.0), vec2(24.0, 24.0));
+            p.rect_filled(tile, CornerRadius::same(6), theme::mix(pal.card, accent, 0.18));
+            icons::paint(p, tile.shrink(5.0), current.family().icon(), accent);
+            let t = p.text(pos2(tile.right() + 9.0, rect.center().y), Align2::LEFT_CENTER, current.label(), theme::bold(13.0), pal.text);
+            chevron(pos2(t.right() + 10.0, rect.center().y));
+        }
         if resp.clicked() {
             self.open = !self.open;
         }

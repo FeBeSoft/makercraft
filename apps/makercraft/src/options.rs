@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use eframe::egui::{self, Align2, Color32, CornerRadius, Rect, RichText, ScrollArea, Sense, Stroke, TextureHandle, Ui, UiBuilder, pos2, vec2};
 use makercraft_ext_api::{CommandSpec, Host};
 
+use crate::about;
 use crate::icons::{self, Icon};
 use crate::prefs::{Prefs, ThemeChoice, Units};
 use crate::theme::{self, Palette};
@@ -36,7 +37,7 @@ impl Page {
             Self::General => &["Interface", "Démarrage"],
             Self::Files => &["Dossiers", "Récents"],
             Self::Extension(_) => &["Commandes"],
-            Self::About => &["Logiciel", "Sources", "Licence"],
+            Self::About => &["Auteur", "Remerciements", "Droits d'auteur", "Sources", "Mises à jour", "Contact"],
         }
     }
 }
@@ -237,9 +238,15 @@ impl Options {
                 (Page::Files, 0) => self.files(ui, pal),
                 (Page::Files, _) => self.recents(ui, pal),
                 (Page::Extension(i), _) => out = extension(ui, pal, host, i),
-                (Page::About, 0) => about_software(ui, pal, host, about_img),
-                (Page::About, 1) => about_sources(ui, pal),
-                (Page::About, _) => about_license(ui, pal),
+                (Page::About, 0) => about_author(ui, pal, host, about_img),
+                (Page::About, 1) => {
+                    ui.add_space(4.0);
+                    text_box(ui, pal, about::THANKS);
+                }
+                (Page::About, 2) => about_rights(ui, pal),
+                (Page::About, 3) => about_sources(ui, pal),
+                (Page::About, 4) => about_updates(ui, pal),
+                (Page::About, _) => about_contact(ui, pal),
             }
         });
         out
@@ -377,11 +384,43 @@ fn extension(ui: &mut Ui, pal: &Palette, host: &Host, i: usize) -> Option<Outcom
     out
 }
 
-fn about_software(ui: &mut Ui, pal: &Palette, host: &Host, img: Option<&TextureHandle>) {
+/// Texte long dans un cadre en retrait, avec défilement si besoin.
+fn text_box(ui: &mut Ui, pal: &Palette, text: &str) {
+    egui::Frame::new()
+        .fill(pal.panel)
+        .stroke(Stroke::new(1.0, pal.card_line))
+        .corner_radius(CornerRadius::same(8))
+        .inner_margin(egui::Margin::same(14))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.add(egui::Label::new(RichText::new(text).size(13.5).color(pal.text)).wrap());
+        });
+}
+
+/// Ligne « clé : valeur » de la fiche de l'auteur ; `url` vide : texte simple, `None` : « bientôt ».
+fn kv(ui: &mut Ui, pal: &Palette, key: &str, value: Option<(&str, &str)>) {
+    ui.horizontal(|ui| {
+        let (r, _) = ui.allocate_exact_size(vec2(84.0, 18.0), Sense::hover());
+        ui.painter().text(r.left_center(), Align2::LEFT_CENTER, key, theme::regular(13.0), pal.weak);
+        match value {
+            Some((text, "")) => {
+                ui.label(RichText::new(text).size(13.5));
+            }
+            Some((text, url)) => {
+                ui.hyperlink_to(RichText::new(text).size(13.5).color(pal.blue), url);
+            }
+            None => {
+                ui.label(RichText::new("bientôt").size(13.5).color(pal.dim));
+            }
+        }
+    });
+}
+
+fn about_author(ui: &mut Ui, pal: &Palette, host: &Host, img: Option<&TextureHandle>) {
     if let Some(t) = img {
         let w = ui.available_width();
         let s = t.size_vec2();
-        let h = (w * s.y / s.x.max(1.0)).min(190.0);
+        let h = (w * s.y / s.x.max(1.0)).min(170.0);
         let (r, _) = ui.allocate_exact_size(vec2(w, h), Sense::hover());
         // recadrage centré de l'illustration sur toute la largeur
         let vis = (h / (w * s.y / s.x.max(1.0))).min(1.0);
@@ -393,39 +432,75 @@ fn about_software(ui: &mut Ui, pal: &Palette, host: &Host, img: Option<&TextureH
         ui.label(RichText::new("MakerCraft").font(theme::bold(20.0)));
         widgets::pill(ui, concat!("v", env!("CARGO_PKG_VERSION")), pal.blue_soft, pal.blue);
     });
-    ui.label(RichText::new("Moteur 2D/3D à ateliers pour le fablab et l'enseignement de la Technologie : DAO, CAO, FAO et pilotage de machines.").color(pal.weak));
-    ui.add_space(4.0);
-    widgets::option_row(ui, pal, "Auteur", "Emmanuel Firre (FeBe) - fe-be.fr", |_| {});
-    widgets::option_row(ui, pal, "Licence", "GPL-3.0-or-later", |_| {});
-    let exts: Vec<String> = host.extensions().iter().map(|(id, l)| format!("{id} ({l})")).collect();
-    widgets::option_row(ui, pal, "Extensions chargées", &exts.join(", "), |_| {});
+    ui.label(RichText::new(about::TAGLINE).color(pal.weak));
+    ui.add_space(6.0);
+    kv(ui, pal, "Auteur", Some((about::AUTHOR, "")));
+    kv(ui, pal, "Droits", Some((about::COPYRIGHT, "")));
+    kv(ui, pal, "Licence", Some((about::LICENSE, "")));
+    let mail = format!("mailto:{}?subject=MakerCraft", about::CONTACT);
+    kv(ui, pal, "Contact", Some((about::CONTACT, mail.as_str())));
+    kv(ui, pal, "Site", Some(("makercraft.fe-be.fr", about::SITE)));
+    kv(ui, pal, "Facebook", Some(("FeBeSoft", about::FACEBOOK)));
+    kv(ui, pal, "Patreon", Some(("FeBeSoft", about::PATREON)));
+    kv(ui, pal, "GitHub", if about::GITHUB.is_empty() { None } else { Some((about::GITHUB, about::GITHUB)) });
+    let exts: Vec<&str> = host.extensions().iter().map(|e| e.0).collect();
+    let exts = exts.join(", ");
+    kv(ui, pal, "Extensions", Some((exts.as_str(), "")));
+    ui.add_space(8.0);
+    text_box(ui, pal, &format!("{}\n\n{}", about::BIO.trim(), about::ORIGIN));
+    ui.add_space(8.0);
+    ui.horizontal(|ui| {
+        if widgets::button(ui, pal, Some(Icon::Open), "Site web", Kind::Plain, true).clicked() {
+            ui.ctx().open_url(egui::OpenUrl::new_tab(about::SITE));
+        }
+        if widgets::button(ui, pal, None, "Copier les informations de version", Kind::Plain, true).clicked() {
+            ui.ctx().copy_text(about::version_info());
+        }
+    });
 }
 
 fn about_sources(ui: &mut Ui, pal: &Palette) {
-    for (name, what, url) in [
-        ("CadCraft 0.20.1", "MIT/Apache, utilisé tel quel : lecture DXF (cadcraft-dxf).", "github.com/storytold/cadcraft"),
-        ("SolidCraft 0.41.0", "MIT/Apache, utilisé tel quel : noyau B-rep, STEP (solidcraft-kernel).", "github.com/tangency-labs/solidcraft"),
-        ("LaserGRBL 7.14.1", "GPLv3, porté : pilotage Grbl, émulateur.", "github.com/arkypita/LaserGRBL"),
-        ("Candle", "GPLv3, porté : G-code, carte de hauteur.", "github.com/Denvi/Candle"),
-        ("Universal G-Code Sender 2.1.27", "GPLv3, porté : architecture du contrôleur.", "github.com/winder/Universal-G-Code-Sender"),
-        ("egui / eframe 0.37", "MIT/Apache : interface graphique.", "github.com/emilk/egui"),
-    ] {
+    for (name, what, url) in about::SOURCES {
         widgets::option_row(ui, pal, name, what, |ui| {
-            ui.label(RichText::new(url).font(theme::mono(12.0)).color(pal.blue));
+            ui.hyperlink_to(RichText::new(url.trim_start_matches("https://")).font(theme::mono(12.0)).color(pal.blue), *url);
         });
     }
 }
 
-fn about_license(ui: &mut Ui, pal: &Palette) {
-    ui.label(
-        RichText::new(
-            "MakerCraft est un logiciel libre : vous pouvez le redistribuer et le modifier selon les termes de la licence publique générale GNU (GPL) version 3 ou toute version ultérieure, publiée par la Free Software Foundation.\n\nIl est distribué dans l'espoir d'être utile, mais SANS AUCUNE GARANTIE, sans même la garantie implicite d'une valeur marchande ou d'une adéquation à un usage particulier.\n\nLes composants MIT/Apache intégrés (CadCraft, SolidCraft, egui) gardent leur licence. Projet indépendant, non affilié à ArtCraft ni aux auteurs de SolidCraft.",
-        )
-        .size(13.5)
-        .color(pal.text),
+fn about_rights(ui: &mut Ui, pal: &Palette) {
+    ui.add_space(4.0);
+    text_box(ui, pal, about::RIGHTS);
+    ui.add_space(6.0);
+    ui.horizontal(|ui| {
+        ui.label(RichText::new("Texte intégral : fichier LICENSE ·").size(12.5).color(pal.weak));
+        ui.hyperlink_to(RichText::new("gnu.org/licenses/gpl-3.0").size(12.5).color(pal.blue), "https://www.gnu.org/licenses/gpl-3.0.html");
+    });
+}
+
+fn about_updates(ui: &mut Ui, pal: &Palette) {
+    widgets::option_row(ui, pal, "MakerCraft", concat!("v", env!("CARGO_PKG_VERSION"), " (alpha)"), |_| {});
+    widgets::option_row(ui, pal, "CadCraft, SolidCraft", "0.20.1 et 0.41.0, dernières releases stables à la compilation", |_| {});
+    widgets::option_row(ui, pal, "egui / eframe", "0.37", |_| {});
+    ui.add_space(6.0);
+    text_box(
+        ui,
+        pal,
+        "Tant que le dépôt n'est pas publié, les mises à jour se font à la main : récupérer les sources dans H:\\_src\\makercraft puis cargo build --release -p makercraft.",
     );
+}
+
+fn about_contact(ui: &mut Ui, pal: &Palette) {
+    ui.add_space(4.0);
+    text_box(ui, pal, "Pour une idée, un atelier à ajouter ou un problème, écris à l'adresse ci-dessous en joignant les informations de version.");
     ui.add_space(8.0);
-    ui.label(RichText::new("Texte intégral : fichier LICENSE, ou gnu.org/licenses/gpl-3.0").size(12.5).color(pal.weak));
+    ui.horizontal(|ui| {
+        if widgets::button(ui, pal, None, about::CONTACT, Kind::Primary, true).clicked() {
+            ui.ctx().open_url(egui::OpenUrl::new_tab(format!("mailto:{}?subject=MakerCraft", about::CONTACT)));
+        }
+        if widgets::button(ui, pal, None, "Copier les informations de version", Kind::Plain, true).clicked() {
+            ui.ctx().copy_text(about::version_info());
+        }
+    });
 }
 
 #[cfg(test)]

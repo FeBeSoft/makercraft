@@ -51,11 +51,21 @@ types MakerCraft (`Drawing`, `StepSummary`) ; aucun autre crate ne voit CadCraft
 ```
 apps/makercraft/src/
   main.rs        fenêtre (taille 1360 x 860, minimum 1024 x 680), icône, polices
-  app.rs         barre du haut (sélecteur d'ateliers, menus, état machine, Options), barre d'état
+  app.rs         barre d'accès rapide (logo, Fichier, Ouvrir, Enregistrer / Annuler / Rétablir
+                 grisés, onglet du document ; à droite Extensions, Aide, état machine, Options),
+                 ruban, barre d'état
+  ribbon.rs      ruban façon SolidCraft / DraftSight : onglets, groupes nommés (nom en bas,
+                 séparateurs), grands boutons libellé dessous, petits empilés par trois,
+                 bascules ; repliable (double-clic sur l'onglet actif ou chevron). Chaque atelier
+                 fournit ses onglets (`ribbon()`) et exécute les commandes (`command(id)`)
   switcher.rs    sélecteur d'ateliers façon « espace de travail » de SolidCraft (CATIA, SolidWorks) :
-                 bouton en haut à gauche, liste des ateliers, ceux à venir grisés
+                 grand bouton à gauche du ruban, liste des ateliers, ceux à venir grisés
   options.rs     fenêtre Options façon GravéoCraft : catégories à gauche, onglets, une ligne par
                  réglage, Réinitialiser / Annuler / Appliquer ; une page par extension ; À propos
+                 en six onglets (Auteur, Remerciements, Droits d'auteur, Sources, Mises à jour,
+                 Contact), sur le modèle d'UIdeCraft
+  about.rs       textes de l'À propos ; la bio de l'auteur vient de H:\_src\_commun\auteur\bio.txt,
+                 copiée par build.rs (repli : assets/bio.txt)
   hote.rs        hôte d'extensions : machine, c2d, cam, dao, cao ; menu « Extensions » construit
                  depuis les CommandSpec ; fenêtre d'exécution d'une commande (paramètres JSON)
   ateliers/      mod.rs (familles CNC / Laser / PCB / Machines, écran « à venir »),

@@ -45,10 +45,15 @@ MakerCraft rouvre le dernier atelier utilisé.
 | Laser, PCB | à venir |
 | Machines | Grbl 1.1 / grblHAL par l'émulateur (choix par défaut) ou un port série : état et position, déplacement manuel, origine, zéro pièce, envoi d'un `.nc` avec progression, pause, reprise, arrêt, console |
 
+Interface : une barre d'accès rapide (Fichier, Ouvrir, document ouvert, état de la machine,
+Options) puis un **ruban** dont les onglets et groupes changent avec l'atelier, choisi par le grand
+bouton **Atelier** à gauche du ruban. Le ruban se replie par double-clic sur l'onglet actif.
+
 Menu **Extensions** : toutes les commandes des extensions chargées, exécutables avec leurs
 paramètres JSON. Bouton **Options** (comme dans GravéoCraft) : thème (sombre par défaut ou clair),
 unités, démarrage, dossiers et fichiers récents (`%APPDATA%\FeBe\MakerCraft\preferences.json`),
-une page par extension avec ses commandes, et l'À propos (logiciel, sources, licence).
+une page par extension avec ses commandes, et l'À propos (auteur, remerciements, droits d'auteur,
+sources, mises à jour, contact).
 
 Sûreté : avant d'envoyer un programme à une vraie machine, MakerCraft demande confirmation ;
 **Arrêt** fait une pause puis un reset de la carte.
