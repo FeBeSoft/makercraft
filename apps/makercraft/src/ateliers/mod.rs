@@ -25,33 +25,12 @@ pub enum Family {
 }
 
 impl Family {
-    pub const ALL: [Family; 4] = [Family::Cnc, Family::Laser, Family::Pcb, Family::Machines];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Cnc => "CNC",
-            Self::Laser => "Laser",
-            Self::Pcb => "PCB",
-            Self::Machines => "Machines",
-        }
-    }
-
     pub fn icon(self) -> Icon {
         match self {
             Self::Cnc => Icon::Cnc,
             Self::Laser => Icon::Laser,
             Self::Pcb => Icon::Pcb,
             Self::Machines => Icon::Machines,
-        }
-    }
-
-    /// Atelier ouvert quand on choisit la famille.
-    pub fn default_atelier(self) -> Atelier {
-        match self {
-            Self::Cnc => Atelier::CncDao,
-            Self::Laser => Atelier::Laser,
-            Self::Pcb => Atelier::Pcb,
-            Self::Machines => Atelier::Machines,
         }
     }
 }
@@ -68,8 +47,62 @@ pub enum Atelier {
     Machines,
 }
 
+impl Family {
+    /// Couleur d'accent de la famille (tuile du menu des ateliers, barre d'état).
+    pub fn accent(self, pal: &crate::theme::Palette) -> eframe::egui::Color32 {
+        match self {
+            Self::Cnc => pal.blue,
+            Self::Laser => pal.red,
+            Self::Pcb => pal.green,
+            Self::Machines => pal.orange,
+        }
+    }
+}
+
 impl Atelier {
-    pub const CNC: [Atelier; 4] = [Atelier::CncDao, Atelier::CncFao, Atelier::CncUsinage3d, Atelier::CncGravure];
+    /// Tous les ateliers, dans l'ordre du menu.
+    pub const ALL: [Atelier; 7] =
+        [Atelier::CncDao, Atelier::CncFao, Atelier::CncUsinage3d, Atelier::CncGravure, Atelier::Laser, Atelier::Pcb, Atelier::Machines];
+
+    /// Identifiant stable (préférences, ligne de commande).
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::CncDao => "cnc.dao",
+            Self::CncFao => "cnc.fao",
+            Self::CncUsinage3d => "cnc.usinage3d",
+            Self::CncGravure => "cnc.gravure",
+            Self::Laser => "laser",
+            Self::Pcb => "pcb",
+            Self::Machines => "machines",
+        }
+    }
+
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|a| a.id() == id)
+    }
+
+    /// Une ligne : à quoi sert l'atelier (menu des ateliers).
+    pub fn description(self) -> &'static str {
+        match self {
+            Self::CncDao => "Dessiner et préparer les pièces, lire les projets et modèles.",
+            Self::CncFao => "Parcours d'outil, vérifications et G-code pour la fraiseuse.",
+            Self::CncUsinage3d => "Reliefs et pièces 3D à partir des modèles SolidCraft.",
+            Self::CncGravure => "Gravure d'images en niveaux de gris.",
+            Self::Laser => "Découpe et gravure au laser, vectorielle et ligne à ligne.",
+            Self::Pcb => "Circuits imprimés à la fraiseuse : isolation et perçage.",
+            Self::Machines => "Piloter les machines et leurs périphériques.",
+        }
+    }
+
+    /// Ce que contient l'atelier (menu des ateliers) ; vide pour un atelier à venir.
+    pub fn contents(self) -> &'static str {
+        match self {
+            Self::CncDao => "Vue 2D · Calques · .c2d, DXF, STEP",
+            Self::CncFao => "Parcours · Vérifications · Trajectoires · Export .nc",
+            Self::Machines => "Connexion · État · Déplacement · Programme · Console",
+            Self::CncUsinage3d | Self::CncGravure | Self::Laser | Self::Pcb => "",
+        }
+    }
 
     pub fn family(self) -> Family {
         match self {
@@ -165,13 +198,20 @@ mod tests {
 
     #[test]
     fn every_atelier_belongs_to_its_family() {
-        for f in Family::ALL {
-            assert_eq!(f.default_atelier().family(), f);
-        }
-        for a in Atelier::CNC {
+        for a in [Atelier::CncDao, Atelier::CncFao, Atelier::CncUsinage3d, Atelier::CncGravure] {
             assert_eq!(a.family(), Family::Cnc);
         }
         assert_eq!(Atelier::CncFao.title(), "CNC - FAO fraiseuse");
+    }
+
+    #[test]
+    fn ids_roundtrip_and_available_ateliers_describe_their_contents() {
+        for a in Atelier::ALL {
+            assert_eq!(Atelier::from_id(a.id()), Some(a));
+            assert!(!a.description().is_empty());
+            assert_eq!(a.available(), !a.contents().is_empty(), "{a:?}");
+        }
+        assert_eq!(Atelier::from_id("inconnu"), None);
     }
 
     #[test]

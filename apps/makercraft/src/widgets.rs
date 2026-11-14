@@ -15,12 +15,55 @@ pub fn card<R>(ui: &mut Ui, pal: &Palette, title: Option<&str>, add: impl FnOnce
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             if let Some(t) = title {
-                ui.label(RichText::new(t).font(theme::bold(15.0)).color(pal.text));
-                ui.add_space(2.0);
+                section_title(ui, pal, t);
             }
             add(ui)
         })
         .inner
+}
+
+/// Titre de section en petites capitales discrètes (« DOCUMENT », « CALQUES »...).
+pub fn section_title(ui: &mut Ui, pal: &Palette, t: &str) {
+    ui.label(RichText::new(t.to_uppercase()).font(theme::bold(11.5)).color(pal.weak).extra_letter_spacing(0.9));
+    ui.add_space(2.0);
+}
+
+/// Interrupteur (bascule) ; renvoie la réponse cliquée quand l'état change.
+pub fn switch(ui: &mut Ui, pal: &Palette, on: &mut bool, label: &str) -> Response {
+    let (rect, mut resp) = ui.allocate_exact_size(vec2(38.0, 20.0), Sense::click());
+    if resp.clicked() {
+        *on = !*on;
+        resp.mark_changed();
+    }
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Switch, true, *on, label));
+    let p = ui.painter();
+    let t = ui.ctx().animate_bool(resp.id, *on);
+    let bg = theme::mix(pal.line2, pal.blue, t);
+    p.rect_filled(rect, CornerRadius::same(255), bg);
+    let x = rect.left() + 10.0 + t * (rect.width() - 20.0);
+    p.circle_filled(pos2(x, rect.center().y), 7.0, if *on { pal.on_blue } else { pal.text });
+    resp
+}
+
+/// Ligne d'options façon GravéoCraft : libellé et explication à gauche, réglage à droite,
+/// filet de séparation dessous.
+pub fn option_row(ui: &mut Ui, pal: &Palette, label: &str, help: &str, control: impl FnOnce(&mut Ui)) {
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        let w = (ui.available_width() - 260.0).max(200.0);
+        ui.vertical(|ui| {
+            ui.set_width(w);
+            ui.label(RichText::new(label).font(theme::regular(14.0)).color(pal.text));
+            if !help.is_empty() {
+                ui.add(egui::Label::new(RichText::new(help).size(12.0).color(pal.weak)).wrap());
+            }
+        });
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), control);
+    });
+    ui.add_space(4.0);
+    let r = ui.available_rect_before_wrap();
+    ui.painter().hline(r.x_range(), r.top(), Stroke::new(1.0, pal.card_line));
+    ui.add_space(2.0);
 }
 
 /// Style d'un bouton.
@@ -81,50 +124,6 @@ pub fn button(ui: &mut Ui, pal: &Palette, icon: Option<Icon>, text: &str, kind: 
     if !text.is_empty() {
         p.text(pos2(x, rect.center().y), Align2::LEFT_CENTER, text, font, fg);
     }
-    resp
-}
-
-/// Onglet d'atelier (icône + nom), surligné quand actif.
-pub fn tab(ui: &mut Ui, pal: &Palette, icon: Icon, text: &str, active: bool, soon: bool) -> Response {
-    let font = theme::bold(14.5);
-    let tw = ui.painter().layout_no_wrap(text.to_owned(), font.clone(), pal.text).size().x;
-    let (rect, resp) = ui.allocate_exact_size(vec2(tw + 52.0, 40.0), Sense::click());
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, true, active, text));
-    let p = ui.painter();
-    let (bg, fg) = if active {
-        (pal.blue, pal.on_blue)
-    } else if resp.hovered() {
-        (pal.blue_soft, pal.text)
-    } else {
-        (Color32::TRANSPARENT, if soon { pal.weak } else { pal.text })
-    };
-    p.rect_filled(rect, CornerRadius::same(10), bg);
-    icons::paint(p, Rect::from_min_size(pos2(rect.left() + 12.0, rect.center().y - 10.0), vec2(20.0, 20.0)), icon, fg);
-    p.text(pos2(rect.left() + 40.0, rect.center().y), Align2::LEFT_CENTER, text, font, fg);
-    resp
-}
-
-/// Segment d'un sélecteur (sous-atelier) ; `soon` : affiché atténué.
-pub fn segment(ui: &mut Ui, pal: &Palette, text: &str, active: bool, soon: bool) -> Response {
-    let font = theme::regular(13.5);
-    let tw = ui.painter().layout_no_wrap(text.to_owned(), font.clone(), pal.text).size().x;
-    let (rect, resp) = ui.allocate_exact_size(vec2(tw + 26.0, 32.0), Sense::click());
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, true, active, text));
-    let p = ui.painter();
-    if active {
-        p.rect_filled(rect, CornerRadius::same(8), pal.card);
-        p.rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.5, pal.blue), StrokeKind::Inside);
-    } else if resp.hovered() {
-        p.rect_filled(rect, CornerRadius::same(8), pal.blue_soft);
-    }
-    let fg = if active {
-        pal.blue
-    } else if soon {
-        pal.weak
-    } else {
-        pal.text
-    };
-    p.text(rect.center(), Align2::CENTER_CENTER, text, if active { theme::bold(13.5) } else { font }, fg);
     resp
 }
 

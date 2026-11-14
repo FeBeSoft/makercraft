@@ -34,8 +34,8 @@ impl Units {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ThemeChoice {
-    #[default]
     Light,
+    #[default]
     Dark,
 }
 
@@ -51,11 +51,24 @@ pub struct Prefs {
     /// Dernier port série et vitesse utilisés.
     pub port: String,
     pub baud: u32,
+    /// Rouvrir au démarrage l'atelier utilisé en dernier.
+    pub remember_atelier: bool,
+    /// Identifiant du dernier atelier (voir `Atelier::id`).
+    pub last_atelier: String,
 }
 
 impl Default for Prefs {
     fn default() -> Self {
-        Self { units: Units::Mm, theme: ThemeChoice::Light, recents: Vec::new(), recent_dirs: Vec::new(), port: String::new(), baud: 115_200 }
+        Self {
+            units: Units::Mm,
+            theme: ThemeChoice::Dark,
+            recents: Vec::new(),
+            recent_dirs: Vec::new(),
+            port: String::new(),
+            baud: 115_200,
+            remember_atelier: true,
+            last_atelier: String::new(),
+        }
     }
 }
 
@@ -123,7 +136,7 @@ mod tests {
 
     #[test]
     fn json_roundtrip_and_defaults() {
-        let mut p = Prefs { units: Units::Inch, theme: ThemeChoice::Dark, ..Prefs::default() };
+        let mut p = Prefs { units: Units::Inch, theme: ThemeChoice::Light, ..Prefs::default() };
         p.add_recent(Path::new("C:/x/y.dxf"));
         let t = serde_json::to_string(&p).unwrap_or_default();
         let back: Prefs = serde_json::from_str(&t).unwrap_or_default();
@@ -132,6 +145,7 @@ mod tests {
         let partial: Prefs = serde_json::from_str(r#"{"units":"Inch"}"#).unwrap_or_default();
         assert_eq!(partial.units, Units::Inch);
         assert_eq!(partial.baud, 115_200);
+        assert_eq!(partial.theme, ThemeChoice::Dark, "thème sombre par défaut");
     }
 
     #[test]

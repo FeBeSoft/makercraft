@@ -51,14 +51,18 @@ types MakerCraft (`Drawing`, `StepSummary`) ; aucun autre crate ne voit CadCraft
 ```
 apps/makercraft/src/
   main.rs        fenêtre (taille 1360 x 860, minimum 1024 x 680), icône, polices
-  app.rs         barre de menus, barre des ateliers, barre d'état, À propos, Préférences
+  app.rs         barre du haut (sélecteur d'ateliers, menus, état machine, Options), barre d'état
+  switcher.rs    sélecteur d'ateliers façon « espace de travail » de SolidCraft (CATIA, SolidWorks) :
+                 bouton en haut à gauche, liste des ateliers, ceux à venir grisés
+  options.rs     fenêtre Options façon GravéoCraft : catégories à gauche, onglets, une ligne par
+                 réglage, Réinitialiser / Annuler / Appliquer ; une page par extension ; À propos
   hote.rs        hôte d'extensions : machine, c2d, cam, dao, cao ; menu « Extensions » construit
                  depuis les CommandSpec ; fenêtre d'exécution d'une commande (paramètres JSON)
   ateliers/      mod.rs (familles CNC / Laser / PCB / Machines, écran « à venir »),
                  cnc.rs (DAO/CAO et FAO fraiseuse), machines.rs (pilotage Grbl)
   view2d.rs      vue 2D : zoom molette autour du curseur, déplacement, grille adaptative, origine
-  prefs.rs       préférences JSON (%APPDATA%\FeBe\MakerCraft\preferences.json)
-  theme.rs       palettes claire et sombre : bleu = design, orange = composants
+  prefs.rs       préférences JSON (%APPDATA%\FeBe\MakerCraft\preferences.json), dernier atelier
+  theme.rs       thème sombre par défaut (esprit GravéoCraft) et clair : bleu = design, orange = composants
   icons.rs       icônes vectorielles dessinées au Painter (pas d'emoji)
   widgets.rs     cartes, boutons, onglets, pastilles
 ```

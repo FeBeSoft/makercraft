@@ -1,28 +1,31 @@
-//! Fenêtre principale : barre de menus, barre des ateliers, contenu de l'atelier actif, barre
-//! d'état ; fenêtres « À propos », « Préférences » et exécution d'une commande d'extension.
+//! Fenêtre principale : barre du haut (sélecteur d'ateliers à gauche, menus, état de la
+//! machine, options), contenu de l'atelier actif, barre d'état ; fenêtres « Options » (qui
+//! contient l'À propos) et exécution d'une commande d'extension.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use eframe::egui::{
-    self, Align2, Color32, ColorImage, CornerRadius, Key, KeyboardShortcut, Modifiers, Rect, RichText, Stroke, TextureHandle, TextureOptions, Ui, UiBuilder,
-    pos2, vec2,
+    self, Align2, ColorImage, CornerRadius, Key, KeyboardShortcut, Modifiers, Rect, RichText, Sense, Stroke, TextureHandle, TextureOptions, Ui, UiBuilder, pos2,
+    vec2,
 };
 use makercraft_ext_api::{CommandSpec, Host};
 
 use crate::ateliers::{self, Atelier, Family, cnc, machines};
 use crate::hote::{self, CommandDialog};
 use crate::icons::{self, Icon};
-use crate::prefs::{Prefs, ThemeChoice, Units};
+use crate::options::{self, Options, Page};
+use crate::prefs::{Prefs, ThemeChoice};
+use crate::switcher::Switcher;
 use crate::theme::{self, Palette};
-use crate::widgets;
 
 pub const ICON_PNG: &[u8] = include_bytes!("../../../assets/branding/makercraft-256.png");
 const ABOUT_JPG: &[u8] = include_bytes!("../../../assets/branding/makercraft-about.jpg");
 
-const MENU_H: f32 = 34.0;
-const ATELIER_H: f32 = 60.0;
-const STATUS_H: f32 = 32.0;
+const TOP_H: f32 = 58.0;
+const STATUS_H: f32 = 30.0;
+/// Largeur réservée au sélecteur d'ateliers.
+const SWITCH_W: f32 = 300.0;
 
 pub struct App {
     prefs: Prefs,
@@ -31,12 +34,11 @@ pub struct App {
     host_error: Option<String>,
     menus: BTreeMap<String, Vec<CommandSpec>>,
     atelier: Atelier,
+    switcher: Switcher,
     cnc: cnc::Cnc,
     machines: machines::Machines,
-    show_about: bool,
-    show_prefs: bool,
+    options: Options,
     command: Option<CommandDialog>,
-    logo: Option<TextureHandle>,
     about_img: Option<TextureHandle>,
     textures_tried: bool,
     status: String,
@@ -48,8 +50,7 @@ enum Action {
     OpenDialog,
     Open(PathBuf),
     Atelier(Atelier),
-    About,
-    Prefs,
+    Options(Page),
     Command(CommandSpec),
     Quit,
 }
@@ -61,19 +62,19 @@ impl App {
         let menus = hote::menu_tree(&host);
         let mut machines = machines::Machines::with_port(prefs.port.clone(), prefs.baud);
         machines.refresh_ports();
+        let atelier = if prefs.remember_atelier { Atelier::from_id(&prefs.last_atelier).filter(|a| a.available()) } else { None };
         let mut app = Self {
             prefs,
             applied_theme: None,
             host,
             host_error,
             menus,
-            atelier: Atelier::CncDao,
+            atelier: atelier.unwrap_or(Atelier::CncDao),
+            switcher: Switcher::default(),
             cnc: cnc::Cnc::default(),
             machines,
-            show_about: false,
-            show_prefs: false,
+            options: Options::default(),
             command: None,
-            logo: None,
             about_img: None,
             textures_tried: false,
             status: "Prêt".to_owned(),
@@ -98,6 +99,17 @@ impl App {
     fn save_prefs(&mut self) {
         if let Err(e) = self.prefs.save() {
             self.status = format!("Préférences non enregistrées : {e}");
+        }
+    }
+
+    fn set_atelier(&mut self, at: Atelier) {
+        self.atelier = at;
+        if at == Atelier::Machines && self.machines.port.is_empty() {
+            self.machines.refresh_ports();
+        }
+        if self.prefs.last_atelier != at.id() {
+            self.prefs.last_atelier = at.id().to_owned();
+            self.save_prefs();
         }
     }
 
@@ -141,10 +153,6 @@ impl App {
             return;
         }
         self.textures_tried = true;
-        if let Ok(icon) = eframe::icon_data::from_png_bytes(ICON_PNG) {
-            let img = ColorImage::from_rgba_unmultiplied([icon.width as usize, icon.height as usize], &icon.rgba);
-            self.logo = Some(ctx.load_texture("logo", img, TextureOptions::LINEAR));
-        }
         if let Ok(img) = image::load_from_memory(ABOUT_JPG) {
             let rgba = img.to_rgba8();
             let size = [rgba.width() as usize, rgba.height() as usize];
@@ -156,14 +164,8 @@ impl App {
         match a {
             Action::OpenDialog => self.open_dialog(),
             Action::Open(p) => self.open(&p),
-            Action::Atelier(at) => {
-                self.atelier = at;
-                if at == Atelier::Machines && self.machines.port.is_empty() {
-                    self.machines.refresh_ports();
-                }
-            }
-            Action::About => self.show_about = true,
-            Action::Prefs => self.show_prefs = true,
+            Action::Atelier(at) => self.set_atelier(at),
+            Action::Options(page) => self.options.show_page(&self.prefs, page),
             Action::Command(spec) => self.command = Some(CommandDialog::new(&spec)),
             Action::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
         }
@@ -195,22 +197,25 @@ impl eframe::App for App {
 
         egui::CentralPanel::default().frame(egui::Frame::new().fill(pal.window)).show(ui, |ui| {
             let full = ui.max_rect();
-            let menu = Rect::from_min_size(full.min, vec2(full.width(), MENU_H));
-            let bar = Rect::from_min_size(pos2(full.left(), menu.bottom()), vec2(full.width(), ATELIER_H));
+            let top = Rect::from_min_size(full.min, vec2(full.width(), TOP_H));
             let status = Rect::from_min_max(pos2(full.left(), full.bottom() - STATUS_H), full.max);
-            let body = Rect::from_min_max(pos2(full.left() + 20.0, bar.bottom() + 18.0), pos2(full.right() - 20.0, status.top() - 16.0));
-            self.menu_bar(ui, menu, pal, &mut actions);
-            self.atelier_bar(ui, bar, pal, &mut actions);
+            let body = Rect::from_min_max(pos2(full.left() + 18.0, top.bottom() + 16.0), pos2(full.right() - 18.0, status.top() - 14.0));
+            self.top_bar(ui, top, pal, &mut actions);
             self.status_bar(ui, status, pal);
             let mut b = ui.new_child(UiBuilder::new().max_rect(body));
             self.body(&mut b, pal);
         });
 
-        if self.show_about {
-            self.about_window(&ctx, pal);
-        }
-        if self.show_prefs {
-            self.prefs_window(&ctx, pal);
+        if self.options.open {
+            match self.options.ui(&ctx, pal, &self.host, self.about_img.as_ref()) {
+                options::Outcome::Apply(p) => {
+                    self.prefs = p;
+                    self.save_prefs();
+                    self.status = "Options enregistrées".to_owned();
+                }
+                options::Outcome::Run(spec) => actions.push(Action::Command(spec)),
+                options::Outcome::None => {}
+            }
         }
         if let Some(d) = &mut self.command
             && !d.show(&ctx, &self.host, pal)
@@ -227,11 +232,53 @@ impl eframe::App for App {
 }
 
 impl App {
-    fn menu_bar(&self, ui: &mut Ui, r: Rect, pal: &Palette, actions: &mut Vec<Action>) {
-        ui.painter().rect_filled(r, CornerRadius::ZERO, pal.bar);
-        let mut m = ui.new_child(UiBuilder::new().max_rect(r.shrink2(vec2(10.0, 3.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
-        m.spacing_mut().button_padding = vec2(10.0, 4.0);
+    fn top_bar(&mut self, ui: &mut Ui, r: Rect, pal: &Palette, actions: &mut Vec<Action>) {
+        let p = ui.painter().clone();
+        p.rect_filled(r, CornerRadius::ZERO, pal.bar);
+        p.hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, pal.bar_line));
+        // sélecteur d'ateliers, tout à gauche
+        let sw = Rect::from_min_size(pos2(r.left() + 10.0, r.top() + 6.0), vec2(SWITCH_W - 16.0, r.height() - 12.0));
+        if let Some(at) = self.switcher.ui(ui, sw, pal, self.atelier) {
+            actions.push(Action::Atelier(at));
+        }
+        p.vline(r.left() + SWITCH_W + 2.0, (r.top() + 14.0)..=(r.bottom() - 14.0), Stroke::new(1.0, pal.bar_line));
+        // menus
+        let mr = Rect::from_min_max(pos2(r.left() + SWITCH_W + 14.0, r.top() + 12.0), pos2(r.right() - 330.0, r.bottom() - 12.0));
+        let mut m = ui.new_child(UiBuilder::new().max_rect(mr).layout(egui::Layout::left_to_right(egui::Align::Center)));
+        self.menus(&mut m, pal, actions);
+        // à droite : état de la machine, options
+        let gear = Rect::from_min_size(pos2(r.right() - 16.0 - 108.0, r.center().y - 17.0), vec2(108.0, 34.0));
+        let g = ui.interact(gear, ui.scope_id().with("options"), Sense::click());
+        g.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Options"));
+        p.rect_filled(gear, CornerRadius::same(8), if g.hovered() { pal.hover } else { pal.bar });
+        p.rect_stroke(gear, CornerRadius::same(8), Stroke::new(1.0, pal.line2), egui::StrokeKind::Inside);
+        icons::paint(&p, Rect::from_min_size(pos2(gear.left() + 12.0, gear.center().y - 8.0), vec2(16.0, 16.0)), Icon::Machines, pal.weak);
+        p.text(pos2(gear.left() + 36.0, gear.center().y), Align2::LEFT_CENTER, "Options", theme::regular(14.0), pal.text);
+        if g.clicked() {
+            actions.push(Action::Options(Page::General));
+        }
+        let connected = self.machines.connected();
+        let mc = if connected { pal.orange } else { pal.dim };
+        let label = format!("Machine : {}", self.machines.state_label());
+        let font = theme::regular(13.0);
+        let tw = p.layout_no_wrap(label.clone(), font.clone(), pal.text).size().x;
+        let pill = Rect::from_min_size(pos2(gear.left() - 14.0 - tw - 34.0, r.center().y - 15.0), vec2(tw + 34.0, 30.0));
+        let pr = ui.interact(pill, ui.scope_id().with("etat-machine"), Sense::click());
+        pr.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &label));
+        p.rect_filled(pill, CornerRadius::same(255), if pr.hovered() { pal.hover } else { pal.card });
+        p.rect_stroke(pill, CornerRadius::same(255), Stroke::new(1.0, pal.card_line), egui::StrokeKind::Inside);
+        p.circle_filled(pos2(pill.left() + 15.0, pill.center().y), 4.0, mc);
+        p.text(pos2(pill.left() + 26.0, pill.center().y), Align2::LEFT_CENTER, label, font, if connected { pal.text } else { pal.weak });
+        if pr.clicked() {
+            actions.push(Action::Atelier(Atelier::Machines));
+        }
+    }
+
+    fn menus(&self, m: &mut Ui, pal: &Palette, actions: &mut Vec<Action>) {
+        m.spacing_mut().button_padding = vec2(10.0, 5.0);
+        m.spacing_mut().item_spacing.x = 4.0;
         m.visuals_mut().widgets.inactive.bg_stroke = Stroke::NONE;
+        m.visuals_mut().widgets.inactive.weak_bg_fill = pal.bar;
         m.menu_button("Fichier", |ui| {
             if ui.add(egui::Button::new("Ouvrir...").shortcut_text("Ctrl+O")).clicked() {
                 actions.push(Action::OpenDialog);
@@ -249,32 +296,14 @@ impl App {
                 }
             });
             ui.separator();
-            if ui.button("Préférences...").clicked() {
-                actions.push(Action::Prefs);
+            if ui.button("Options...").clicked() {
+                actions.push(Action::Options(Page::General));
                 ui.close();
             }
             ui.separator();
             if ui.button("Quitter").clicked() {
                 actions.push(Action::Quit);
                 ui.close();
-            }
-        });
-        m.menu_button("Atelier", |ui| {
-            ui.menu_button("CNC", |ui| {
-                for at in Atelier::CNC {
-                    let label = if at.available() { at.label().to_owned() } else { format!("{} (à venir)", at.label()) };
-                    if ui.radio(self.atelier == at, label).clicked() {
-                        actions.push(Action::Atelier(at));
-                        ui.close();
-                    }
-                }
-            });
-            for at in [Atelier::Laser, Atelier::Pcb, Atelier::Machines] {
-                let label = if at.available() { at.label().to_owned() } else { format!("{} (à venir)", at.label()) };
-                if ui.radio(self.atelier == at, label).clicked() {
-                    actions.push(Action::Atelier(at));
-                    ui.close();
-                }
             }
         });
         m.menu_button("Extensions", |ui| {
@@ -299,46 +328,10 @@ impl App {
         });
         m.menu_button("Aide", |ui| {
             if ui.button("À propos de MakerCraft").clicked() {
-                actions.push(Action::About);
+                actions.push(Action::Options(Page::About));
                 ui.close();
             }
         });
-    }
-
-    fn atelier_bar(&self, ui: &mut Ui, r: Rect, pal: &Palette, actions: &mut Vec<Action>) {
-        let p = ui.painter();
-        p.rect_filled(r, CornerRadius::ZERO, pal.bar);
-        p.hline(r.x_range(), r.top() + 0.5, Stroke::new(1.0, pal.bar_line));
-        p.hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, pal.bar_line));
-        let logo = Rect::from_min_size(pos2(r.left() + 20.0, r.center().y - 17.0), vec2(34.0, 34.0));
-        if let Some(t) = &self.logo {
-            p.image(t.id(), logo, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
-        }
-        let title = p.text(pos2(logo.right() + 12.0, r.center().y), Align2::LEFT_CENTER, "MakerCraft", theme::bold(19.0), pal.text);
-        let mut tabs = ui.new_child(UiBuilder::new().max_rect(Rect::from_min_max(pos2(title.right() + 36.0, r.top() + 10.0), pos2(r.right() - 20.0, r.bottom() - 10.0))).layout(egui::Layout::left_to_right(egui::Align::Center)));
-        tabs.spacing_mut().item_spacing.x = 6.0;
-        for f in Family::ALL {
-            let active = self.atelier.family() == f;
-            let soon = !f.default_atelier().available();
-            let resp = widgets::tab(&mut tabs, pal, f.icon(), f.label(), active, soon);
-            if resp.clicked() && !active {
-                actions.push(Action::Atelier(f.default_atelier()));
-            }
-            if soon {
-                resp.on_hover_text("Atelier à venir");
-            }
-        }
-        if self.atelier.family() == Family::Cnc {
-            tabs.add_space(24.0);
-            let (sep, _) = tabs.allocate_exact_size(vec2(1.0, 28.0), egui::Sense::hover());
-            tabs.painter().rect_filled(sep, CornerRadius::ZERO, pal.bar_line);
-            tabs.add_space(16.0);
-            for at in Atelier::CNC {
-                if widgets::segment(&mut tabs, pal, at.label(), self.atelier == at, !at.available()).clicked() {
-                    actions.push(Action::Atelier(at));
-                }
-            }
-        }
     }
 
     fn status_bar(&self, ui: &mut Ui, r: Rect, pal: &Palette) {
@@ -346,27 +339,23 @@ impl App {
         p.rect_filled(r, CornerRadius::ZERO, pal.bar);
         p.hline(r.x_range(), r.top() + 0.5, Stroke::new(1.0, pal.bar_line));
         let f = theme::regular(12.5);
-        icons::paint(p, Rect::from_min_size(pos2(r.left() + 16.0, r.center().y - 8.0), vec2(16.0, 16.0)), self.atelier.family().icon(), pal.blue);
-        let a = p.text(pos2(r.left() + 40.0, r.center().y), Align2::LEFT_CENTER, self.atelier.title(), theme::bold(12.5), pal.text);
+        let accent = self.atelier.family().accent(pal);
+        p.circle_filled(pos2(r.left() + 18.0, r.center().y), 4.0, accent);
+        let a = p.text(pos2(r.left() + 30.0, r.center().y), Align2::LEFT_CENTER, self.atelier.title(), theme::bold(12.5), pal.text);
         let mut x = a.right() + 18.0;
         if let Some(n) = self.cnc.file_name() {
             let t = p.text(pos2(x, r.center().y), Align2::LEFT_CENTER, n, theme::mono(12.0), pal.weak);
             x = t.right() + 18.0;
         }
-        // à droite : unités, machine
-        let mc = if self.machines.connected() { pal.orange } else { pal.weak };
         let right = p.text(pos2(r.right() - 16.0, r.center().y), Align2::RIGHT_CENTER, format!("Unités : {}", self.prefs.units.label()), f.clone(), pal.weak);
-        let m = p.text(pos2(right.left() - 22.0, r.center().y), Align2::RIGHT_CENTER, format!("Machine : {}", self.machines.state_label()), f.clone(), mc);
-        p.circle_filled(pos2(m.left() - 10.0, r.center().y), 4.0, mc);
-        let max = m.left() - 30.0 - x;
+        let ver = p.text(pos2(right.left() - 22.0, r.center().y), Align2::RIGHT_CENTER, concat!("MakerCraft ", env!("CARGO_PKG_VERSION")), f.clone(), pal.dim);
+        let max = ver.left() - 30.0 - x;
         if max > 40.0 {
-            let mut s = self.status.clone();
-            while s.chars().count() > 4 && p.layout_no_wrap(s.clone(), f.clone(), pal.text).size().x > max {
-                let n = s.chars().count();
-                s = s.chars().take(n - 4).collect::<String>() + "...";
-                s = s.replacen("......", "...", 1);
-            }
-            p.text(pos2(x, r.center().y), Align2::LEFT_CENTER, s, f, pal.text);
+            let mut job = egui::text::LayoutJob::simple_singleline(self.status.clone(), f, pal.text);
+            job.wrap.max_width = max;
+            job.wrap.max_rows = 1;
+            let g = p.layout_job(job);
+            p.galley(pos2(x, r.center().y - g.size().y / 2.0), g, pal.text);
         }
     }
 
@@ -402,81 +391,6 @@ impl App {
                 }
             }
             at => ateliers::soon_screen(ui, pal, at),
-        }
-    }
-
-    fn about_window(&mut self, ctx: &egui::Context, pal: &Palette) {
-        let mut open = true;
-        egui::Window::new("À propos de MakerCraft").collapsible(false).resizable(false).fixed_size(vec2(560.0, 620.0)).anchor(Align2::CENTER_CENTER, vec2(0.0, 0.0)).open(&mut open).show(ctx, |ui| {
-            if let Some(t) = &self.about_img {
-                let w = ui.available_width();
-                let s = t.size_vec2();
-                let h = (w * s.y / s.x.max(1.0)).min(240.0);
-                let w = h * s.x / s.y.max(1.0);
-                let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), h), egui::Sense::hover());
-                let r = Rect::from_center_size(r.center(), vec2(w, h));
-                ui.painter().image(t.id(), r, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
-            }
-            ui.add_space(6.0);
-            ui.label(RichText::new(format!("MakerCraft {}", env!("CARGO_PKG_VERSION"))).font(theme::bold(20.0)));
-            ui.label("Moteur 2D/3D à extensions pour le fablab et l'enseignement de la Technologie : DAO, CAO, FAO et pilotage de machines.");
-            ui.label(RichText::new("Licence GPL-3.0-or-later. Projet indépendant, non affilié à ArtCraft ni aux auteurs de SolidCraft.").size(12.5).color(pal.weak));
-            ui.add_space(4.0);
-            widgets::caption(ui, pal, "Extensions chargées");
-            for (id, label) in self.host.extensions() {
-                ui.horizontal(|ui| {
-                    widgets::pill(ui, id, pal.blue_soft, pal.blue);
-                    ui.label(*label);
-                });
-            }
-            if let Some(e) = &self.host_error {
-                widgets::status_line(ui, pal, Icon::Error, pal.bad, e);
-            }
-            ui.add_space(4.0);
-            widgets::caption(ui, pal, "Bâti sur");
-            ui.label(RichText::new("CadCraft 0.20.1 et SolidCraft 0.41.0 (MIT/Apache, utilisés tels quels) ; portages de LaserGRBL 7.14.1, Candle et Universal G-Code Sender 2.1.27 (GPLv3).").size(12.5));
-        });
-        if !open {
-            self.show_about = false;
-        }
-    }
-
-    fn prefs_window(&mut self, ctx: &egui::Context, pal: &Palette) {
-        let mut open = true;
-        let before = self.prefs.clone();
-        let mut clear = false;
-        egui::Window::new("Préférences").collapsible(false).resizable(false).fixed_size(vec2(440.0, 340.0)).anchor(Align2::CENTER_CENTER, vec2(0.0, 0.0)).open(&mut open).show(ctx, |ui| {
-            ui.spacing_mut().item_spacing.y = 10.0;
-            widgets::caption(ui, pal, "Unités d'affichage");
-            ui.horizontal(|ui| {
-                ui.radio_value(&mut self.prefs.units, Units::Mm, "Millimètres");
-                ui.radio_value(&mut self.prefs.units, Units::Inch, "Pouces");
-            });
-            widgets::caption(ui, pal, "Thème");
-            ui.horizontal(|ui| {
-                ui.radio_value(&mut self.prefs.theme, ThemeChoice::Light, "Clair");
-                ui.radio_value(&mut self.prefs.theme, ThemeChoice::Dark, "Sombre");
-            });
-            widgets::caption(ui, pal, "Dossiers récents");
-            egui::ScrollArea::vertical().max_height(110.0).show(ui, |ui| {
-                if self.prefs.recent_dirs.is_empty() {
-                    ui.label(RichText::new("aucun").color(pal.weak));
-                }
-                for d in &self.prefs.recent_dirs {
-                    ui.label(RichText::new(d.display().to_string()).font(theme::mono(12.5)));
-                }
-            });
-            clear = widgets::button(ui, pal, None, "Vider les listes de récents", widgets::Kind::Plain, !self.prefs.recent_dirs.is_empty() || !self.prefs.recents.is_empty()).clicked();
-        });
-        if clear {
-            self.prefs.recents.clear();
-            self.prefs.recent_dirs.clear();
-        }
-        if self.prefs != before {
-            self.save_prefs();
-        }
-        if !open {
-            self.show_prefs = false;
         }
     }
 }

@@ -33,7 +33,9 @@ cargo run -p makercraft                       # ou : makercraft.exe "projet.c2d"
 cargo build --release -p makercraft           # -> target\release\makercraft.exe
 ```
 
-Le menu **Atelier** (ou la barre sous les menus) change d'atelier :
+Le bouton **Atelier**, en haut à gauche, déplie la liste des ateliers (comme l'espace de travail
+de SolidCraft, CATIA ou SolidWorks) ; ceux qui ne sont pas encore disponibles sont grisés.
+MakerCraft rouvre le dernier atelier utilisé.
 
 | Atelier | Contenu de la v0.1 |
 |---|---|
@@ -44,8 +46,9 @@ Le menu **Atelier** (ou la barre sous les menus) change d'atelier :
 | Machines | Grbl 1.1 / grblHAL par l'émulateur (choix par défaut) ou un port série : état et position, déplacement manuel, origine, zéro pièce, envoi d'un `.nc` avec progression, pause, reprise, arrêt, console |
 
 Menu **Extensions** : toutes les commandes des extensions chargées, exécutables avec leurs
-paramètres JSON. **Fichier > Préférences** : unités (mm, pouce), thème clair ou sombre, dossiers
-récents (`%APPDATA%\FeBe\MakerCraft\preferences.json`). **Aide > À propos** : version et extensions.
+paramètres JSON. Bouton **Options** (comme dans GravéoCraft) : thème (sombre par défaut ou clair),
+unités, démarrage, dossiers et fichiers récents (`%APPDATA%\FeBe\MakerCraft\preferences.json`),
+une page par extension avec ses commandes, et l'À propos (logiciel, sources, licence).
 
 Sûreté : avant d'envoyer un programme à une vraie machine, MakerCraft demande confirmation ;
 **Arrêt** fait une pause puis un reset de la carte.
