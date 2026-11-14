@@ -21,11 +21,13 @@ makercraft-galaad = { path = "crates/ext/galaad" }
 makercraft-tooldb = { path = "crates/ext/tooldb" }
 makercraft-dao = { path = "crates/ext/dao" }
 makercraft-cao = { path = "crates/ext/cao" }
+makercraft-mkc = { path = "crates/ext/mkc" }
 
 # --- fondations ---
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+zip = { version = "9", default-features = false, features = ["deflate"] }
 toml = "1"
 serialport = "4"
 ctrlc = "3"
@@ -47,7 +49,16 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 # SolidCraft remplacent egui-wgpu et winit par des copies différentes, incompatibles entre elles.
 # Ni patch ni modification de leurs sources : ils sont compilés tels quels.
 cadcraft-dxf      = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
+cadcraft-doc      = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
+cadcraft-geom     = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
+cadcraft-engine   = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
+cadcraft-io       = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
+cadcraft-render   = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
 solidcraft-kernel = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.41.0" }
+solidcore-record  = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.41.0" }
+solidcore-tess    = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.41.0" }
+solidcraft-io     = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.41.0" }
+solidcraft-viewport = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.41.0" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -72,3 +83,8 @@ codegen-units = 16
 # Aucun [patch] amont nécessaire : les crates liés (cadcraft-dxf, solidcraft-kernel) n'en
 # dépendent pas. Si un crate graphique de CadCraft ou de SolidCraft devait être lié un jour,
 # ses [patch.crates-io] seraient à recopier ici (un patch ne s'applique qu'au workspace racine).
+
+# Moteur de PDF de craft-pdf (export PDF de cadcraft-io) : mêmes révisions que CadCraft 0.20.1,
+# car Cargo ignore les [patch] d'une dépendance. Pas de patch de la famille egui.
+[patch.crates-io]
+krilla = { version = "=0.8.2", git = "https://github.com/storytold/craft-libs", rev = "92d392cff132eaf53e13afff77f38b5c11b73aa0" }

@@ -10,14 +10,15 @@
 | L1 | `core/ext-api` | `Extension`, `Registry`, `CommandSpec`, `Host` (ordre des dépendances) | ✅ base |
 | L2 | `core/scene` | scène neutre 2D/3D (polylignes, maillages) → rendu wgpu | à faire |
 | L2 | `core/io` | registre d'importeurs/exporteurs | à faire |
-| L3 | `ext/dao` | adaptateur CadCraft 0.20.1 (`cadcraft-dxf`) : DXF en contours par calque ; DWG/SVG/PDF plus tard | 🟡 v0.1 (DXF) |
-| L3 | `ext/cao` | adaptateur SolidCraft 0.41.0 (`solidcraft-kernel`) : lecture STEP, mesures des corps | 🟡 v0.1 (STEP) |
+| L3 | `ext/dao` | adaptateur CadCraft 0.20.1 : `Sketch` = moteur de dessin `cadcraft-engine` (commandes à invites, accroches, sélection, annuler), DXF/DWG par `cadcraft-io`, liste d'affichage `cadcraft-render` ; contours par calque | 🟡 dessin éditable |
+| L3 | `ext/cao` | adaptateur SolidCraft 0.41.0 : lecture STEP et mesures (`solidcraft-kernel`) ; vue 3D en lecture seule (`view3d`, rendu sur processeur de `solidcraft-viewport`) | 🟡 STEP, vue 3D |
+| L3 | `ext/mkc` | projet `.mkc` : archive zip (`makercraft.json` + dessin CadCraft `.dxf`/`.dwg` + modèle SolidCraft `.sc`) ; machine, brut, brides, parcours | ✅ format 1 |
 | L3 | `ext/c2d` | lecture des projets Carbide Create `.c2d` (formes, calques, outils, parcours) ; commande `c2d.info` | ✅ |
 | L3 | `ext/galaad` | lecture des dessins Galaad 3 `.gal` / `.gli` / `.cub` (géométrie, outils, attributs d'usinage) ; format : `reference/galaad-format-gal.md` | 🟡 lecture |
 | L3 | `ext/cam` | FAO 2.5D : découpe, poche, perçage, gravure ; G-code Grbl ASCII ; aperçu SVG | 🟡 v0.1 (laser, attaches, V-carve vrai à faire) |
 | L3 | `ext/machine` | transports (série, TCP, émulateur), protocole Grbl 1.1/grblHAL, contrôleur et streaming, codes d'erreur | ✅ v0.1 (aperçu G-code à faire) |
 | L4 | `ui/shell` | egui : coquille commune aux applis (prévue quand une 2e appli à ateliers existera) | à faire |
-| app | `makercraft` | **application de bureau v0.1** : ateliers CNC (DAO/CAO, FAO fraiseuse), Laser, PCB, Machines ; hôte d'extensions | 🟡 v0.1 |
+| app | `makercraft` | **application de bureau** : atelier CNC (fraisage 2,5D : Machine > Brut > Dessin > Parcours > Simulation > Usinage), Machines ; Laser, PCB, usinage 3D et gravure à venir ; hôte d'extensions | 🟡 |
 | app | `makercraft-cli` | lister / exécuter les commandes | ✅ |
 | app | `makercraft-send` | console Grbl et envoi de fichiers G-code | ✅ |
 | app | `makercraft-c2d` | projet `.c2d` → G-code Grbl (un fichier par outil) | ✅ |
@@ -41,18 +42,23 @@ surface `run(commande, json)` que celle prévue par SolidCraft (`docs/plugins.md
 
 Dépendances git épinglées sur leur dernière release stable, compilées telles quelles (détails et
 procédure de mise à jour : `UPSTREAM.md`). Seuls des crates **sans interface graphique** sont liés :
-`cadcraft-dxf` dans `ext/dao`, `solidcraft-kernel` dans `ext/cao`. Leurs crates egui ne peuvent
+`cadcraft-dxf`, `-doc`, `-geom`, `-engine`, `-io`, `-render` dans `ext/dao` ; `solidcraft-kernel`,
+`-io`, `-viewport`, `solidcore-record`, `solidcore-tess` dans `ext/cao`. Leurs crates egui ne peuvent
 pas cohabiter dans un même exécutable (chacun remplace `egui-wgpu` et `winit` par sa propre
-version) : MakerCraft dessine ses vues lui-même. Les adaptateurs convertissent leurs types en
-types MakerCraft (`Drawing`, `StepSummary`) ; aucun autre crate ne voit CadCraft ou SolidCraft.
+version) : MakerCraft dessine ses vues lui-même (la 2D peint la liste d'affichage de CadCraft, la 3D
+affiche l'image du moteur de rendu de SolidCraft).
 
-## Application `makercraft` (v0.1)
+Deux réglages du workspace, sans toucher à leurs sources : le `Cargo.lock` garde les crates `icu_*` en
+2.3 (exigé par `cadcraft-fonts`), et `[patch.crates-io]` reprend la révision de `krilla` que
+CadCraft épingle pour `craft-pdf` (Cargo ignore les patchs d'une dépendance).
+
+## Application `makercraft`
 
 ```
 apps/makercraft/src/
   main.rs        fenêtre (taille 1360 x 860, minimum 1024 x 680), icône, polices
   app.rs         barre d'accès rapide (logo, Fichier, Ouvrir, Enregistrer / Annuler / Rétablir
-                 grisés, onglet du document ; à droite Extensions, Aide, état machine, Options),
+                 de l'atelier CNC, onglet du document ; à droite Extensions, Aide, état machine, Options),
                  ruban, barre d'état
   ribbon.rs      ruban façon SolidCraft / DraftSight : onglets, groupes nommés (nom en bas,
                  séparateurs), grands boutons libellé dessous, petits empilés par trois,
@@ -66,21 +72,31 @@ apps/makercraft/src/
                  Contact), sur le modèle d'UIdeCraft
   about.rs       textes de l'À propos ; la bio de l'auteur vient de H:\_src\_commun\auteur\bio.txt,
                  copiée par build.rs (repli : assets/bio.txt)
-  hote.rs        hôte d'extensions : machine, c2d, cam, dao, cao ; menu « Extensions » construit
+  hote.rs        hôte d'extensions : machine, c2d, cam, dao, cao, mkc ; menu « Extensions » construit
                  depuis les CommandSpec ; fenêtre d'exécution d'une commande (paramètres JSON)
   ateliers/      mod.rs (familles CNC / Laser / PCB / Machines, écran « à venir »),
-                 cnc.rs (DAO/CAO et FAO fraiseuse), machines.rs (pilotage Grbl)
-  view2d.rs      vue 2D : zoom molette autour du curseur, déplacement, grille adaptative, origine
+                 machines.rs (pilotage Grbl), cnc/ :
+    mod.rs         atelier CNC : étapes Machine > Brut > Dessin > Parcours > Simulation > Usinage
+                   (un onglet de ruban chacune), panneau de l'étape | dessin 2D | vue 3D, projet .mkc
+    panels.rs      panneau de gauche de chaque étape (machine, brut et brides, contours, réglages
+                   des parcours, vérifications et durée, G-code)
+    sketch_view.rs dessin 2D piloté par le moteur de CadCraft : clics et accroches, ligne de
+                   commande (noms français acceptés, invites traduites), zoom, déplacement
+    view3d.rs      vue 3D en lecture seule : image recalculée seulement quand la scène change,
+                   rotation à la souris, zoom
+    toolpaths.rs   parcours -> opérations de `ext/cam` (contour, poche, perçage, gravure),
+                   lignes 3D, contrôle des zones de bridage
   prefs.rs       préférences JSON (%APPDATA%\FeBe\MakerCraft\preferences.json), dernier atelier
   theme.rs       thème sombre par défaut (esprit GravéoCraft) et clair : bleu = design, orange = composants
   icons.rs       icônes vectorielles dessinées au Painter (pas d'emoji)
   widgets.rs     cartes, boutons, onglets, pastilles
 ```
 
-- Ateliers disponibles : CNC / DAO-CAO (ouvre `.c2d`, `.dxf`, `.step`), CNC / FAO fraiseuse (parcours
-  et vérifications de `cam::check`, trajectoires dans la vue 2D, export par `cam::write_outputs`),
+- Ateliers disponibles : CNC - Fraisage 2,5D (ouvre `.mkc`, `.dxf`, `.dwg` ; un calque = un contour,
+  chaque parcours choisit ses calques et son outil ; G-code Grbl, envoi vers l'atelier Machines) et
   Machines (Grbl par l'émulateur ou un port série). Usinage 3D, Gravure d'images, Laser et PCB
-  affichent un écran « à venir » qui décrit ce qu'ils feront, sans bouton factice.
+  affichent un écran « à venir » qui décrit ce qu'ils feront, sans bouton factice. Les projets
+  `.c2d` restent le domaine de `c2d_to_nc`.
 - Les ateliers sont des modules de l'appli en v0.1 ; le contrat `Atelier` et les coquilles
   autonomes de `ateliers.md` viendront quand un deuxième exécutable à ateliers sera fait.
 - Sûreté machine : émulateur par défaut, confirmation avant d'envoyer un programme à une vraie

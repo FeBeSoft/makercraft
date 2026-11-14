@@ -1,0 +1,13 @@
+Ce logiciel respecte le Règlement général sur la protection des données (RGPD, règlement UE 2016/679).
+
+Aucune donnée personnelle n'est collectée. Le logiciel ne demande aucun compte, n'envoie ni télémétrie, ni statistiques d'utilisation, ni rapport de plantage, et n'utilise aucun identifiant de votre ordinateur.
+
+Vos fichiers, vos réglages et vos historiques restent sur votre ordinateur. Rien n'est transmis à FeBe ni à un tiers.
+
+La seule connexion réseau qu'un logiciel FeBe peut faire de lui-même est la vérification des mises à jour, quand elle existe : il lit un petit fichier de version sur son site (https). Aucune information vous concernant n'y est ajoutée ; comme pour toute visite d'un site, l'hébergeur (IONOS, en Europe) voit l'adresse IP de la connexion. Cette vérification peut toujours être désactivée dans les réglages. Le paragraphe ci-dessous précise ce que fait ce logiciel.
+
+Les liens de cette fenêtre (site, Patreon, Facebook) ne s'ouvrent que si vous cliquez dessus, dans votre navigateur. Ces sites appliquent leurs propres règles de confidentialité.
+
+Si une future fonction devait envoyer des données (formulaire, rapport d'erreur), elle vous demanderait d'abord votre accord, en disant ce qui est envoyé et pourquoi.
+
+Pour toute question, ou pour exercer vos droits (accès, rectification, effacement), écrivez à l'adresse de contact du logiciel ou à contact@fe-be.fr. Vous pouvez aussi saisir la CNIL (www.cnil.fr).

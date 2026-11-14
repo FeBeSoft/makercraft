@@ -16,6 +16,17 @@ pub const TAGLINE: &str = "Ateliers CNC, Laser, PCB et Machines pour le fablab e
 /// Bio commune à tous les logiciels FeBe (H:\_src\_commun\auteur\bio.txt), reprise à la compilation.
 pub const BIO: &str = include_str!(concat!(env!("OUT_DIR"), "/bio.txt"));
 
+/// Déclaration RGPD commune à tous les logiciels FeBe (H:\_src\_commun\rgpd\rgpd.txt), reprise à la compilation.
+pub const RGPD_COMMUN: &str = include_str!(concat!(env!("OUT_DIR"), "/rgpd.txt"));
+
+/// Ce que fait MakerCraft en particulier, affiché après la déclaration commune.
+pub const RGPD_MAKERCRAFT: &str = "MakerCraft en particulier : il ne fait aucune connexion réseau. Il dialogue avec les machines (CNC, laser) uniquement par les ports USB ou série de votre ordinateur. Dessins, projets, banque d'outils, réglages et fichiers récents sont enregistrés sur votre ordinateur et n'en sortent que si vous les envoyez vous-même. Il n'y a pas de vérification automatique des mises à jour pour l'instant ; si elle est ajoutée, elle suivra la règle ci-dessus et pourra être désactivée.";
+
+/// Texte complet de l'onglet « Confidentialité (RGPD) ».
+pub fn rgpd() -> String {
+    format!("{}\n\n{RGPD_MAKERCRAFT}", RGPD_COMMUN.trim_end())
+}
+
 /// Paragraphe propre à MakerCraft, affiché après la bio commune.
 pub const ORIGIN: &str = "MakerCraft est né de là : réunir dans un seul logiciel libre le dessin, la fabrication et le pilotage des machines du fablab, en reprenant l'esprit des ateliers de la suite Galaad, avec des outils modernes et ouverts.";
 

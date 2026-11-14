@@ -6,21 +6,18 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
-[features]
-default = ["dao", "cao"]
-# DAO 2D greffée sur CadCraft (lecture DXF)
-dao = ["dep:makercraft-dao"]
-# CAO 3D greffée sur SolidCraft (noyau B-rep, STEP)
-cao = ["dep:makercraft-cao"]
-
 [dependencies]
 makercraft-geom.workspace = true
 makercraft-ext-api.workspace = true
 makercraft-c2d.workspace = true
 makercraft-cam.workspace = true
 makercraft-ext-machine.workspace = true
-makercraft-dao = { workspace = true, optional = true }
-makercraft-cao = { workspace = true, optional = true }
+makercraft-tooldb.workspace = true
+makercraft-mkc.workspace = true
+# DAO 2D greffée sur CadCraft (moteur de dessin, DXF/DWG)
+makercraft-dao.workspace = true
+# CAO 3D greffée sur SolidCraft (noyau B-rep, STEP, rendu de la vue 3D)
+makercraft-cao.workspace = true
 eframe.workspace = true
 rfd.workspace = true
 serde.workspace = true

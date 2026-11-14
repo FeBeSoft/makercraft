@@ -4,6 +4,7 @@
 
 fn main() {
     bio_commune();
+    rgpd_commun();
     let icon = "../../assets/branding/makercraft.ico";
     println!("cargo:rerun-if-changed={icon}");
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
@@ -33,6 +34,22 @@ fn bio_commune() {
     let out = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap_or_default()).join("bio.txt");
     if let Err(e) = std::fs::copy(&src, &out) {
         println!("cargo:warning=bio introuvable ({}) : {e}", src.display());
+        let _ = std::fs::write(&out, "");
+    }
+}
+
+/// Déclaration RGPD commune à tous les logiciels FeBe : H:\_src\_commun\rgpd\rgpd.txt.
+/// Même principe que la bio (repli : assets/rgpd.txt du dépôt).
+fn rgpd_commun() {
+    let manifest = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default());
+    let commun = manifest.join("../../../_commun/rgpd/rgpd.txt");
+    let secours = manifest.join("../../assets/rgpd.txt");
+    println!("cargo:rerun-if-changed={}", commun.display());
+    println!("cargo:rerun-if-changed={}", secours.display());
+    let src = if commun.exists() { commun } else { secours };
+    let out = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap_or_default()).join("rgpd.txt");
+    if let Err(e) = std::fs::copy(&src, &out) {
+        println!("cargo:warning=déclaration RGPD introuvable ({}) : {e}", src.display());
         let _ = std::fs::write(&out, "");
     }
 }

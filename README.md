@@ -18,7 +18,7 @@ GPL-3.0-or-later (voir `LICENSE`). Les composants MIT/Apache intégrés gardent 
 
 ```
 crates/core/   noyau sans métier : geom, ext-api (contrat d'extension, commandes, hôte)
-crates/ext/    extensions : machine, c2d, cam, dao (CadCraft), cao (SolidCraft), galaad, tooldb
+crates/ext/    extensions : machine, c2d, cam, dao (CadCraft), cao (SolidCraft), mkc (projet), galaad, tooldb
 apps/          makercraft (application de bureau), c2d_to_nc, makercraft-send (console + envoi
                de G-code), makercraft-cli (commandes des extensions), makercraft-c2d, makercraft-outils
 assets/        branding : icône (.ico, .png) et illustration « à propos »
@@ -29,7 +29,7 @@ upstream.toml  projets amont suivis et fichiers portés
 ## Application MakerCraft (v0.1)
 
 ```
-cargo run -p makercraft                       # ou : makercraft.exe "projet.c2d"
+cargo run -p makercraft                       # ou : makercraft.exe "projet.mkc" (ou un .dxf / .dwg)
 cargo build --release -p makercraft           # -> target\release\makercraft.exe
 ```
 
@@ -39,11 +39,12 @@ MakerCraft rouvre le dernier atelier utilisé.
 
 | Atelier | Contenu de la v0.1 |
 |---|---|
-| CNC - DAO / CAO | vue 2D (molette : zoom, glisser : déplacer, grille, origine) d'un projet Carbide Create `.c2d` (brut, formes, calques), d'un dessin DXF (lu par CadCraft) ou de l'encombrement d'un modèle STEP (lu par le noyau SolidCraft) |
-| CNC - FAO fraiseuse | parcours du `.c2d` par outil, vérifications, trajectoires dans la vue 2D, export des `.nc` |
+| CNC - Fraisage 2,5D | onglets dans l'ordre de fabrication : **Machine** (machine de la banque d'outils, courses), **Brut** (dimensions, matière, zéro pièce, zones de bridage), **Dessin** (moteur de CadCraft : ligne, polyligne, rectangle, cercle, arc, modifier, accroches, annuler ; import DXF/DWG ; un calque = un contour), **Parcours** (contour extérieur/intérieur, sur le trait, poche, perçage, gravure ; l'outil et ses vitesses se choisissent dans chaque parcours), **Simulation** (passages dans les brides, profondeur, durée), **Usinage** (G-code Grbl, envoi vers l'atelier Machines). Fenêtre : panneau de l'étape, dessin 2D à gauche, vue 3D en lecture seule à droite |
 | CNC - Usinage 3D, Gravure d'images | à venir |
 | Laser, PCB | à venir |
 | Machines | Grbl 1.1 / grblHAL par l'émulateur (choix par défaut) ou un port série : état et position, déplacement manuel, origine, zéro pièce, envoi d'un `.nc` avec progression, pause, reprise, arrêt, console |
+
+Projet CNC : fichier `.mkc`, une archive qui contient le dessin au format natif de CadCraft (`dessin.dxf` ou `dessin.dwg`), le modèle SolidCraft (`modele.sc`) et `makercraft.json` (machine, brut, brides, parcours). Les deux fichiers natifs s'extraient tels quels.
 
 Interface : une barre d'accès rapide (Fichier, Ouvrir, document ouvert, état de la machine,
 Options) puis un **ruban** dont les onglets et groupes changent avec l'atelier, choisi par le grand

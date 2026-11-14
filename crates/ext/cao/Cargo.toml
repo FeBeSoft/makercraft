@@ -9,6 +9,10 @@ rust-version.workspace = true
 [dependencies]
 makercraft-ext-api.workspace = true
 solidcraft-kernel.workspace = true
+solidcraft-io.workspace = true
+solidcore-record.workspace = true
+solidcore-tess.workspace = true
+solidcraft-viewport.workspace = true
 
 [lints]
 workspace = true

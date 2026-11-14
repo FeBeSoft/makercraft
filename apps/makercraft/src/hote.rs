@@ -11,13 +11,14 @@ use crate::theme::{self, Palette};
 
 /// Extensions compilées dans cette version de MakerCraft.
 pub fn builtin() -> Vec<Box<dyn Extension>> {
-    let mut v: Vec<Box<dyn Extension>> =
-        vec![Box::new(makercraft_ext_machine::MachineExtension), Box::new(makercraft_c2d::C2dExtension), Box::new(makercraft_cam::CamExtension)];
-    #[cfg(feature = "dao")]
-    v.push(Box::new(makercraft_dao::DaoExtension));
-    #[cfg(feature = "cao")]
-    v.push(Box::new(makercraft_cao::CaoExtension));
-    v
+    vec![
+        Box::new(makercraft_ext_machine::MachineExtension),
+        Box::new(makercraft_c2d::C2dExtension),
+        Box::new(makercraft_cam::CamExtension),
+        Box::new(makercraft_dao::DaoExtension),
+        Box::new(makercraft_cao::CaoExtension),
+        Box::new(makercraft_mkc::MkcExtension),
+    ]
 }
 
 /// Charge les extensions ; une erreur est rapportée sans empêcher le démarrage.
@@ -92,13 +93,9 @@ mod tests {
         let (host, err) = load();
         assert_eq!(err, None);
         let ids: Vec<&str> = host.extensions().iter().map(|e| e.0).collect();
-        for id in ["machine", "c2d", "cam"] {
+        for id in ["machine", "c2d", "cam", "dao", "cao", "mkc"] {
             assert!(ids.contains(&id), "{ids:?}");
         }
-        #[cfg(feature = "dao")]
-        assert!(ids.contains(&"dao"));
-        #[cfg(feature = "cao")]
-        assert!(ids.contains(&"cao"));
         let tree = menu_tree(&host);
         assert!(tree.keys().any(|k| k.starts_with("Machine")), "{:?}", tree.keys());
     }

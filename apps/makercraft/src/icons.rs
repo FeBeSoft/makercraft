@@ -37,18 +37,38 @@ pub enum Icon {
     Save,
     Undo,
     Redo,
-    /// Trajectoires d'usinage.
-    Paths,
     /// Déplacements rapides (tirets).
     Rapids,
     /// Un seul fichier.
     File,
-    /// Image (aperçu SVG).
-    Image,
     /// Chevron vers le haut (replier le ruban).
     Collapse,
     /// Chevron vers le bas (déplier).
     Expand,
+    New,
+    Trash,
+    Line,
+    Polyline,
+    Rect,
+    Circle,
+    Arc,
+    Move,
+    Copy,
+    Offset,
+    Trim,
+    Fillet,
+    /// Calques (contours).
+    Layers,
+    Pocket,
+    Drill,
+    Engrave,
+    /// Brut (pavé).
+    Stock,
+    /// Bride de serrage.
+    Clamp,
+    /// Cube (vue 3D).
+    Cube,
+    Check,
 }
 
 /// Point relatif au carré `r` : (0,0) coin haut gauche, (1,1) coin bas droit.
@@ -206,10 +226,6 @@ pub fn paint(p: &Painter, r: Rect, icon: Icon, c: Color32) {
             line(p, r, &[(f(0.2), 0.42), (f(0.62), 0.42), (f(0.82), 0.52), (f(0.86), 0.68), (f(0.78), 0.82), (f(0.6), 0.88)], s);
             line(p, r, &[(f(0.38), 0.22), (f(0.18), 0.42), (f(0.38), 0.62)], s);
         }
-        Icon::Paths => {
-            line(p, r, &[(0.1, 0.85), (0.1, 0.35), (0.35, 0.15), (0.65, 0.15), (0.9, 0.35), (0.9, 0.85)], s);
-            line(p, r, &[(0.3, 0.85), (0.3, 0.45), (0.5, 0.35), (0.7, 0.45), (0.7, 0.85)], s);
-        }
         Icon::Rapids => {
             for i in 0..4 {
                 let a = 0.08 + i as f32 * 0.24;
@@ -223,12 +239,101 @@ pub fn paint(p: &Painter, r: Rect, icon: Icon, c: Color32) {
             line(p, r, &[(0.34, 0.5), (0.68, 0.5)], s);
             line(p, r, &[(0.34, 0.68), (0.68, 0.68)], s);
         }
-        Icon::Image => {
-            p.rect_stroke(Rect::from_min_max(at(r, 0.08, 0.16), at(r, 0.92, 0.84)), cr, s, StrokeKind::Middle);
-            line(p, r, &[(0.14, 0.78), (0.4, 0.48), (0.58, 0.66), (0.7, 0.54), (0.86, 0.72)], s);
-            p.circle_filled(at(r, 0.7, 0.34), w * 1.3, c);
-        }
         Icon::Collapse => line(p, r, &[(0.2, 0.64), (0.5, 0.34), (0.8, 0.64)], s),
         Icon::Expand => line(p, r, &[(0.2, 0.36), (0.5, 0.66), (0.8, 0.36)], s),
+        Icon::New => {
+            line(p, r, &[(0.2, 0.06), (0.62, 0.06), (0.82, 0.26), (0.82, 0.94), (0.2, 0.94), (0.2, 0.06)], s);
+            line(p, r, &[(0.51, 0.4), (0.51, 0.76)], s);
+            line(p, r, &[(0.33, 0.58), (0.69, 0.58)], s);
+        }
+        Icon::Trash => {
+            line(p, r, &[(0.14, 0.24), (0.86, 0.24)], s);
+            line(p, r, &[(0.38, 0.24), (0.42, 0.1), (0.58, 0.1), (0.62, 0.24)], s);
+            line(p, r, &[(0.24, 0.24), (0.3, 0.92), (0.7, 0.92), (0.76, 0.24)], s);
+            line(p, r, &[(0.44, 0.4), (0.44, 0.78)], s);
+            line(p, r, &[(0.56, 0.4), (0.56, 0.78)], s);
+        }
+        Icon::Line => {
+            line(p, r, &[(0.15, 0.85), (0.85, 0.15)], s);
+            p.circle_filled(at(r, 0.15, 0.85), w * 1.4, c);
+            p.circle_filled(at(r, 0.85, 0.15), w * 1.4, c);
+        }
+        Icon::Polyline => {
+            line(p, r, &[(0.1, 0.8), (0.35, 0.3), (0.6, 0.65), (0.9, 0.2)], s);
+            for (x, y) in [(0.1, 0.8), (0.35, 0.3), (0.6, 0.65), (0.9, 0.2)] {
+                p.circle_filled(at(r, x, y), w * 1.2, c);
+            }
+        }
+        Icon::Rect => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.12, 0.24), at(r, 0.88, 0.76)), CornerRadius::ZERO, s, StrokeKind::Middle);
+        }
+        Icon::Circle => {
+            p.circle_stroke(r.center(), r.width() * 0.38, s);
+            p.circle_filled(r.center(), w * 1.1, c);
+        }
+        Icon::Arc => {
+            let pts: Vec<Pos2> = (0..=16).map(|i| { let a = std::f32::consts::PI * (1.0 + i as f32 / 16.0); at(r, 0.5 + 0.38 * a.cos(), 0.72 + 0.38 * a.sin()) }).collect();
+            p.add(Shape::line(pts, s));
+        }
+        Icon::Move => {
+            arrow(p, r, vec2(1.0, 0.0), s);
+            arrow(p, r, vec2(0.0, -1.0), s);
+        }
+        Icon::Copy => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.1, 0.3), at(r, 0.62, 0.9)), cr, s, StrokeKind::Middle);
+            line(p, r, &[(0.38, 0.3), (0.38, 0.1), (0.9, 0.1), (0.9, 0.7), (0.62, 0.7)], s);
+        }
+        Icon::Offset => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.3, 0.3), at(r, 0.7, 0.7)), CornerRadius::ZERO, s, StrokeKind::Middle);
+            p.rect_stroke(Rect::from_min_max(at(r, 0.1, 0.1), at(r, 0.9, 0.9)), cr, Stroke::new(w * 0.7, c), StrokeKind::Middle);
+        }
+        Icon::Trim => {
+            line(p, r, &[(0.5, 0.08), (0.5, 0.92)], s);
+            line(p, r, &[(0.1, 0.5), (0.5, 0.5)], s);
+            line(p, r, &[(0.6, 0.5), (0.9, 0.5)], Stroke::new(w * 0.6, theme_dim(c)));
+        }
+        Icon::Fillet => {
+            line(p, r, &[(0.15, 0.9), (0.15, 0.5)], s);
+            line(p, r, &[(0.5, 0.15), (0.9, 0.15)], s);
+            let pts: Vec<Pos2> = (0..=10).map(|i| { let a = std::f32::consts::PI * (1.0 + 0.5 * i as f32 / 10.0); at(r, 0.5 + 0.35 * a.cos(), 0.5 + 0.35 * a.sin()) }).collect();
+            p.add(Shape::line(pts, s));
+        }
+        Icon::Layers => {
+            for dy in [0.0, 0.2, 0.4] {
+                line(p, r, &[(0.5, 0.12 + dy), (0.9, 0.3 + dy), (0.5, 0.48 + dy), (0.1, 0.3 + dy), (0.5, 0.12 + dy)], s);
+            }
+        }
+        Icon::Pocket => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.1, 0.1), at(r, 0.9, 0.9)), cr, s, StrokeKind::Middle);
+            for y in [0.3, 0.5, 0.7] {
+                line(p, r, &[(0.24, y), (0.76, y)], Stroke::new(w * 0.8, c));
+            }
+        }
+        Icon::Drill => {
+            line(p, r, &[(0.36, 0.06), (0.36, 0.6), (0.5, 0.94), (0.64, 0.6), (0.64, 0.06)], s);
+            line(p, r, &[(0.36, 0.2), (0.64, 0.34)], Stroke::new(w * 0.8, c));
+            line(p, r, &[(0.36, 0.4), (0.64, 0.54)], Stroke::new(w * 0.8, c));
+        }
+        Icon::Engrave => {
+            line(p, r, &[(0.3, 0.06), (0.5, 0.5), (0.7, 0.06)], s);
+            line(p, r, &[(0.08, 0.8), (0.28, 0.66), (0.5, 0.8), (0.72, 0.66), (0.92, 0.8)], s);
+        }
+        Icon::Stock | Icon::Cube => {
+            line(p, r, &[(0.1, 0.35), (0.5, 0.15), (0.9, 0.35), (0.9, 0.7), (0.5, 0.9), (0.1, 0.7), (0.1, 0.35)], s);
+            line(p, r, &[(0.1, 0.35), (0.5, 0.55), (0.9, 0.35)], s);
+            line(p, r, &[(0.5, 0.55), (0.5, 0.9)], s);
+        }
+        Icon::Clamp => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.08, 0.3), at(r, 0.92, 0.5)), cr, s, StrokeKind::Middle);
+            line(p, r, &[(0.5, 0.06), (0.5, 0.3)], Stroke::new(w * 1.3, c));
+            line(p, r, &[(0.1, 0.86), (0.9, 0.86)], s);
+            line(p, r, &[(0.2, 0.5), (0.2, 0.86)], s);
+        }
+        Icon::Check => line(p, r, &[(0.15, 0.52), (0.4, 0.78), (0.86, 0.24)], Stroke::new(w * 1.3, c)),
     }
+}
+
+/// Variante atténuée d'une couleur (traits secondaires).
+fn theme_dim(c: Color32) -> Color32 {
+    Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 110)
 }

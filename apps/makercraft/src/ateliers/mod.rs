@@ -1,6 +1,7 @@
 //! Ateliers de MakerCraft (menu « Atelier », comme l'« espace de travail » de SolidCraft).
 //!
-//! - **CNC** : DAO/CAO, FAO fraiseuse, usinage 3D, gravure d'images ;
+//! - **CNC** : fraisage 2,5D (de la machine à l'usinage : machine, brut, dessin, parcours,
+//!   simulation, usinage), usinage 3D, gravure d'images ;
 //! - **Laser** ;
 //! - **PCB** (complément CNC) ;
 //! - **Machines** : infrastructure générique (laser, fraiseuse, tour...) : pilotage et périphériques.
@@ -38,8 +39,7 @@ impl Family {
 /// Atelier affiché.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Atelier {
-    CncDao,
-    CncFao,
+    Cnc,
     CncUsinage3d,
     CncGravure,
     Laser,
@@ -61,14 +61,13 @@ impl Family {
 
 impl Atelier {
     /// Tous les ateliers, dans l'ordre du menu.
-    pub const ALL: [Atelier; 7] =
-        [Atelier::CncDao, Atelier::CncFao, Atelier::CncUsinage3d, Atelier::CncGravure, Atelier::Laser, Atelier::Pcb, Atelier::Machines];
+    pub const ALL: [Atelier; 6] =
+        [Atelier::Cnc, Atelier::CncUsinage3d, Atelier::CncGravure, Atelier::Laser, Atelier::Pcb, Atelier::Machines];
 
     /// Identifiant stable (préférences, ligne de commande).
     pub fn id(self) -> &'static str {
         match self {
-            Self::CncDao => "cnc.dao",
-            Self::CncFao => "cnc.fao",
+            Self::Cnc => "cnc",
             Self::CncUsinage3d => "cnc.usinage3d",
             Self::CncGravure => "cnc.gravure",
             Self::Laser => "laser",
@@ -78,14 +77,15 @@ impl Atelier {
     }
 
     pub fn from_id(id: &str) -> Option<Self> {
+        // anciens identifiants (v0.1 : DAO/CAO et FAO séparés)
+        let id = if matches!(id, "cnc.dao" | "cnc.fao") { "cnc" } else { id };
         Self::ALL.into_iter().find(|a| a.id() == id)
     }
 
     /// Une ligne : à quoi sert l'atelier (menu des ateliers).
     pub fn description(self) -> &'static str {
         match self {
-            Self::CncDao => "Dessiner et préparer les pièces, lire les projets et modèles.",
-            Self::CncFao => "Parcours d'outil, vérifications et G-code pour la fraiseuse.",
+            Self::Cnc => "De la machine à l'usinage : brut, dessin 2D, parcours, simulation 3D.",
             Self::CncUsinage3d => "Reliefs et pièces 3D à partir des modèles SolidCraft.",
             Self::CncGravure => "Gravure d'images en niveaux de gris.",
             Self::Laser => "Découpe et gravure au laser, vectorielle et ligne à ligne.",
@@ -97,8 +97,7 @@ impl Atelier {
     /// Ce que contient l'atelier (menu des ateliers) ; vide pour un atelier à venir.
     pub fn contents(self) -> &'static str {
         match self {
-            Self::CncDao => "Vue 2D · Calques · .c2d, DXF, STEP",
-            Self::CncFao => "Parcours · Vérifications · Trajectoires · Export .nc",
+            Self::Cnc => "Machine · Brut · Dessin · Parcours · Simulation · Usinage",
             Self::Machines => "Connexion · État · Déplacement · Programme · Console",
             Self::CncUsinage3d | Self::CncGravure | Self::Laser | Self::Pcb => "",
         }
@@ -106,7 +105,7 @@ impl Atelier {
 
     pub fn family(self) -> Family {
         match self {
-            Self::CncDao | Self::CncFao | Self::CncUsinage3d | Self::CncGravure => Family::Cnc,
+            Self::Cnc | Self::CncUsinage3d | Self::CncGravure => Family::Cnc,
             Self::Laser => Family::Laser,
             Self::Pcb => Family::Pcb,
             Self::Machines => Family::Machines,
@@ -115,8 +114,7 @@ impl Atelier {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::CncDao => "DAO / CAO",
-            Self::CncFao => "FAO fraiseuse",
+            Self::Cnc => "Fraisage 2,5D",
             Self::CncUsinage3d => "Usinage 3D",
             Self::CncGravure => "Gravure d'images",
             Self::Laser => "Laser",
@@ -134,7 +132,7 @@ impl Atelier {
     }
 
     pub fn available(self) -> bool {
-        matches!(self, Self::CncDao | Self::CncFao | Self::Machines)
+        matches!(self, Self::Cnc | Self::Machines)
     }
 
     /// Ce que l'atelier apportera (écran « à venir »).
@@ -142,7 +140,7 @@ impl Atelier {
         match self {
             Self::CncUsinage3d => (
                 "Usinage de reliefs et de pièces 3D à partir des modèles SolidCraft.",
-                &["Import STEP par le noyau SolidCraft (déjà lu dans DAO / CAO)", "Ébauche par niveaux et finition en balayage", "Simulation de l'enlèvement de matière"],
+                &["Import STEP par le noyau SolidCraft", "Ébauche par niveaux et finition en balayage", "Simulation de l'enlèvement de matière"],
             ),
             Self::CncGravure => (
                 "Gravure d'images en niveaux de gris à la fraise en V ou à la pointe.",
@@ -156,7 +154,7 @@ impl Atelier {
                 "Fabrication de circuits imprimés à la fraiseuse, en complément de l'atelier CNC.",
                 &["Import Gerber et Excellon", "Isolation des pistes et perçage", "Palpage de la planéité (carte de hauteur)"],
             ),
-            Self::CncDao | Self::CncFao | Self::Machines => ("", &[]),
+            Self::Cnc | Self::Machines => ("", &[]),
         }
     }
 }
@@ -198,10 +196,11 @@ mod tests {
 
     #[test]
     fn every_atelier_belongs_to_its_family() {
-        for a in [Atelier::CncDao, Atelier::CncFao, Atelier::CncUsinage3d, Atelier::CncGravure] {
+        for a in [Atelier::Cnc, Atelier::CncUsinage3d, Atelier::CncGravure] {
             assert_eq!(a.family(), Family::Cnc);
         }
-        assert_eq!(Atelier::CncFao.title(), "CNC - FAO fraiseuse");
+        assert_eq!(Atelier::Cnc.title(), "CNC - Fraisage 2,5D");
+        assert_eq!(Atelier::from_id("cnc.fao"), Some(Atelier::Cnc));
     }
 
     #[test]

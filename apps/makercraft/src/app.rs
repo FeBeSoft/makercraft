@@ -75,7 +75,7 @@ impl App {
             host,
             host_error,
             menus,
-            atelier: atelier.unwrap_or(Atelier::CncDao),
+            atelier: atelier.unwrap_or(Atelier::Cnc),
             switcher: Switcher::default(),
             ribbon: Ribbon::default(),
             logo: None,
@@ -130,9 +130,7 @@ impl App {
             self.atelier = Atelier::Machines;
             self.machines.load_program(path)
         } else {
-            if self.atelier.family() != Family::Cnc {
-                self.atelier = Atelier::CncDao;
-            }
+            self.atelier = Atelier::Cnc;
             self.cnc.open(path)
         };
         match r {
@@ -211,6 +209,9 @@ impl eframe::App for App {
         if ctx.input_mut(|i| i.consume_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::O))) {
             actions.push(Action::OpenDialog);
         }
+        if self.atelier == Atelier::Cnc && ctx.input_mut(|i| i.consume_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::S))) {
+            actions.push(Action::Ribbon("cnc.enregistrer"));
+        }
 
         egui::CentralPanel::default().frame(egui::Frame::new().fill(pal.window)).show(ui, |ui| {
             let full = ui.max_rect();
@@ -274,9 +275,12 @@ impl App {
         if quick_button(&mut m, pal, Icon::Open, "Ouvrir (Ctrl+O)", true) {
             actions.push(Action::OpenDialog);
         }
-        quick_button(&mut m, pal, Icon::Save, "Enregistrer : pas encore disponible", false);
-        quick_button(&mut m, pal, Icon::Undo, "Annuler : pas encore disponible", false);
-        quick_button(&mut m, pal, Icon::Redo, "Rétablir : pas encore disponible", false);
+        let cnc = self.atelier == Atelier::Cnc;
+        for (icon, tip, id) in [(Icon::Save, "Enregistrer (Ctrl+S)", "cnc.enregistrer"), (Icon::Undo, "Annuler", "cnc.annuler"), (Icon::Redo, "Rétablir", "cnc.retablir")] {
+            if quick_button(&mut m, pal, icon, if cnc { tip } else { "Dans l'atelier CNC" }, cnc) {
+                actions.push(Action::Ribbon(id));
+            }
+        }
         if self.atelier.family() == Family::Cnc
             && let Some(n) = self.cnc.file_name()
         {
@@ -327,8 +331,15 @@ impl App {
         p.vline(r.left() + SWITCH_W, (r.top() + 6.0)..=(r.bottom() - 6.0), Stroke::new(1.0, pal.bar_line));
         let tabs = self.ribbon_tabs();
         let collapsed = self.ribbon.collapsed;
+        // atelier CNC : les onglets du ruban sont les étapes, de la machine à l'usinage
+        if self.atelier == Atelier::Cnc {
+            self.ribbon.tab = self.cnc.step.index();
+        }
         let tr = Rect::from_min_max(pos2(r.left() + SWITCH_W + 6.0, r.top()), pos2(r.right() - 6.0, r.top() + ribbon::TAB_ROW_H));
         self.ribbon.tabs_ui(ui, tr, pal, &tabs, self.atelier.family().accent(pal));
+        if self.atelier == Atelier::Cnc {
+            self.cnc.step = cnc::Step::from_index(self.ribbon.tab);
+        }
         if !collapsed {
             p.hline(tr.left()..=r.right(), tr.bottom() - 0.5, Stroke::new(1.0, pal.bar_line));
             let br = Rect::from_min_max(pos2(tr.left(), tr.bottom()), pos2(r.right() - 6.0, r.bottom()));
@@ -340,7 +351,7 @@ impl App {
 
     fn ribbon_tabs(&self) -> Vec<Tab> {
         match self.atelier {
-            Atelier::CncDao | Atelier::CncFao => self.cnc.ribbon(self.atelier),
+            Atelier::Cnc => self.cnc.ribbon(),
             Atelier::Machines => self.machines.ribbon(),
             _ => vec![Tab { label: "Accueil", groups: Vec::new(), empty_note: "Cet atelier arrive dans une prochaine version : son ruban est vide pour l'instant." }],
         }
@@ -362,11 +373,18 @@ impl App {
         for r in req {
             match r {
                 cnc::Request::OpenDialog => self.open_dialog(),
-                cnc::Request::RecentDir(d) => {
-                    self.prefs.add_recent_dir(&d);
+                cnc::Request::Status(s) => self.status = s,
+                cnc::Request::Recent(p) => {
+                    self.prefs.add_recent(&p);
                     self.save_prefs();
                 }
-                cnc::Request::Status(s) => self.status = s,
+                cnc::Request::SendProgram(p) => match self.machines.load_program(&p) {
+                    Ok(msg) => {
+                        self.set_atelier(Atelier::Machines);
+                        self.status = format!("Programme ouvert dans l'atelier Machines : {msg}");
+                    }
+                    Err(e) => self.status = format!("Programme illisible : {e}"),
+                },
             }
         }
     }
@@ -474,9 +492,9 @@ impl App {
     fn body(&mut self, ui: &mut Ui, pal: &Palette) {
         let units = self.prefs.units;
         match self.atelier {
-            Atelier::CncDao | Atelier::CncFao => {
+            Atelier::Cnc => {
                 let mut req = Vec::new();
-                self.cnc.ui(ui, pal, units, self.atelier, &mut req);
+                self.cnc.ui(ui, pal, units, &mut req);
                 self.cnc_requests(req);
             }
             Atelier::Machines => {

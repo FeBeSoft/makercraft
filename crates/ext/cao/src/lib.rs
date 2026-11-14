@@ -8,6 +8,8 @@
 //! Pour la v0.1, l'adaptateur lit un fichier STEP et en donne les corps avec leurs mesures
 //! (volume, surface, encombrement) : c'est la porte d'entrée de l'usinage 3D à venir.
 
+pub mod view3d;
+
 use std::path::Path;
 
 use makercraft_ext_api::{CommandSpec, ExtError, Extension, Registry, Value, json};

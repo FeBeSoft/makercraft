@@ -37,7 +37,7 @@ impl Page {
             Self::General => &["Interface", "Démarrage"],
             Self::Files => &["Dossiers", "Récents"],
             Self::Extension(_) => &["Commandes"],
-            Self::About => &["Auteur", "Remerciements", "Droits d'auteur", "Sources", "Mises à jour", "Contact"],
+            Self::About => &["Auteur", "Remerciements", "Droits d'auteur", "Sources", "Mises à jour", "Confidentialité (RGPD)", "Contact"],
         }
     }
 }
@@ -246,6 +246,10 @@ impl Options {
                 (Page::About, 2) => about_rights(ui, pal),
                 (Page::About, 3) => about_sources(ui, pal),
                 (Page::About, 4) => about_updates(ui, pal),
+                (Page::About, 5) => {
+                    ui.add_space(4.0);
+                    text_box(ui, pal, &about::rgpd());
+                }
                 (Page::About, _) => about_contact(ui, pal),
             }
         });

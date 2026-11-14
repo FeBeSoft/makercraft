@@ -16,7 +16,6 @@ mod prefs;
 mod ribbon;
 mod switcher;
 mod theme;
-mod view2d;
 mod widgets;
 
 use std::path::PathBuf;

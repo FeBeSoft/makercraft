@@ -1,0 +1,16 @@
+[package]
+name = "makercraft-mkc"
+description = "MakerCraft : projet .mkc (dessin CadCraft, modèle SolidCraft et données MakerCraft dans une archive)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+makercraft-ext-api.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+zip.workspace = true
+
+[lints]
+workspace = true

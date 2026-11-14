@@ -9,6 +9,9 @@
 //! Entités lues : LINE, LWPOLYLINE (avec arrondis « bulge »), POLYLINE/VERTEX, CIRCLE, ARC,
 //! POINT. Les autres (textes, cotes, splines, blocs) sont comptées et signalées, pas dessinées.
 
+pub mod sketch;
+pub use sketch::{LayerInfo, Sketch};
+
 use std::collections::BTreeMap;
 use std::f64::consts::TAU;
 use std::path::Path;
