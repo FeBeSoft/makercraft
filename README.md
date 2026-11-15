@@ -51,6 +51,16 @@ En développement, pas encore diffusé : le code sera publié ici avec la premi�
 
 Licence prévue / Planned license : GPL-3.0
 
+## Remerciements / Credits
+
+Merci à tous ceux dont le travail a rendu MakerCraft possible / Thanks to everyone whose work made MakerCraft possible:
+
+- [CadCraft](https://github.com/storytold/cadcraft) et [SolidCraft](https://github.com/bherbruck/solidcraft), dont MakerCraft utilise la lecture DXF et le noyau 3D
+- [LaserGRBL](https://github.com/arkypita/LaserGRBL), [Candle](https://github.com/Denvi/Candle) et [Universal G-Code Sender](https://github.com/winder/Universal-G-Code-Sender), dont le pilotage des machines Grbl s'inspire
+- [Grbl](https://github.com/gnea/grbl) et [grblHAL](https://github.com/grblHAL)
+- Emil Ernerfeldt et les contributeurs d'[egui / eframe](https://github.com/emilk/egui)
+- les équipes de Rust, serde, rusqlite et geo
+
 ---
 
 <p align="center">Un projet <a href="https://fe-be.fr">FeBe</a> - logiciels libres pour makers</p>
