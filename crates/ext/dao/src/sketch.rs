@@ -104,15 +104,26 @@ impl Sketch {
 
     /// Ajoute un calque s'il n'existe pas ; renvoie vrai s'il a été créé.
     pub fn add_layer(&mut self, name: &str) -> bool {
+        // couleurs bien distinctes pour les contours : bleu, rouge, vert, magenta, cyan, jaune...
+        const ACI: [u8; 8] = [5, 1, 3, 6, 4, 2, 30, 150];
         match self.session.doc_mut() {
-            Ok(d) => d.ensure_layer(name),
+            Ok(d) => {
+                let created = d.ensure_layer(name);
+                if created {
+                    let n = d.layers.len();
+                    if let Some(l) = d.layers.last_mut() {
+                        l.color = cadcraft_color::Color::Index(ACI[n % ACI.len()]);
+                    }
+                }
+                created
+            }
             Err(_) => false,
         }
     }
 
     pub fn set_current_layer(&mut self, name: &str) {
+        self.add_layer(name);
         if let Ok(d) = self.session.doc_mut() {
-            d.ensure_layer(name);
             d.header.set_str("CLAYER", name);
         }
     }

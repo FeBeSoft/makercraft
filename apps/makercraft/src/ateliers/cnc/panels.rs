@@ -10,16 +10,19 @@ use crate::theme::{self, Palette};
 use crate::widgets::{self, Kind};
 
 pub fn show(c: &mut Cnc, ui: &mut Ui, pal: &Palette, units: Units, req: &mut Vec<Request>) {
-    // fil d'étapes : où l'on en est dans la chronologie
-    ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing.x = 4.0;
-        for (i, s) in Step::ALL.iter().enumerate() {
-            let cur = *s == c.step;
-            let t = RichText::new(format!("{} {}", i + 1, s.label())).size(12.0).color(if cur { pal.blue } else { pal.dim });
-            if ui.add(egui::Label::new(if cur { t.strong() } else { t }).sense(Sense::click())).clicked() {
-                c.step = *s;
+    // où l'on en est dans la chronologie, avec l'étape précédente et la suivante
+    let i = c.step.index();
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(format!("ÉTAPE {} / {}", i + 1, Step::ALL.len())).font(theme::bold(11.0)).color(pal.dim));
+        ui.label(RichText::new(c.step.label()).font(theme::bold(15.0)).color(pal.blue));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui.add_enabled(i + 1 < Step::ALL.len(), egui::Button::new(">").small()).on_hover_text("Étape suivante").clicked() {
+                c.step = Step::from_index(i + 1);
             }
-        }
+            if ui.add_enabled(i > 0, egui::Button::new("<").small()).on_hover_text("Étape précédente").clicked() {
+                c.step = Step::from_index(i - 1);
+            }
+        });
     });
     let _ = units;
     match c.step {
@@ -156,7 +159,7 @@ fn drawing(c: &mut Cnc, ui: &mut Ui, pal: &Palette, req: &mut Vec<Request>) {
     let layers = c.sketch.layers();
     let current = c.sketch.current_layer();
     widgets::card(ui, pal, Some("Contours (un calque = un contour)"), |ui| {
-        for l in layers.iter().filter(|l| l.name != "0" || l.objects > 0) {
+        for l in layers.iter().filter(|l| l.name != "Defpoints" && (l.name != "0" || l.objects > 0)) {
             let paths = c.sketch.contours(&l.name, 0.05);
             let closed = paths.iter().filter(|p| p.closed).count();
             ui.horizontal(|ui| {
@@ -341,7 +344,10 @@ fn machining(c: &mut Cnc, ui: &mut Ui, pal: &Palette, req: &mut Vec<Request>) {
     widgets::card(ui, pal, Some("Programme"), |ui| {
         ui.label(format!("{} outil(s), {} parcours", job.groups.len(), job.groups.iter().map(|g| g.ops.len()).sum::<usize>()));
         for g in &job.groups {
-            widgets::pill(ui, &makercraft_cam::job::tool_label(&g.tool), pal.orange_soft, pal.orange);
+            ui.horizontal(|ui| {
+                widgets::pill(ui, &format!("T{}", g.tool.number), pal.orange_soft, pal.orange);
+                ui.add(egui::Label::new(RichText::new(format!("{}  -  Ø{:.2} mm", g.tool.name, g.tool.diameter)).size(13.0)).truncate());
+            });
         }
         ui.label(RichText::new("Un seul fichier Grbl : pause M0 à chaque changement d'outil.").size(12.5).color(pal.weak));
         ui.horizontal(|ui| {

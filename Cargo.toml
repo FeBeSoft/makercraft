@@ -49,6 +49,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 # SolidCraft remplacent egui-wgpu et winit par des copies différentes, incompatibles entre elles.
 # Ni patch ni modification de leurs sources : ils sont compilés tels quels.
 cadcraft-dxf      = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
+cadcraft-color    = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
 cadcraft-doc      = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
 cadcraft-geom     = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
 cadcraft-engine   = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }

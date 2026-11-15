@@ -473,7 +473,9 @@ impl App {
         p.circle_filled(pos2(r.left() + 18.0, r.center().y), 4.0, accent);
         let a = p.text(pos2(r.left() + 30.0, r.center().y), Align2::LEFT_CENTER, self.atelier.title(), theme::bold(12.5), pal.text);
         let mut x = a.right() + 18.0;
-        if let Some(n) = self.cnc.file_name() {
+        if self.atelier == Atelier::Cnc
+            && let Some(n) = self.cnc.file_name()
+        {
             let t = p.text(pos2(x, r.center().y), Align2::LEFT_CENTER, n, theme::mono(12.0), pal.weak);
             x = t.right() + 18.0;
         }

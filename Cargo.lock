@@ -2782,6 +2782,7 @@ dependencies = [
 name = "makercraft-dao"
 version = "0.1.0"
 dependencies = [
+ "cadcraft-color",
  "cadcraft-doc",
  "cadcraft-dxf",
  "cadcraft-engine",

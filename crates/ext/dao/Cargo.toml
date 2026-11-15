@@ -11,6 +11,7 @@ makercraft-geom.workspace = true
 makercraft-ext-api.workspace = true
 cadcraft-dxf.workspace = true
 cadcraft-doc.workspace = true
+cadcraft-color.workspace = true
 cadcraft-geom.workspace = true
 cadcraft-engine.workspace = true
 cadcraft-io.workspace = true
