@@ -18,7 +18,7 @@ pub mod preview;
 use makercraft_geom::{Vec2, Vec3};
 
 pub use ext::CamExtension;
-pub use job::{Job, ToolGroup, job_from_c2d};
+pub use job::{Job, Park, ToolGroup, job_from_c2d};
 
 /// Un déplacement.
 #[derive(Debug, Clone, Copy, PartialEq)]

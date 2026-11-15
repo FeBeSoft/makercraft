@@ -63,11 +63,11 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
 }
 
 fn describe_error(code: u16) -> String {
-    codes::error(code).map(|c| format!("error:{code} — {}", c.brief)).unwrap_or_else(|| format!("error:{code}"))
+    codes::error(code).map(|c| format!("error:{code} - {}", c.explain())).unwrap_or_else(|| format!("error:{code}"))
 }
 
 fn describe_alarm(code: u16) -> String {
-    codes::alarm(code).map(|c| format!("ALARM:{code} — {} : {}", c.brief, c.description)).unwrap_or_else(|| format!("ALARM:{code}"))
+    codes::alarm(code).map(|c| format!("ALARM:{code} - {}", c.explain())).unwrap_or_else(|| format!("ALARM:{code}"))
 }
 
 fn fmt_duration(d: Duration) -> String {

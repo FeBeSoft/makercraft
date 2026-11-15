@@ -165,7 +165,10 @@ impl Cnc {
         let stale = self.job_cache.as_ref().is_none_or(|(k, _)| *k != key);
         if stale {
             let title = self.path.as_ref().and_then(|p| p.file_stem()).map_or_else(|| "Sans titre".to_owned(), |s| s.to_string_lossy().into_owned());
-            let job = toolpaths::job(&self.project, &self.sketch, &title);
+            let mut job = toolpaths::job(&self.project, &self.sketch, &title);
+            if let Ok(db) = self.tooldb() {
+                set_holders(&mut job, &key.0, db);
+            }
             self.job_cache = Some((key, job));
         }
         match &self.job_cache {
@@ -661,6 +664,25 @@ fn clone_item(i: &Item) -> Item {
     Item { id: i.id, label: i.label, icon: i.icon, large: i.large, enabled: i.enabled, checked: i.checked, tone: i.tone, tip: i.tip.clone() }
 }
 
+/// Pince ER11 (profil de l'atelier) et queue (banque d'outils) de chaque outil du travail, pour le
+/// rappel écrit avant chaque changement d'outil.
+fn set_holders(job: &mut Job, project: &Project, db: &ToolDb) {
+    let atelier = db.profile_tools(&project.machine.tooldb_id).unwrap_or_default();
+    let known: Vec<(String, f64, Option<f64>, Option<f64>)> = project
+        .toolpaths
+        .iter()
+        .filter(|tp| !tp.tool.id.is_empty())
+        .map(|tp| {
+            let collet = atelier.iter().find(|a| a.tool.id == tp.tool.id).map(|a| a.collet_mm);
+            let shank = db.tool(&tp.tool.id).ok().and_then(|t| t.shank_mm);
+            (tp.tool.name.clone(), tp.tool.diameter, collet, shank)
+        })
+        .collect();
+    job.set_holders(|t| {
+        known.iter().find(|k| k.0 == t.name && (k.1 - t.diameter).abs() < 1e-9).map_or((None, None), |k| (k.2, k.3))
+    });
+}
+
 /// Le cache est toujours rempli juste avant : ce chemin n'est jamais pris.
 fn unreachable_job() -> &'static Job {
     static EMPTY: std::sync::OnceLock<Job> = std::sync::OnceLock::new();
@@ -672,6 +694,7 @@ fn unreachable_job() -> &'static Job {
         groups: Vec::new(),
         design: Vec::new(),
         warnings: Vec::new(),
+        park: makercraft_cam::Park::default(),
     })
 }
 

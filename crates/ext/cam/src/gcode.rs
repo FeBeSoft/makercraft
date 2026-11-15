@@ -5,9 +5,10 @@
 //! donc translittérés, et les parenthèses internes remplacées (Grbl n'imbrique pas les
 //! commentaires). Pas de G2/G3 pour l'instant : arcs en segments (comme Carbide Create).
 
+use makercraft_c2d::ToolKind;
 use makercraft_geom::Vec3;
 
-use crate::job::{Job, ToolGroup, tool_label};
+use crate::job::{Job, Park, ToolGroup, tool_label};
 use crate::{Move, Step};
 
 /// Texte → ASCII imprimable sûr pour un commentaire Grbl.
@@ -160,15 +161,50 @@ fn group_body(w: &mut Writer, job: &Job, g: &ToolGroup) {
     w.line("M5");
 }
 
+/// Rappel de l'outil et de la pince ER11 à monter (texte de commentaire, translittéré à l'écriture).
+pub fn tool_reminder(g: &ToolGroup) -> String {
+    let t = &g.tool;
+    let kind = match t.kind {
+        ToolKind::Flat => "fraise plate".to_owned(),
+        ToolKind::Ball => "fraise boule".to_owned(),
+        ToolKind::VBit => format!("fraise en V {} deg", num(t.angle)),
+        ToolKind::Other(_) => "outil".to_owned(),
+    };
+    let holder = match (g.collet_mm, g.shank_mm) {
+        (Some(c), _) => format!("pince ER11 {}", num(c)),
+        (None, Some(s)) => format!("queue {} mm", num(s)),
+        (None, None) => "verifier la pince".to_owned(),
+    };
+    format!("Changer outil T{} : {kind} {} - {holder}", t.number, num(t.diameter))
+}
+
+/// Fin de programme : Z de sécurité d'abord, puis dégagement XY, puis `M2`.
+fn ending(w: &mut Writer, job: &Job) {
+    let safe = job.heights.safe_z;
+    w.rapid_z(safe);
+    match job.park {
+        Park::Stock { margin } => w.mv(&Move::Rapid(Vec3::new(0.0, job.stock_size.1 + margin, safe))),
+        Park::Work { x, y } => w.mv(&Move::Rapid(Vec3::new(x, y, safe))),
+        Park::Machine { x, y } => {
+            w.comment("Degagement en coordonnees machine [prise d'origine faite]");
+            w.line(&format!("G53 G0 X{} Y{}", num(x), num(y)));
+            w.motion = 0;
+            w.axes[0] = None;
+            w.axes[1] = None;
+        }
+    }
+    w.line("M2");
+}
+
 /// Un fichier pour un groupe d'outil (à lancer après avoir fait le zéro avec CET outil).
 pub fn write_group(job: &Job, index: usize) -> Option<String> {
     let g = job.groups.get(index)?;
     let mut w = Writer::new();
     header(&mut w, job, &format!("Fichier {}/{} - outil {}", index + 1, job.groups.len(), tool_label(&g.tool)));
+    w.comment(&tool_reminder(g));
     w.comment("Monter cet outil et faire le zero X Y Z avant de lancer");
     group_body(&mut w, job, g);
-    w.mv(&Move::Rapid(Vec3::new(0.0, 0.0, job.heights.safe_z)));
-    w.line("M2");
+    ending(&mut w, job);
     Some(w.out)
 }
 
@@ -181,14 +217,16 @@ pub fn write_all(job: &Job) -> String {
             w.rapid_z(job.heights.safe_z);
             w.mv(&Move::Rapid(Vec3::new(0.0, 0.0, job.heights.safe_z)));
             w.comment(&format!("CHANGEMENT D'OUTIL : monter {}, refaire le zero Z, puis reprendre", tool_label(&g.tool)));
+            // juste avant M0 : l'atelier Machines affiche ce rappel pendant la pause
+            w.comment(&tool_reminder(g));
             w.line("M0");
         } else {
             w.comment(&format!("Outil : {}", tool_label(&g.tool)));
+            w.comment(&tool_reminder(g));
         }
         group_body(&mut w, job, g);
     }
-    w.mv(&Move::Rapid(Vec3::new(0.0, 0.0, job.heights.safe_z)));
-    w.line("M2");
+    ending(&mut w, job);
     w.out
 }
 
@@ -230,9 +268,10 @@ mod tests {
             stock_size: (290.0, 170.0, 9.0),
             machine: "Shapeoko 3".into(),
             heights: Heights { safe_z: 10.0, clear_z: 1.0 },
-            groups: vec![ToolGroup { tool: tool.clone(), ops: vec![op.clone()] }, ToolGroup { tool, ops: vec![op] }],
+            groups: vec![ToolGroup::new(tool.clone(), vec![op.clone()]), ToolGroup::new(Tool { number: 2, ..tool }, vec![op])],
             design: vec![],
             warnings: vec![],
+            park: Park::default(),
         }
     }
 
@@ -243,7 +282,7 @@ mod tests {
         let lines: Vec<&str> = g.lines().filter(|l| !l.starts_with('(')).collect();
         assert_eq!(
             lines,
-            ["G90 G94 G17", "G21", "G0 Z10", "M3 S10000", "G4 P2", "X5 Y5", "Z1", "G1 Z-2 F300", "X15 F800", "Y9", "G0 Z10", "M5", "X0 Y0", "M2"]
+            ["G90 G94 G17", "G21", "G0 Z10", "M3 S10000", "G4 P2", "X5 Y5", "Z1", "G1 Z-2 F300", "X15 F800", "Y9", "G0 Z10", "M5", "X0 Y180", "M2"]
         );
     }
 
@@ -253,5 +292,34 @@ mod tests {
         assert_eq!(all.matches("M0\n").count(), 1);
         assert!(all.contains("CHANGEMENT D'OUTIL"));
         assert!(all.bytes().all(|b| b.is_ascii()));
+    }
+
+    #[test]
+    fn collet_reminder_just_before_m0() {
+        let mut j = job();
+        j.set_holders(|t| if t.number == 2 { (Some(3.175), None) } else { (None, Some(3.175)) });
+        let all = write_all(&j);
+        assert!(all.bytes().all(|b| b.is_ascii()), "{all}");
+        let lines: Vec<&str> = all.lines().collect();
+        let Some(i) = lines.iter().position(|l| *l == "M0") else { panic!("M0 absent") };
+        assert_eq!(lines[i - 1], "(Changer outil T2 : fraise plate 3.175 - pince ER11 3.175)");
+        assert!(all.contains("(Changer outil T102 : fraise plate 3.175 - queue 3.175 mm)"), "{all}");
+        let Some(g) = write_group(&job(), 0) else { panic!("groupe absent") };
+        assert!(g.contains("- verifier la pince)"), "{g}");
+    }
+
+    #[test]
+    fn ending_lifts_z_then_parks() {
+        let mut j = job();
+        j.park = Park::Work { x: 20.0, y: 150.0 };
+        let all = write_all(&j);
+        let tail: Vec<&str> = all.lines().rev().take(4).collect();
+        assert_eq!(tail, ["M2", "X20 Y150", "M5", "G0 Z10"]);
+        j.park = Park::for_machine(true, Some((-5.0, -2.0)));
+        let all = write_all(&j);
+        let tail: Vec<&str> = all.lines().rev().filter(|l| !l.starts_with('(')).take(3).collect();
+        assert_eq!(tail, ["M2", "G53 G0 X-5 Y-2", "M5"]);
+        assert!(all.bytes().all(|b| b.is_ascii()));
+        assert_eq!(Park::for_machine(false, Some((1.0, 1.0))), Park::default());
     }
 }

@@ -87,7 +87,7 @@ pub fn job(project: &Project, sketch: &Sketch, title: &str) -> Job {
             g.ops.push(op);
         } else {
             let number = groups.len() as i64 + 1;
-            groups.push(ToolGroup { tool: tool_of(tp, number), ops: vec![op] });
+            groups.push(ToolGroup::new(tool_of(tp, number), vec![op]));
         }
     }
     let s = project.stock.size;
@@ -100,6 +100,7 @@ pub fn job(project: &Project, sketch: &Sketch, title: &str) -> Job {
         groups,
         design: contours_of(sketch, &all),
         warnings: Vec::new(),
+        park: makercraft_cam::Park::default(),
     }
 }
 

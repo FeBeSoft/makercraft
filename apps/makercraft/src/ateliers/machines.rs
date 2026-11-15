@@ -10,7 +10,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use eframe::egui::{self, Key, RichText, ScrollArea, Sense, TextEdit, Ui, UiBuilder, pos2, vec2};
-use makercraft_ext_machine::protocol::prepare_line;
+use makercraft_ext_machine::codes;
+use makercraft_ext_machine::program::ProgramText;
 use makercraft_ext_machine::transport::{PortInfo, list_ports};
 use makercraft_ext_machine::{Controller, ControllerOptions, Event, MachineState, MachineStatus, Progress, TransportConfig};
 
@@ -35,7 +36,8 @@ pub enum Request {
 
 struct Program {
     path: PathBuf,
-    lines: Vec<String>,
+    /// Lignes à envoyer et commentaires des pauses `M0` (rappel d'outil et de pince).
+    text: ProgramText,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,6 +64,10 @@ pub struct Machines {
     progress: Progress,
     run: Run,
     paused: bool,
+    /// Dernière alarme reçue, tant que la machine reste en alarme (bandeau d'état).
+    alarm: Option<u16>,
+    /// Pause programmée (`M0`) en cours : commentaire qui la précède dans le programme.
+    pause_note: Option<String>,
     step: f64,
     feed: f64,
     /// Confirmation demandée avant l'envoi à une vraie machine.
@@ -85,6 +91,8 @@ impl Default for Machines {
             progress: Progress::default(),
             run: Run::Idle,
             paused: false,
+            alarm: None,
+            pause_note: None,
             step: 1.0,
             feed: 600.0,
             confirm: false,
@@ -93,10 +101,11 @@ impl Default for Machines {
 }
 
 /// Lit un programme G-code : seules les lignes que le contrôleur enverra sont gardées (sans les
-/// commentaires ni les lignes vides), pour que le compte affiché soit celui de l'envoi.
-pub fn read_program(path: &Path) -> Result<Vec<String>, String> {
+/// commentaires ni les lignes vides), pour que le compte affiché soit celui de l'envoi ; les
+/// commentaires qui précèdent les pauses `M0` sont gardés à part.
+pub fn read_program(path: &Path) -> Result<ProgramText, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{} : {e}", path.display()))?;
-    Ok(text.lines().filter(|l| prepare_line(l).is_some()).map(str::to_owned).collect())
+    Ok(ProgramText::parse(&text))
 }
 
 impl Machines {
@@ -171,16 +180,20 @@ impl Machines {
                 Event::Firmware(f) => {
                     self.firmware = Some(format!("{:?} {}", f.firmware, f.version()));
                 }
-                Event::Status(s) => self.status = s,
+                Event::Status(s) => {
+                    self.status = s;
+                    self.on_state();
+                }
                 Event::Sent { .. } => {}
                 Event::Ack { line, result: Err(code), .. } => {
-                    let d = makercraft_ext_machine::codes::error(code).map(|c| c.brief).unwrap_or("erreur inconnue");
-                    self.log(format!("error:{code} ({d}) sur « {line} »"));
+                    let d = codes::error(code).map_or_else(|| "erreur inconnue".to_owned(), |c| c.explain());
+                    self.log(format!("error:{code} sur « {line} » : {d}"));
                 }
                 Event::Ack { .. } => {}
                 Event::Alarm(code) => {
-                    let d = makercraft_ext_machine::codes::alarm(code).map(|c| c.brief).unwrap_or("alarme");
+                    let d = codes::alarm(code).map_or_else(|| "alarme inconnue".to_owned(), |c| c.explain());
                     self.log(format!("ALARME {code} : {d}"));
+                    self.alarm = Some(code);
                 }
                 Event::Line(l) => self.log(l),
                 Event::Progress(p) => self.progress = p,
@@ -213,10 +226,39 @@ impl Machines {
         }
     }
 
+    /// Suit l'état reçu : fin d'alarme, pause programmée (`M0`) et son rappel.
+    fn on_state(&mut self) {
+        if self.status.state != MachineState::Alarm {
+            self.alarm = None;
+        }
+        let hold = self.status.state == MachineState::Hold;
+        if !hold {
+            self.pause_note = None;
+            return;
+        }
+        // en pause sans que l'opérateur l'ait demandé : c'est un M0 du programme
+        if self.run == Run::Running && !self.paused && self.pause_note.is_none() {
+            let note = self.program.as_ref().and_then(|p| p.text.note_before(self.progress.sent)).map(str::to_owned);
+            let note = note.unwrap_or_else(|| "pause du programme (M0)".to_owned());
+            self.log(format!("Pause programme : {note}  -  Reprise pour continuer"));
+            self.pause_note = Some(note);
+            self.paused = true;
+        }
+    }
+
+    /// Message du bandeau d'état : alarme en cours ou rappel de la pause programmée.
+    pub fn banner(&self) -> Option<(bool, String)> {
+        if let Some(code) = self.alarm {
+            let t = codes::alarm(code).map_or_else(|| format!("Alarme {code}"), |c| format!("Alarme {code} : {} - à faire : {}", c.label(), c.action));
+            return Some((true, t));
+        }
+        self.pause_note.as_ref().map(|n| (false, format!("Pause : {n}")))
+    }
+
     pub fn load_program(&mut self, path: &Path) -> Result<String, String> {
-        let lines = read_program(path)?;
-        let n = lines.len();
-        self.program = Some(Program { path: path.to_path_buf(), lines });
+        let text = read_program(path)?;
+        let n = text.lines.len();
+        self.program = Some(Program { path: path.to_path_buf(), text });
         self.progress = Progress { total: n, ..Progress::default() };
         self.run = Run::Idle;
         Ok(format!("{n} ligne(s) chargée(s)"))
@@ -224,8 +266,8 @@ impl Machines {
 
     fn start(&mut self) {
         let (Some(c), Some(p)) = (&self.ctrl, &self.program) else { return };
-        c.run_program(p.lines.clone());
-        self.progress = Progress { total: p.lines.len(), ..Progress::default() };
+        c.run_program(p.text.lines.clone());
+        self.progress = Progress { total: p.text.lines.len(), ..Progress::default() };
         self.run = Run::Running;
         self.paused = false;
         let name = p.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
@@ -412,6 +454,10 @@ impl Machines {
                     ui.label(RichText::new(f).size(12.5).color(pal.weak));
                 }
             });
+            if let Some((alarm, text)) = self.banner() {
+                let color = if alarm { pal.bad } else { pal.warn };
+                ui.add(egui::Label::new(RichText::new(text).size(13.0).strong().color(color)).wrap());
+            }
             egui::Grid::new("pos").num_columns(3).spacing(vec2(18.0, 6.0)).show(ui, |ui| {
                 ui.label("");
                 ui.label(RichText::new("Pièce").size(12.0).color(pal.weak));
@@ -506,7 +552,7 @@ impl Machines {
                     Some(p) => {
                         let name = p.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
                         ui.label(RichText::new(name).font(theme::mono(13.5)));
-                        ui.label(RichText::new(format!("{} lignes", p.lines.len())).color(pal.weak));
+                        ui.label(RichText::new(format!("{} lignes", p.text.lines.len())).color(pal.weak));
                     }
                     None => {
                         ui.label(RichText::new("aucun programme chargé").color(pal.weak));
@@ -569,7 +615,7 @@ impl Machines {
     }
 
     fn confirm_window(&mut self, ctx: &egui::Context, pal: &Palette) {
-        let n = self.program.as_ref().map_or(0, |p| p.lines.len());
+        let n = self.program.as_ref().map_or(0, |p| p.text.lines.len());
         let mut go = false;
         let mut cancel = false;
         egui::Window::new("Envoyer à la machine ?").collapsible(false).resizable(false).fixed_size(vec2(420.0, 160.0)).anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0)).show(ctx, |ui| {

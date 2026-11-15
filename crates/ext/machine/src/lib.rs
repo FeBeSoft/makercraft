@@ -10,6 +10,7 @@
 
 pub mod codes;
 pub mod controller;
+pub mod program;
 pub mod protocol;
 pub mod transport;
 
@@ -67,7 +68,7 @@ fn param_u16(p: &Value, key: &str) -> Result<u16, ExtError> {
 
 fn code_json(c: Option<codes::CodeInfo>, code: u16) -> Value {
     match c {
-        Some(c) => json!({ "code": c.code, "brief": c.brief, "description": c.description }),
+        Some(c) => json!({ "code": c.code, "brief": c.brief, "description": c.description, "fr": c.fr, "cause": c.cause, "action": c.action }),
         None => json!({ "code": code, "brief": "inconnu" }),
     }
 }

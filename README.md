@@ -77,6 +77,13 @@ s'arrête). Options : `--sync` (une ligne à la fois), `--no-reset`, `--pause-on
 Sûreté : arrêt de l'envoi sur alarme, détection d'une machine muette, d'un redémarrage
 inattendu de la carte et des « ok » perdus ; jamais de dépassement du tampon de la carte ;
 aucun caractère non ASCII envoyé (Grbl les prendrait pour des commandes temps réel).
+Erreurs et alarmes affichées en français avec la cause probable et quoi faire ; à une pause
+`M0` du programme, le commentaire qui la précède (outil et pince ER11 à monter) est affiché.
+
+G-code écrit : avant chaque `M0` de changement d'outil, rappel de l'outil et de sa pince ER11
+(lue dans le profil de l'atelier, sinon diamètre de queue) ; en fin de programme, montée en Z
+de sécurité puis dégagement en X0, Y = profondeur du brut + 10 mm (ou position `G53` si la
+machine fait sa prise d'origine).
 
 ## Projets Carbide Create (`.c2d`) vers Grbl
 

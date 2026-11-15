@@ -11,9 +11,17 @@ use crate::{Heights, Operation, Stats, stats};
 pub struct ToolGroup {
     pub tool: Tool,
     pub ops: Vec<Operation>,
+    /// Pince ER à monter (Ø mm), donnée par le profil de l'atelier quand l'outil y figure.
+    pub collet_mm: Option<f64>,
+    /// Diamètre de queue (mm) si connu, rappelé quand la pince ne l'est pas.
+    pub shank_mm: Option<f64>,
 }
 
 impl ToolGroup {
+    pub fn new(tool: Tool, ops: Vec<Operation>) -> Self {
+        Self { tool, ops, collet_mm: None, shank_mm: None }
+    }
+
     pub fn stats(&self, h: Heights) -> Stats {
         stats(self.ops.iter().flat_map(Operation::moves), Vec3::new(0.0, 0.0, h.safe_z))
     }
@@ -29,6 +37,47 @@ pub struct Job {
     /// Formes du dessin (pour l'aperçu).
     pub design: Vec<Contour>,
     pub warnings: Vec<String>,
+    /// Dégagement de fin de programme.
+    pub park: Park,
+}
+
+impl Job {
+    /// Renseigne pince et queue de chaque groupe (le plus souvent depuis la banque d'outils,
+    /// `Db::profile_tools`) : `f` rend `(pince, queue)` pour un outil, `None` si inconnu.
+    pub fn set_holders(&mut self, f: impl Fn(&Tool) -> (Option<f64>, Option<f64>)) {
+        for g in &mut self.groups {
+            (g.collet_mm, g.shank_mm) = f(&g.tool);
+        }
+    }
+}
+
+/// Où envoyer la broche en fin de programme, après la montée en Z de sécurité, pour sortir la
+/// pièce.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Park {
+    /// Coordonnées pièce : X0, Y = profondeur du brut + `margin` (marche sans prise d'origine).
+    Stock { margin: f64 },
+    /// Coordonnées pièce données.
+    Work { x: f64, y: f64 },
+    /// Coordonnées machine `G53` : seulement si la machine fait sa prise d'origine.
+    Machine { x: f64, y: f64 },
+}
+
+impl Default for Park {
+    fn default() -> Self {
+        Self::Stock { margin: 10.0 }
+    }
+}
+
+impl Park {
+    /// Choix selon la machine : `G53` si elle a une prise d'origine et une position de
+    /// dégagement connue, sinon coordonnées pièce.
+    pub fn for_machine(homing: bool, machine_xy: Option<(f64, f64)>) -> Self {
+        match machine_xy {
+            Some((x, y)) if homing => Self::Machine { x, y },
+            _ => Self::default(),
+        }
+    }
 }
 
 /// Description française d'un outil.
@@ -161,7 +210,7 @@ pub fn job_from_c2d(pr: &Project, title: &str, only: Option<&str>) -> Job {
         let same_tool = groups.last().is_some_and(|g| g.tool.number == tp.tool.number && (g.tool.diameter - tp.tool.diameter).abs() < 1e-6);
         match groups.last_mut() {
             Some(g) if same_tool => g.ops.push(op),
-            _ => groups.push(ToolGroup { tool: tp.tool.clone(), ops: vec![op] }),
+            _ => groups.push(ToolGroup::new(tp.tool.clone(), vec![op])),
         }
     }
     // formes utilisées par au moins un parcours (les calques de construction sont ignorés)
@@ -175,5 +224,6 @@ pub fn job_from_c2d(pr: &Project, title: &str, only: Option<&str>) -> Job {
         groups,
         design,
         warnings,
+        park: Park::default(),
     }
 }
