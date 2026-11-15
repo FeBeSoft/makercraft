@@ -7,12 +7,13 @@
 use std::path::PathBuf;
 
 use eframe::egui::{self, Color32, RichText};
-use makercraft_tooldb::{CutParams, Machine, Origin, Tool, ToolDb, UserCut, supported};
+use makercraft_tooldb::{CutParams, Machine, Origin, Profile, ProfileTool, Tool, ToolDb, UserCut, supported};
 
 const ICON_PNG: &[u8] = include_bytes!("../../../assets/branding/makercraft-256.png");
 const ACCENT: Color32 = Color32::from_rgb(0xf9, 0x73, 0x16);
 const PERSO: Color32 = Color32::from_rgb(0x8b, 0x5c, 0xf6);
-const TYPES: [(&str, &str); 7] = [
+const ATELIER: Color32 = Color32::from_rgb(0x38, 0xbd, 0xf8);
+const TYPES: [(&str, &str); 8] = [
     ("flat", "Fraise plate"),
     ("ballnose", "Fraise hémisphérique"),
     ("bullnose", "Fraise torique"),
@@ -20,6 +21,7 @@ const TYPES: [(&str, &str); 7] = [
     ("engraver", "Pointe à graver"),
     ("drill", "Foret"),
     ("form", "Fraise de forme"),
+    ("counterbore", "Fraise à lamer"),
 ];
 
 fn type_label(k: &str) -> &str {
@@ -67,6 +69,10 @@ struct App {
     status: String,
     tools: Vec<Tool>,
     machines: Vec<Machine>,
+    /// Machines réelles (profils) : choisies dans la même liste que les classes.
+    profiles: Vec<Profile>,
+    /// Outils numérotés du profil choisi (vide pour une classe de machine).
+    atelier: Vec<ProfileTool>,
     materials: Vec<(String, String)>,
     filter: String,
     sel_tool: Option<String>,
@@ -88,11 +94,13 @@ impl App {
             status: String::new(),
             tools: vec![],
             machines: vec![],
+            profiles: vec![],
+            atelier: vec![],
             materials: vec![],
             filter: String::new(),
             sel_tool: None,
-            sel_material: "mdf".into(),
-            sel_machine: "cnc3018".into(),
+            sel_material: "osb".into(),
+            sel_machine: "genmitsu-3018-pro".into(),
             computed: None,
             result: None,
             edit: Edit::default(),
@@ -112,14 +120,23 @@ impl App {
 
     fn reload_lists(&mut self) {
         let Some(db) = &self.db else { return };
-        let r = (|| -> makercraft_tooldb::Result<_> { Ok((db.tools()?, db.machines()?, db.materials()?)) })();
+        let r = (|| -> makercraft_tooldb::Result<_> { Ok((db.tools()?, db.machines()?, db.profiles()?, db.materials()?)) })();
         match r {
-            Ok((t, m, mat)) => {
+            Ok((t, m, p, mat)) => {
                 self.tools = t;
                 self.machines = m;
+                self.profiles = p;
                 self.materials = mat.into_iter().filter(|(id, _)| id != "generique").collect();
+                let known = self.profile().is_some() || self.machines.iter().any(|m| m.id == self.sel_machine);
+                if !known {
+                    self.sel_machine = self.profiles.first().map(|p| p.id.clone())
+                        .or_else(|| self.machines.first().map(|m| m.id.clone()))
+                        .unwrap_or_default();
+                }
+                self.load_atelier();
                 if self.sel_tool.as_ref().is_none_or(|id| !self.tools.iter().any(|t| &t.id == id)) {
-                    self.sel_tool = self.tools.first().map(|t| t.id.clone());
+                    self.sel_tool = self.atelier.first().map(|t| t.tool.id.clone())
+                        .or_else(|| self.tools.first().map(|t| t.id.clone()));
                 }
             }
             Err(e) => self.error = Some(e.to_string()),
@@ -127,13 +144,36 @@ impl App {
         self.dirty = true;
     }
 
+    /// Profil choisi, `None` si c'est une classe de machine.
+    fn profile(&self) -> Option<&Profile> {
+        self.profiles.iter().find(|p| p.id == self.sel_machine)
+    }
+
+    fn load_atelier(&mut self) {
+        let id = self.profile().map(|p| p.id.clone());
+        self.atelier = match (&self.db, id) {
+            (Some(db), Some(id)) => db.profile_tools(&id).unwrap_or_default(),
+            _ => Vec::new(),
+        };
+    }
+
+    fn atelier_tool(&self, id: &str) -> Option<&ProfileTool> {
+        self.atelier.iter().find(|t| t.tool.id == id)
+    }
+
     /// Recalcule après un changement de sélection, recharge les valeurs perso dans l'éditeur.
     fn refresh(&mut self) {
         self.dirty = false;
         let (Some(db), Some(tid)) = (&self.db, &self.sel_tool) else { return };
         let (mat, mac) = (&self.sel_material, &self.sel_machine);
+        // machine réelle : calcul avec sa classe, valeurs perso enregistrées sous l'id du profil
+        let class = self.profiles.iter().find(|p| &p.id == mac).map(|p| p.class.clone());
         let r = (|| -> makercraft_tooldb::Result<_> {
-            Ok((db.compute_for(tid, mat, mac)?, db.suggest(tid, mat, mac)?, db.user_cut(tid, mat, mac)?))
+            let suggested = match &class {
+                Some(_) => db.suggest_in(tid, mat, mac)?,
+                None => db.suggest(tid, mat, mac)?,
+            };
+            Ok((db.compute_for(tid, mat, class.as_deref().unwrap_or(mac))?, suggested, db.user_cut(tid, mat, mac)?))
         })();
         match r {
             Ok((c, s, u)) => {
@@ -205,14 +245,29 @@ impl App {
             ui.label(RichText::new("Bibliothèque d'outils").heading().color(ACCENT));
             ui.separator();
             ui.label("Machine");
-            let cur = self.machines.iter().find(|m| m.id == self.sel_machine).map_or(self.sel_machine.clone(), |m| m.name.clone());
-            egui::ComboBox::from_id_salt("machine").width(330.0).selected_text(cur).show_ui(ui, |ui| {
-                for m in &self.machines {
-                    if ui.selectable_value(&mut self.sel_machine, m.id.clone(), &m.name).changed() {
-                        self.dirty = true;
+            let cur = self
+                .profile()
+                .map(|p| p.name.clone())
+                .or_else(|| self.machines.iter().find(|m| m.id == self.sel_machine).map(|m| format!("Classe : {}", m.name)))
+                .unwrap_or_else(|| self.sel_machine.clone());
+            let mut changed = false;
+            egui::ComboBox::from_id_salt("machine").width(360.0).selected_text(cur).show_ui(ui, |ui| {
+                if !self.profiles.is_empty() {
+                    ui.label(RichText::new("Machines de l'atelier").small().color(ATELIER));
+                    for p in &self.profiles {
+                        changed |= ui.selectable_value(&mut self.sel_machine, p.id.clone(), &p.name).changed();
                     }
+                    ui.separator();
+                }
+                ui.label(RichText::new("Classes de machine (calcul seul)").small().weak());
+                for m in &self.machines {
+                    changed |= ui.selectable_value(&mut self.sel_machine, m.id.clone(), &m.name).changed();
                 }
             });
+            if changed {
+                self.load_atelier();
+                self.dirty = true;
+            }
             ui.label("Matériau");
             let cur = self.materials.iter().find(|(id, _)| *id == self.sel_material).map_or(self.sel_material.clone(), |(_, n)| n.clone());
             egui::ComboBox::from_id_salt("materiau").width(230.0).selected_text(cur).show_ui(ui, |ui| {
@@ -236,6 +291,24 @@ impl App {
         let f = self.filter.to_lowercase();
         let mut clicked = None;
         egui::ScrollArea::vertical().show(ui, |ui| {
+            if !self.atelier.is_empty() {
+                let list: Vec<&ProfileTool> = self
+                    .atelier
+                    .iter()
+                    .filter(|t| f.is_empty() || t.tool.name.to_lowercase().contains(&f) || t.number.to_string() == f)
+                    .collect();
+                egui::CollapsingHeader::new(RichText::new(format!("Atelier ({})", list.len())).color(ATELIER))
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        for t in list {
+                            let sel = self.sel_tool.as_deref() == Some(t.tool.id.as_str());
+                            let txt = RichText::new(format!("{:>2}  {}", t.number, t.tool.name));
+                            if ui.selectable_label(sel, txt).on_hover_text(format!("{} - pince ER11 {} mm", t.usage, t.collet_mm)).clicked() {
+                                clicked = Some(t.tool.id.clone());
+                            }
+                        }
+                    });
+            }
             for (kind, label) in TYPES.iter().map(|(k, l)| (*k, *l)).chain(std::iter::once(("", "Autres"))) {
                 let list: Vec<&Tool> = self
                     .tools
@@ -292,6 +365,12 @@ impl App {
             geo += &format!(" · queue {s} mm");
         }
         ui.label(RichText::new(geo).weak());
+        if let Some(a) = self.atelier_tool(&t.id) {
+            ui.label(
+                RichText::new(format!("Outil n°{} de l'atelier · pince ER11 {} mm · {}", a.number, a.collet_mm, a.usage))
+                    .color(ATELIER),
+            );
+        }
         if user_tool {
             ui.horizontal(|ui| {
                 if ui.button("Modifier l'outil").clicked() {
@@ -367,7 +446,7 @@ impl App {
                     Origin::Computed => ("Retenu : calcul", ACCENT),
                     Origin::User => ("Retenu : mes valeurs", PERSO),
                     Origin::Mixed => ("Retenu : mes valeurs + calcul", PERSO),
-                    Origin::Atelier => ("Retenu : valeurs de l'atelier", PERSO),
+                    Origin::Atelier => ("Retenu : valeurs de l'atelier", ATELIER),
                 };
                 ui.label(RichText::new(txt).strong().color(col));
                 let mut s = format!("{} tr/min · avance {} mm/min · plongée {} mm/min · passe {} mm",
