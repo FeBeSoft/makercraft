@@ -81,6 +81,9 @@ bois = "bois_dur"
 pmma = "plastique_dur"
 plastique = "plastique_dur"
 mousse = "plastique_tendre"
+# panneaux de bois : ligne bois tendre (fz plus bas que le MDF, choix prudent)
+osb = "bois_tendre"
+contreplaque = "bois_tendre"
 # alliages : volontairement non relie (CNC3D "Alloys" = alliages durs, pas de l'alu)
 
 # Profondeur conseillee propre a un materiau (Sorotec : mousse dure jusqu'a 5 x D)

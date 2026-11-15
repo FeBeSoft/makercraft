@@ -367,6 +367,7 @@ impl App {
                     Origin::Computed => ("Retenu : calcul", ACCENT),
                     Origin::User => ("Retenu : mes valeurs", PERSO),
                     Origin::Mixed => ("Retenu : mes valeurs + calcul", PERSO),
+                    Origin::Atelier => ("Retenu : valeurs de l'atelier", PERSO),
                 };
                 ui.label(RichText::new(txt).strong().color(col));
                 let mut s = format!("{} tr/min · avance {} mm/min · plongée {} mm/min · passe {} mm",

@@ -1,0 +1,139 @@
+# Profil de machine réelle : la Genmitsu 3018-PRO de l'atelier du collège.
+# Un profil s'appuie sur une classe de machine (machines.toml) pour le calcul des paramètres
+# et ajoute ce qui est propre à la machine : courses, broche, pinces, modèles 3D, outils
+# numérotés et valeurs de coupe éprouvées à l'atelier.
+# Source : « Documentation Atelier CNC - Genmitsu 3018-PRO » (Manu), sections 1 à 4.
+
+id = "genmitsu-3018-pro"
+name = "Genmitsu 3018-PRO (atelier)"
+class = "cnc3018"
+source = "Documentation Atelier CNC - Genmitsu 3018-PRO (Manu)"
+travel_mm = [300, 180, 45]
+controller = "Grbl 1.1"
+connection = "USB (CH340)"
+table = "Plaque aluminium usinée, rainures pour écrous T"
+# Pinces ER11 en stock
+collets_mm = [3.175, 4, 6]
+
+[spindle]
+name = "Moteur 775 24 V"
+power_w = 60
+rpm_max = 20000
+
+# Ponts d'attache par défaut (procédure OSB 9 mm)
+[tabs]
+height_mm = 2
+spacing_mm = 50
+
+# Modèles 3D de Manu (dossier _CAD de la 3018), non copiés dans le dépôt
+[models]
+table = "3018 - Table.sc"
+martyr = "spoilboard MDF 300x180x8 M6.sc"
+ecrou_t = "Ecrou T30xM6.sc"
+vis_fhc = "Vis FHC M6x15 Zn classe 10.9 ISO 10642.sc"
+
+# Outils de l'atelier (banque/tools/atelier-3018.toml). La pince se déduit de la queue.
+[[tool]]
+number = 1
+tool = "atelier-3018-01"
+usage = "Gravure fine, lettrage"
+
+[[tool]]
+number = 2
+tool = "atelier-3018-02"
+usage = "Découpe OSB (outil principal)"
+
+[[tool]]
+number = 3
+tool = "atelier-3018-03"
+usage = "Gravure très fine"
+
+[[tool]]
+number = 4
+tool = "atelier-3018-04"
+usage = "Détails fins (fragile)"
+
+[[tool]]
+number = 5
+tool = "atelier-3018-05"
+usage = "Détails moyens"
+
+[[tool]]
+number = 6
+tool = "atelier-3018-06"
+usage = "Rechange de l'outil 2"
+
+[[tool]]
+number = 7
+tool = "atelier-3018-07"
+usage = "Gravure (fournie avec la machine)"
+
+[[tool]]
+number = 8
+tool = "atelier-3018-08"
+usage = "Découpe standard (fournie avec la machine)"
+
+[[tool]]
+number = 9
+tool = "atelier-3018-09"
+usage = "Trous de vis CHC / FHC M3"
+
+[[tool]]
+number = 10
+tool = "atelier-3018-10"
+usage = "Trous de vis CHC / FHC M4"
+
+[[tool]]
+number = 11
+tool = "atelier-3018-11"
+usage = "Ébavurage, lamage de tête fraisée"
+
+# Valeurs de coupe éprouvées à l'atelier (section 4 de la doc).
+# Plages [min, max] : MakerCraft propose le milieu pour la broche et le bas de la plage pour
+# l'avance, la plongée et la passe (prudence sur une machine peu rigide).
+# Un champ absent est complété : plongée = avance / 3, le reste par le calcul.
+# tools : numéros d'outils concernés (la doc donne ces valeurs pour les fraises Ø3,175).
+[[cut]]
+material = "osb"
+tools = [2, 6, 8]
+thickness_mm = 9
+stepdown_mm = [2.5, 2.5]
+rpm = [10000, 12000]
+feed_mm_min = [800, 1000]
+plunge_mm_min = [300, 400]
+note = "OSB 9 mm : 4 passes (2,5 + 2,5 + 2,5 + 1,5), dry run Z+10 avant lancement"
+
+[[cut]]
+material = "mdf"
+tools = [2, 6, 8]
+thickness_mm = 5
+stepdown_mm = [2, 2]
+rpm = [12000, 12000]
+feed_mm_min = [1000, 1000]
+
+[[cut]]
+material = "contreplaque"
+tools = [2, 6, 8]
+thickness_mm = 10
+stepdown_mm = [2, 3]
+rpm = [10000, 10000]
+feed_mm_min = [800, 1000]
+note = "Contreplaqué peuplier 5 à 10 mm"
+
+[[cut]]
+material = "mousse"
+tools = [2, 6, 8]
+thickness_mm = 10
+stepdown_mm = [5, 5]
+rpm = [10000, 10000]
+feed_mm_min = [1200, 1200]
+note = "Mousse PU rigide"
+
+[[cut]]
+material = "pmma"
+tools = [2, 6, 8]
+thickness_mm = 3
+stepdown_mm = [1, 1]
+rpm = [8000, 8000]
+feed_mm_min = [500, 500]
+note = "Acrylique 3 mm"

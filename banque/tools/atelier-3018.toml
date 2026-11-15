@@ -1,0 +1,107 @@
+# Outils de l'atelier 3018 du collège (numérotation de l'atelier : 1 à 11).
+# Source : « Documentation Atelier CNC - Genmitsu 3018-PRO » (Manu), section 2.
+# Dimensions de la doc : Ø queue x Ø coupe (ou angle x pointe) x longueur utile x longueur totale.
+# Valeurs « à vérifier » : non données par la doc, choix prudent (nombre de dents bas).
+# Le numéro et la pince de chaque outil sont dans banque/profils/genmitsu-3018-pro.toml.
+
+[[tool]]
+id = "atelier-3018-01"
+name = "V 60° pointe 0,2 (outil 1)"
+type = "vbit"
+diameter_mm = 3.175
+flutes = 1
+angle_deg = 60
+tip_diameter_mm = 0.2
+shank_mm = 3.175
+
+[[tool]]
+id = "atelier-3018-02"
+name = "Plate 2 dents Ø3,175 (outil 2, découpe OSB)"
+type = "flat"
+diameter_mm = 3.175
+flutes = 2
+flute_length_mm = 17
+shank_mm = 3.175
+
+[[tool]]
+id = "atelier-3018-03"
+name = "V 60° pointe 0,1 (outil 3)"
+type = "vbit"
+diameter_mm = 3.175
+flutes = 1
+angle_deg = 60
+tip_diameter_mm = 0.1
+shank_mm = 3.175
+
+[[tool]]
+id = "atelier-3018-04"
+name = "Plate 2 dents Ø1 (outil 4, fragile)"
+type = "flat"
+diameter_mm = 1.0
+flutes = 2
+flute_length_mm = 6
+shank_mm = 3.175
+
+[[tool]]
+id = "atelier-3018-05"
+name = "Plate 2 dents Ø2 (outil 5)"
+type = "flat"
+diameter_mm = 2.0
+flutes = 2
+flute_length_mm = 22
+shank_mm = 3.175
+
+[[tool]]
+id = "atelier-3018-06"
+name = "Plate 2 dents Ø3,175 (outil 6, rechange de l'outil 2)"
+type = "flat"
+diameter_mm = 3.175
+flutes = 2
+flute_length_mm = 17
+shank_mm = 3.175
+
+# Outils 7 et 8 : fournis avec la machine, angle et dents non relevés (à vérifier).
+[[tool]]
+id = "atelier-3018-07"
+name = "V d'origine (outil 7, angle à relever)"
+type = "vbit"
+diameter_mm = 3.175
+flutes = 1
+shank_mm = 3.175
+
+[[tool]]
+id = "atelier-3018-08"
+name = "Plate d'origine Ø3,175 (outil 8)"
+type = "flat"
+diameter_mm = 3.175
+flutes = 2
+shank_mm = 3.175
+
+# Groupe B : queue 6 mm, pince ER11 6 mm.
+# Fraises à lamer : Ø de coupe type DIN 974 pour vis CHC (M3 : 6,5 ; M4 : 8), à mesurer.
+# Pas de modèle de calcul : valeurs à saisir à la main.
+[[tool]]
+id = "atelier-3018-09"
+name = "Fraise à lamer M3 (outil 9)"
+type = "counterbore"
+diameter_mm = 6.5
+flutes = 3
+shank_mm = 6
+
+[[tool]]
+id = "atelier-3018-10"
+name = "Fraise à lamer M4 (outil 10)"
+type = "counterbore"
+diameter_mm = 8.0
+flutes = 3
+shank_mm = 6
+
+# Fraise à chanfreiner : se comporte comme un V à 90° (chanfrein, lamage de tête fraisée).
+[[tool]]
+id = "atelier-3018-11"
+name = "Chanfrein 90° Ø10 (outil 11)"
+type = "vbit"
+diameter_mm = 10.0
+flutes = 1
+angle_deg = 90
+shank_mm = 6

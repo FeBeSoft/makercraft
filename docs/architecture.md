@@ -16,6 +16,7 @@
 | L3 | `ext/c2d` | lecture des projets Carbide Create `.c2d` (formes, calques, outils, parcours) ; commande `c2d.info` | ✅ |
 | L3 | `ext/galaad` | lecture des dessins Galaad 3 `.gal` / `.gli` / `.cub` (géométrie, outils, attributs d'usinage) ; format : `reference/galaad-format-gal.md` | 🟡 lecture |
 | L3 | `ext/cam` | FAO 2.5D : découpe, poche, perçage, gravure ; G-code Grbl ASCII ; aperçu SVG | 🟡 v0.1 (laser, attaches, V-carve vrai à faire) |
+| L3 | `ext/tooldb` | banque d'outils (`banque/*.toml` compilée en SQLite) : catalogue, classes de machine, calcul Sorotec, valeurs perso ; profils de machines réelles (`banque/profils`, 3018 Pro : courses, pinces, outils 1 à 11, valeurs d'atelier) | ✅ |
 | L3 | `ext/machine` | transports (série, TCP, émulateur), protocole Grbl 1.1/grblHAL, contrôleur et streaming, codes d'erreur | ✅ v0.1 (aperçu G-code à faire) |
 | L4 | `ui/shell` | egui : coquille commune aux applis (prévue quand une 2e appli à ateliers existera) | à faire |
 | app | `makercraft` | **application de bureau** : atelier CNC (fraisage 2,5D : Machine > Brut > Dessin > Parcours > Simulation > Usinage), Machines ; Laser, PCB, usinage 3D et gravure à venir ; hôte d'extensions | 🟡 |

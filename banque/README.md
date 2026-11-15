@@ -29,7 +29,8 @@ hémisphériques, et les matériaux PCB, composites, pierre.
 | `machines.toml` | Classes de machine : `cnc3018`, `defonceuse`, `broche_pro` | oui |
 | `references/sorotec.toml` | Modèle de calcul (vc, fz par Ø, profondeur conseillée) | oui |
 | `references/amana.toml` | Borne haute industrielle, pour le recoupement | oui |
-| `tools/*.toml` | Catalogue curé (géométries seules) | oui |
+| `tools/*.toml` | Catalogue curé (géométries seules) ; `atelier-3018.toml` = outils de l'atelier | oui |
+| `profils/*.toml` | Profils de machines réelles (courses, broche, pinces, outils numérotés, valeurs d'atelier) | oui |
 | `_import/import_sources.py` | Import des banques des logiciels installés (lecture seule) | oui |
 | `_import/recouper.py` | Compare logiciels et modèle fabricant | oui |
 | `imported/` | Résultats bruts, rapports `_rapport.md` et `_recoupement.md` | **non** |
@@ -66,6 +67,40 @@ db.save_user_cut("flat-2f-3.175", "bois_tendre", "cnc3018",
     &UserCut { feed_mm_min: Some(600.0), note: Some("CTP peuplier, essai OK".into()), ..Default::default() })?;
 db.save_user_tool(&mon_outil)?;                     // outil absent du catalogue
 db.compute_for(outil, matiere, machine)?;           // calcul seul, pour comparer
+```
+
+## Profils de machines réelles
+
+Une classe (`machines.toml`) sert au calcul ; un profil (`profils/<id>.toml`) décrit une machine
+précise et s'appuie sur une classe (`class = "cnc3018"`). Premier profil : `genmitsu-3018-pro`
+(source : documentation atelier de Manu).
+
+| Bloc | Contenu |
+|---|---|
+| en-tête | courses `travel_mm`, contrôleur, liaison, table, pinces `collets_mm` |
+| `[spindle]` | broche : nom, puissance, tr/min maxi |
+| `[tabs]` | ponts d'attache par défaut (hauteur, espacement) |
+| `[models]` | noms des modèles 3D (table, martyr, écrou T, vis), non copiés dans le dépôt |
+| `[[tool]]` | outils numérotés de l'atelier ; la pince se déduit de la queue |
+| `[[cut]]` | valeurs éprouvées par matériau et numéros d'outils, en plages `[min, max]` |
+
+Contrôles à la compilation (`build.rs`) : classe, outils et matériaux existants, numéros uniques,
+une pince pour chaque queue, plages valides. Une erreur arrête la compilation.
+
+Ordre de priorité dans `suggest_in(outil, matériau, profil)` :
+
+1. valeurs perso enregistrées sous l'id du profil (`save_user_cut(.., "genmitsu-3018-pro", ..)`) ;
+2. valeurs de l'atelier (`Origin::Atelier`) : milieu de la plage pour la broche, bas de la plage
+   pour l'avance, la plongée et la passe ; plongée absente = avance / 3 ;
+3. calcul avec la classe du profil.
+
+```rust
+let p3018 = db.profile("genmitsu-3018-pro")?;          // courses, broche, pinces, ponts
+for t in db.profile_tools(&p3018.id)? {                 // outils 1 à 11 et leur pince ER11
+    println!("{} {} - pince {}", t.number, t.tool.name, t.collet_mm);
+}
+let osb = db.suggest_in("atelier-3018-02", "osb", &p3018.id)?;   // 11 000 tr/min, 800 mm/min
+assert!(p3018.fits([0.0; 3], [250.0, 150.0, 9.0]));     // contrôle de course
 ```
 
 ## Ajouter un outil au catalogue

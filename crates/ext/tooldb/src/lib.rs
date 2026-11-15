@@ -72,6 +72,50 @@ pub enum Origin {
     User,
     /// Valeurs utilisateur complétées par le calcul pour les champs non saisis.
     Mixed,
+    /// Valeurs éprouvées de l'atelier (profil de machine), complétées par le calcul si besoin.
+    Atelier,
+}
+
+/// Profil d'une machine réelle (`banque/profils/*.toml`) : s'appuie sur une classe de machine
+/// pour le calcul et décrit la machine elle-même.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Profile {
+    pub id: String,
+    pub name: String,
+    /// Classe de machine (`machines.toml`) utilisée pour le calcul.
+    pub class: String,
+    pub source: String,
+    /// Courses X, Y, Z (mm).
+    pub travel_mm: [f64; 3],
+    pub controller: String,
+    pub connection: String,
+    pub table: String,
+    pub spindle: String,
+    pub spindle_power_w: f64,
+    pub spindle_rpm_max: f64,
+    /// Pinces disponibles (Ø mm), croissantes.
+    pub collets_mm: Vec<f64>,
+    /// Ponts d'attache par défaut : hauteur et espacement (mm).
+    pub tab_height_mm: f64,
+    pub tab_spacing_mm: f64,
+    /// (rôle, nom de fichier) des modèles 3D : table, martyr, écrou T, vis...
+    pub models: Vec<(String, String)>,
+}
+
+impl Profile {
+    /// `true` si la boîte `[min, max]` (mm, origine machine) tient dans les courses.
+    pub fn fits(&self, min: [f64; 3], max: [f64; 3]) -> bool {
+        (0..3).all(|i| min[i] >= -1e-6 && max[i] <= self.travel_mm[i] + 1e-6 && min[i] <= max[i])
+    }
+}
+
+/// Outil numéroté d'un atelier, avec la pince à monter.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProfileTool {
+    pub number: u32,
+    pub tool: Tool,
+    pub collet_mm: f64,
+    pub usage: String,
 }
 
 /// Valeurs éprouvées saisies par l'utilisateur pour un trio outil / matériau / machine.
@@ -174,6 +218,61 @@ pub fn compute(tool: &Tool, machine: &Machine, r: &MaterialRef, depth_x_d: f64) 
         stepover_mm: stepover.map(|s| (s * 100.0).round() / 100.0),
         fz_mm: (fz * 10000.0).round() / 10000.0,
         notes,
+    }
+}
+
+/// Recouvre `base` (calcul, éventuellement absent) par des valeurs saisies.
+/// Plongée non saisie : avance / 3 si l'avance est saisie, sinon celle de `base`.
+/// `None` si rien d'utilisable (pas de base et ni tr/min ni avance).
+fn overlay(base: Option<CutParams>, u: &UserCut, flutes: u32, full: Origin, partial: Origin, completed: &str) -> Option<CutParams> {
+    let z = f64::from(flutes.max(1));
+    let fz_of = |rpm: f64, feed: f64, dflt: f64| if rpm > 0.0 { (feed / (rpm * z) * 10000.0).round() / 10000.0 } else { dflt };
+    let mut notes: Vec<String> = u.note.iter().cloned().collect();
+    Some(match base {
+        Some(c) => {
+            let all = u.rpm.is_some() && u.feed_mm_min.is_some() && u.plunge_mm_min.is_some() && u.stepdown_mm.is_some();
+            if !all {
+                notes.push(completed.into());
+            }
+            let rpm = u.rpm.unwrap_or(c.rpm);
+            let feed = u.feed_mm_min.unwrap_or(c.feed_mm_min);
+            let plunge = match (u.plunge_mm_min, u.feed_mm_min) {
+                (Some(p), _) => p,
+                (None, Some(f)) => (f / 3.0 / 10.0).round() * 10.0,
+                (None, None) => c.plunge_mm_min,
+            };
+            CutParams {
+                origin: if all { full } else { partial },
+                rpm,
+                feed_mm_min: feed,
+                plunge_mm_min: plunge,
+                stepdown_mm: u.stepdown_mm.unwrap_or(c.stepdown_mm),
+                stepover_mm: u.stepover_mm.or(c.stepover_mm),
+                fz_mm: fz_of(rpm, feed, c.fz_mm),
+                notes,
+            }
+        }
+        // pas de modèle : seules les valeurs saisies, si elles suffisent
+        None => {
+            let (Some(rpm), Some(feed)) = (u.rpm, u.feed_mm_min) else { return None };
+            CutParams {
+                origin: full,
+                rpm,
+                feed_mm_min: feed,
+                plunge_mm_min: u.plunge_mm_min.unwrap_or(feed / 3.0),
+                stepdown_mm: u.stepdown_mm.unwrap_or(0.0),
+                stepover_mm: u.stepover_mm,
+                fz_mm: fz_of(rpm, feed, 0.0),
+                notes,
+            }
+        }
+    })
+}
+
+fn range_text(label: &str, lo: Option<f64>, hi: Option<f64>, unit: &str) -> Option<String> {
+    match (lo, hi) {
+        (Some(a), Some(b)) if (b - a).abs() > 1e-9 => Some(format!("{label} {a}-{b} {unit}")),
+        _ => None,
     }
 }
 
@@ -383,45 +482,113 @@ impl ToolDb {
         let Some(u) = self.user_cut(tool_id, material, machine_id)? else {
             return Ok(computed);
         };
-        let mut notes: Vec<String> = u.note.iter().cloned().collect();
-        let p = match computed {
-            Some(c) => {
-                let full = u.rpm.is_some() && u.feed_mm_min.is_some() && u.plunge_mm_min.is_some()
-                    && u.stepdown_mm.is_some();
-                if !full {
-                    notes.push("valeurs perso complétées par le calcul".into());
-                }
-                let rpm = u.rpm.unwrap_or(c.rpm);
-                let feed = u.feed_mm_min.unwrap_or(c.feed_mm_min);
-                let z = f64::from(self.tool(tool_id)?.flutes.max(1));
-                CutParams {
-                    origin: if full { Origin::User } else { Origin::Mixed },
-                    rpm,
-                    feed_mm_min: feed,
-                    plunge_mm_min: u.plunge_mm_min.unwrap_or(c.plunge_mm_min),
-                    stepdown_mm: u.stepdown_mm.unwrap_or(c.stepdown_mm),
-                    stepover_mm: u.stepover_mm.or(c.stepover_mm),
-                    fz_mm: if rpm > 0.0 { (feed / (rpm * z) * 10000.0).round() / 10000.0 } else { c.fz_mm },
-                    notes,
-                }
-            }
-            // pas de modèle : seules les valeurs perso, si elles suffisent
-            None => {
-                let (Some(rpm), Some(feed)) = (u.rpm, u.feed_mm_min) else { return Ok(None) };
-                let z = f64::from(self.tool(tool_id)?.flutes.max(1));
-                CutParams {
-                    origin: Origin::User,
-                    rpm,
-                    feed_mm_min: feed,
-                    plunge_mm_min: u.plunge_mm_min.unwrap_or(feed / 3.0),
-                    stepdown_mm: u.stepdown_mm.unwrap_or(0.0),
-                    stepover_mm: u.stepover_mm,
-                    fz_mm: if rpm > 0.0 { (feed / (rpm * z) * 10000.0).round() / 10000.0 } else { 0.0 },
-                    notes,
-                }
-            }
+        let flutes = self.tool(tool_id)?.flutes;
+        Ok(overlay(computed, &u, flutes, Origin::User, Origin::Mixed, "valeurs perso complétées par le calcul"))
+    }
+
+    /// Profils de machines réelles.
+    pub fn profiles(&self) -> Result<Vec<Profile>> {
+        let ids: Vec<String> = {
+            let mut st = self.conn.prepare("SELECT id FROM profile ORDER BY name")?;
+            let rows = st.query_map([], |r| r.get(0))?;
+            rows.collect::<std::result::Result<_, _>>()?
         };
-        Ok(Some(p))
+        ids.iter().map(|id| self.profile(id)).collect()
+    }
+
+    pub fn profile(&self, id: &str) -> Result<Profile> {
+        let mut p = self
+            .conn
+            .query_row(
+                "SELECT id,name,class,source,travel_x,travel_y,travel_z,controller,connection,table_desc,
+                        spindle,spindle_power_w,spindle_rpm_max,tab_height_mm,tab_spacing_mm
+                   FROM profile WHERE id=?1",
+                [id],
+                |r| {
+                    Ok(Profile {
+                        id: r.get(0)?,
+                        name: r.get(1)?,
+                        class: r.get(2)?,
+                        source: r.get(3)?,
+                        travel_mm: [r.get(4)?, r.get(5)?, r.get(6)?],
+                        controller: r.get(7)?,
+                        connection: r.get(8)?,
+                        table: r.get(9)?,
+                        spindle: r.get(10)?,
+                        spindle_power_w: r.get(11)?,
+                        spindle_rpm_max: r.get(12)?,
+                        collets_mm: Vec::new(),
+                        tab_height_mm: r.get(13)?,
+                        tab_spacing_mm: r.get(14)?,
+                        models: Vec::new(),
+                    })
+                },
+            )
+            .optional()?
+            .ok_or_else(|| Error::NotFound(format!("profil {id}")))?;
+        let mut st = self.conn.prepare("SELECT diameter_mm FROM profile_collet WHERE profile=?1 ORDER BY diameter_mm")?;
+        p.collets_mm = st.query_map([id], |r| r.get(0))?.collect::<std::result::Result<_, _>>()?;
+        let mut st = self.conn.prepare("SELECT role, file FROM profile_model WHERE profile=?1 ORDER BY role")?;
+        p.models = st.query_map([id], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<std::result::Result<_, _>>()?;
+        Ok(p)
+    }
+
+    /// Outils numérotés de l'atelier d'un profil, par numéro croissant.
+    pub fn profile_tools(&self, profile: &str) -> Result<Vec<ProfileTool>> {
+        let rows: Vec<(u32, String, f64, String)> = {
+            let mut st = self.conn.prepare(
+                "SELECT number, tool_id, collet_mm, usage FROM profile_tool WHERE profile=?1 ORDER BY number",
+            )?;
+            let rows = st.query_map([profile], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
+            rows.collect::<std::result::Result<_, _>>()?
+        };
+        rows.into_iter()
+            .map(|(number, id, collet_mm, usage)| Ok(ProfileTool { number, tool: self.tool(&id)?, collet_mm, usage }))
+            .collect()
+    }
+
+    /// Valeurs éprouvées de l'atelier pour un outil et un matériau : milieu de la plage pour la
+    /// broche, bas de la plage pour l'avance, la plongée et la passe (machine peu rigide).
+    pub fn atelier_cut(&self, profile: &str, tool_id: &str, material: &str) -> Result<Option<UserCut>> {
+        type Row = (Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<String>);
+        let row: Option<Row> = self
+            .conn
+            .query_row(
+                "SELECT stepdown_min,stepdown_max,rpm_min,rpm_max,feed_min,feed_max,plunge_min,plunge_max,note
+                   FROM profile_cut WHERE profile=?1 AND tool_id=?2 AND material=?3",
+                params![profile, tool_id, material],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?, r.get(8)?)),
+            )
+            .optional()?;
+        let Some((sd0, sd1, n0, n1, f0, f1, p0, p1, note)) = row else { return Ok(None) };
+        let mut text = vec!["valeurs de l'atelier".to_string()];
+        text.extend(note);
+        text.extend(range_text("broche", n0, n1, "tr/min"));
+        text.extend(range_text("avance", f0, f1, "mm/min"));
+        text.extend(range_text("plongée", p0, p1, "mm/min"));
+        text.extend(range_text("passe", sd0, sd1, "mm"));
+        Ok(Some(UserCut {
+            rpm: n0.zip(n1).map(|(a, b)| ((a + b) / 2.0).round()),
+            feed_mm_min: f0,
+            plunge_mm_min: p0,
+            stepdown_mm: sd0,
+            stepover_mm: None,
+            note: Some(text.join(" ; ")),
+        }))
+    }
+
+    /// Paramètres proposés sur une machine réelle : valeurs perso (enregistrées sous l'id du
+    /// profil), puis valeurs de l'atelier, puis calcul avec la classe de machine du profil.
+    pub fn suggest_in(&self, tool_id: &str, material: &str, profile_id: &str) -> Result<Option<CutParams>> {
+        let profile = self.profile(profile_id)?;
+        let flutes = self.tool(tool_id)?.flutes;
+        let computed = self.compute_for(tool_id, material, &profile.class)?;
+        let base = match self.atelier_cut(profile_id, tool_id, material)? {
+            Some(a) => overlay(computed, &a, flutes, Origin::Atelier, Origin::Atelier, "complétées par le calcul"),
+            None => computed,
+        };
+        let Some(u) = self.user_cut(tool_id, material, profile_id)? else { return Ok(base) };
+        Ok(overlay(base, &u, flutes, Origin::User, Origin::Mixed, "valeurs perso complétées par l'atelier ou le calcul"))
     }
 
     /// Accès direct pour les requêtes personnalisées.
@@ -564,6 +731,79 @@ mod tests {
     #[test]
     fn materiau_sans_reference() {
         assert!(db().suggest("engr-20-0.1", "pcb", "cnc3018").unwrap().is_none());
+    }
+
+    const P3018: &str = "genmitsu-3018-pro";
+
+    #[test]
+    fn profil_3018() {
+        let db = db();
+        let p = db.profile(P3018).unwrap();
+        assert_eq!(p.class, "cnc3018");
+        assert_eq!(p.travel_mm, [300.0, 180.0, 45.0]);
+        assert_eq!(p.spindle_rpm_max, 20000.0);
+        assert_eq!(p.collets_mm, vec![3.175, 4.0, 6.0]);
+        assert_eq!((p.tab_height_mm, p.tab_spacing_mm), (2.0, 50.0));
+        assert!(p.models.iter().any(|(r, f)| r == "table" && f == "3018 - Table.sc"));
+        assert!(p.fits([0.0, 0.0, 0.0], [300.0, 180.0, 45.0]));
+        assert!(!p.fits([0.0, 0.0, 0.0], [301.0, 100.0, 10.0]));
+        assert!(!p.fits([-1.0, 0.0, 0.0], [10.0, 10.0, 10.0]));
+        assert_eq!(db.profiles().unwrap().len(), 1);
+        assert!(db.profile("inconnu").is_err());
+    }
+
+    #[test]
+    fn outils_atelier_3018_et_pinces() {
+        let db = db();
+        let t = db.profile_tools(P3018).unwrap();
+        assert_eq!(t.iter().map(|t| t.number).collect::<Vec<_>>(), (1..=11).collect::<Vec<_>>());
+        // outils 1 à 8 : pince 3,175 ; 9 à 11 : pince 6 mm (règle de la doc atelier)
+        assert!(t.iter().filter(|t| t.number <= 8).all(|t| t.collet_mm == 3.175));
+        assert!(t.iter().filter(|t| t.number >= 9).all(|t| t.collet_mm == 6.0));
+        let n2 = &t[1].tool;
+        assert_eq!((n2.kind.as_str(), n2.diameter_mm, n2.flutes, n2.flute_length_mm), ("flat", 3.175, 2, Some(17.0)));
+        assert_eq!((t[0].tool.angle_deg, t[0].tool.tip_diameter_mm), (Some(60.0), Some(0.2)));
+        assert_eq!(t[2].tool.tip_diameter_mm, Some(0.1));
+        assert_eq!(t[10].tool.angle_deg, Some(90.0));
+    }
+
+    #[test]
+    fn valeurs_atelier_osb() {
+        let db = db();
+        let p = db.suggest_in("atelier-3018-02", "osb", P3018).unwrap().unwrap();
+        assert_eq!(p.origin, Origin::Atelier);
+        assert_eq!((p.rpm, p.feed_mm_min, p.plunge_mm_min, p.stepdown_mm), (11000.0, 800.0, 300.0, 2.5));
+        assert_eq!(p.stepover_mm, Some(0.79)); // 25 % du Ø, complété par le calcul
+        assert!(p.notes.iter().any(|n| n.contains("800-1000")));
+        // mêmes valeurs pour les outils 6 et 8, pas pour la Ø1
+        assert_eq!(db.suggest_in("atelier-3018-08", "osb", P3018).unwrap().unwrap().origin, Origin::Atelier);
+        assert_eq!(db.suggest_in("atelier-3018-04", "osb", P3018).unwrap().unwrap().origin, Origin::Computed);
+    }
+
+    #[test]
+    fn valeurs_atelier_sans_plongee() {
+        // mousse PU : la doc ne donne pas la plongée -> avance / 3
+        let p = db().suggest_in("atelier-3018-02", "mousse", P3018).unwrap().unwrap();
+        assert_eq!(p.origin, Origin::Atelier);
+        assert_eq!((p.rpm, p.feed_mm_min, p.plunge_mm_min, p.stepdown_mm), (10000.0, 1200.0, 400.0, 5.0));
+    }
+
+    #[test]
+    fn perso_prioritaire_sur_atelier() {
+        let db = db();
+        let u = UserCut { feed_mm_min: Some(950.0), ..Default::default() };
+        db.save_user_cut("atelier-3018-02", "osb", P3018, &u).unwrap();
+        let p = db.suggest_in("atelier-3018-02", "osb", P3018).unwrap().unwrap();
+        assert_eq!(p.origin, Origin::Mixed);
+        assert_eq!((p.feed_mm_min, p.rpm, p.stepdown_mm), (950.0, 11000.0, 2.5));
+        // les valeurs perso du profil ne touchent pas la classe de machine
+        assert_eq!(db.suggest("atelier-3018-02", "osb", "cnc3018").unwrap().unwrap().origin, Origin::Computed);
+    }
+
+    #[test]
+    fn fraise_a_lamer_sans_modele() {
+        // pas de calcul ni de valeurs d'atelier : à saisir à la main
+        assert!(db().suggest_in("atelier-3018-09", "mdf", P3018).unwrap().is_none());
     }
 
     #[test]

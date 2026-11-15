@@ -16,6 +16,16 @@ name = "Bois dur (feuillus)"
 aliases = ["Hardwood"]
 
 [[material]]
+id = "osb"
+name = "OSB (panneau de lamelles orientees)"
+aliases = ["OSB"]
+
+[[material]]
+id = "contreplaque"
+name = "Contreplaque (peuplier, bouleau)"
+aliases = ["Plywood"]
+
+[[material]]
 id = "bois"
 name = "Bois (generique)"
 aliases = ["Timbers", "Wood"]
