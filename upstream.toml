@@ -81,6 +81,18 @@ pinned = "c636281"   # version en cours au 2026-11-10
 kind = "reference"
 license = "MIT OR Apache-2.0"
 
+# Cut Craft : appli Rust de conception 2D/3D et FAO façon Vectric Aspire (base d'outils, machines,
+# post-processeurs grbl/FluidNC, format .ccjob). Licence PolyForm Noncommercial 1.0.0 + « Small Maker
+# Permission » : source disponible, NON libre, incompatible avec la GPLv3. Lecture des idées et de
+# l'ergonomie seulement : aucune copie de code, de données ni de ressources dans MakerCraft.
+[[repo]]
+name = "Cut-Craft"
+url = "https://github.com/NoobyNull/Cut-Craft"
+path = "../upstream/Cut-Craft"
+pinned = "ababf02d"   # version en cours au 2026-11-17
+kind = "reference"
+license = "PolyForm-Noncommercial-1.0.0"
+
 [[repo]]
 name = "cavalier_contours"
 url = "https://github.com/jbuckmccready/cavalier_contours"
