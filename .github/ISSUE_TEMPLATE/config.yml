@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discussions (questions, échanges libres / questions, open talk)
+    url: https://github.com/FeBeSoft/makercraft/discussions
+    about: Pour poser une question ou échanger sur MakerCraft / To ask a question or talk about MakerCraft
+  - name: Courriel / Email
+    url: mailto:makercraft@fe-be.fr
+    about: Sans compte GitHub, écrivez à makercraft@fe-be.fr / Without a GitHub account, write to makercraft@fe-be.fr

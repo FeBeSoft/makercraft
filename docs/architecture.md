@@ -14,7 +14,7 @@
 | L3 | `ext/cao` | adaptateur SolidCraft 0.41.0 : lecture STEP et mesures (`solidcraft-kernel`) ; vue 3D en lecture seule (`view3d`, rendu sur processeur de `solidcraft-viewport`) | 🟡 STEP, vue 3D |
 | L3 | `ext/mkc` | projet `.mkc` : archive zip (`makercraft.json` + dessin CadCraft `.dxf`/`.dwg` + modèle SolidCraft `.sc`) ; machine, brut, brides, parcours | ✅ format 1 |
 | L3 | `ext/c2d` | lecture des projets Carbide Create `.c2d` (formes, calques, outils, parcours) ; commande `c2d.info` | ✅ |
-| L3 | `ext/galaad` | lecture des dessins Galaad 3 `.gal` / `.gli` / `.cub` (géométrie, outils, attributs d'usinage) ; format : `reference/galaad-format-gal.md` | 🟡 lecture |
+| L3 | import Galaad | lecture des dessins de la suite Galaad, envisagée pour les ateliers de technologie qui en ont encore | ⚪ envisagé |
 | L3 | `ext/cam` | FAO 2.5D : découpe, poche, perçage, gravure ; G-code Grbl ASCII ; aperçu SVG | 🟡 v0.1 (laser, attaches, V-carve vrai à faire) |
 | L3 | `ext/tooldb` | banque d'outils (`banque/*.toml` compilée en SQLite) : catalogue, classes de machine, calcul Sorotec, valeurs perso ; profils de machines réelles (`banque/profils`, 3018 Pro : courses, pinces, outils 1 à 11, valeurs d'atelier) | ✅ |
 | L3 | `ext/machine` | transports (série, TCP, émulateur), protocole Grbl 1.1/grblHAL, contrôleur et streaming, codes d'erreur | ✅ v0.1 (aperçu G-code à faire) |

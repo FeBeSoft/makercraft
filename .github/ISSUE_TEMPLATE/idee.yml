@@ -1,0 +1,36 @@
+name: Proposer une idée / Suggest an idea
+description: Une fonction qui manque, une amélioration / A missing feature or an improvement
+labels: ["idée"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Les idées des utilisateurs décident de ce qui arrive dans les prochaines versions. Merci !
+        *Users' ideas decide what comes next. Thank you!*
+  - type: dropdown
+    id: usage
+    attributes:
+      label: Usage
+      options:
+        - Maker (atelier, fablab)
+        - En classe (prof / élève)
+        - Les deux / Both
+    validations:
+      required: true
+  - type: textarea
+    id: besoin
+    attributes:
+      label: Votre besoin / Your need
+      description: Ce que vous voulez pouvoir faire, et pourquoi / What you want to do, and why
+    validations:
+      required: true
+  - type: textarea
+    id: exemple
+    attributes:
+      label: Exemple / Example
+      description: Un cas concret, un autre logiciel qui le fait bien, une capture... / A concrete case, another software that does it well, a screenshot...
+  - type: textarea
+    id: machine
+    attributes:
+      label: Votre machine (facultatif) / Your machine (optional)
+      description: Modèle, courses, broche, pinces, contrôleur, pour enrichir la banque de machines / Model, travel, spindle, collets, controller

@@ -1,0 +1,55 @@
+name: Signaler un problème / Report a problem
+description: Quelque chose ne marche pas comme prévu / Something does not work as expected
+labels: ["problème"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre le temps de signaler ce problème ! Une capture et quelques lignes suffisent.
+        *Thanks for reporting! A screenshot and a few lines are enough.*
+  - type: textarea
+    id: version
+    attributes:
+      label: Version
+      description: |
+        Dans MakerCraft : Options > À propos > « Copier les informations de version », puis collez ici.
+        *In MakerCraft: Options > À propos > "Copier les informations de version", then paste here.*
+      placeholder: MakerCraft v0.1.0 bêta 20261121 ...
+    validations:
+      required: true
+  - type: dropdown
+    id: atelier
+    attributes:
+      label: Atelier / Workshop
+      options:
+        - CNC - Fraisage 2,5D
+        - Machines
+        - Bibliothèque d'outils (makercraft-outils)
+        - Options / À propos
+        - Autre / Other
+    validations:
+      required: true
+  - type: input
+    id: machine
+    attributes:
+      label: Machine
+      description: Émulateur, ou modèle de votre machine et son contrôleur / Emulator, or your machine and controller
+      placeholder: Émulateur / Genmitsu 3018-PRO, Grbl 1.1
+  - type: textarea
+    id: attendu
+    attributes:
+      label: Ce que vous vouliez faire / What you wanted to do
+    validations:
+      required: true
+  - type: textarea
+    id: constate
+    attributes:
+      label: Ce qui s'est passé / What happened
+      description: Ajoutez une capture si possible (glisser-déposer ici) / Add a screenshot if you can (drag and drop here)
+    validations:
+      required: true
+  - type: textarea
+    id: fichiers
+    attributes:
+      label: Fichiers utiles / Useful files
+      description: Projet .mkc, dessin .dxf ou G-code .nc concerné (facultatif) / Related .mkc, .dxf or .nc file (optional)

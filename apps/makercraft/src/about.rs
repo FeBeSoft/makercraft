@@ -9,7 +9,7 @@ pub const SITE: &str = "https://makercraft.fe-be.fr/";
 /// Adresse propre au logiciel (les autres contacts FeBe sont sur son site).
 pub const CONTACT: &str = "makercraft@fe-be.fr";
 /// Étape de développement affichée avec le numéro de version.
-pub const STAGE: &str = "bêta";
+pub const STAGE: &str = "bêta 20261121";
 
 /// « v0.1.0 bêta ».
 pub fn version_label() -> String {
@@ -123,7 +123,7 @@ En pratique, la GPL-3 impose à toute personne qui redistribue MakerCraft, modif
 
 Les fichiers que vous créez avec MakerCraft (dessins, programmes G-code) vous appartiennent.
 
-Interopérabilité : MakerCraft lit les fichiers d'autres logiciels (Carbide Create, Galaad) dans le respect de l'article L122-6-1 du Code de la propriété intellectuelle, sans copie de leur code ni contournement de protection. Il n'est affilié ni à ArtCraft, ni aux auteurs de SolidCraft, ni à Carbide 3D.
+Interopérabilité : MakerCraft lit les fichiers d'autres logiciels (Carbide Create ; l'import des dessins Galaad est envisagé) dans le respect de l'article L122-6-1 du Code de la propriété intellectuelle, sans copie de leur code ni contournement de protection. Il n'est affilié ni à ArtCraft, ni aux auteurs de SolidCraft, ni à Carbide 3D.
 
 Composants tiers (licences compatibles avec la GPL-3) :
 - CadCraft, SolidCraft : MIT / Apache-2.0, utilisés tels quels
@@ -177,6 +177,6 @@ mod tests {
         assert_ne!(version_of("eframe"), "?");
         assert!(main_library().starts_with("egui / eframe 0."));
         assert!(rights_body().starts_with("Ce programme"));
-        assert!(version_label().ends_with("bêta"));
+        assert!(version_label().contains("bêta"));
     }
 }
