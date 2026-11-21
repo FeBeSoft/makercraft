@@ -3,6 +3,8 @@
 //!
 //! Tout est sans interface pour être testé : la page Machines ne fait que l'afficher.
 
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 
 use crate::prefs::Mode;
@@ -29,6 +31,12 @@ pub struct Equipment {
     pub laser_offset_mm: [f64; 2],
     /// Module laser 12 V PWM à la place de la broche.
     pub laser_module: bool,
+    /// Caméra de surveillance (caméra système vue par Windows).
+    pub camera: bool,
+    /// Ce qui est prévu pour chaque équipement absent (dans l'ordre de `Item::ALL`).
+    pub plans: [Plan; 6],
+    /// Photo de la machine (fichier de l'utilisateur).
+    pub photo: Option<PathBuf>,
     /// Épaisseur de la planche martyr (mm).
     pub spoilboard_mm: f64,
     /// Corrections de calibrage (équerrage, planéité) appliquées d'office.
@@ -46,13 +54,88 @@ impl Default for Equipment {
             laser_cross: false,
             laser_offset_mm: [0.0, 0.0],
             laser_module: false,
+            camera: false,
+            plans: [Plan::Non; 6],
+            photo: None,
             spoilboard_mm: 8.0,
             corrections: true,
         }
     }
 }
 
+/// Ce qui est prévu pour un équipement absent ; un clic sur l'état passe au suivant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum Plan {
+    #[default]
+    Non,
+    AVenir,
+    ATester,
+    AImprimer,
+}
+
+impl Plan {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Non => "non",
+            Self::AVenir => "à venir",
+            Self::ATester => "à tester",
+            Self::AImprimer => "support à imprimer",
+        }
+    }
+
+    pub fn next(self) -> Self {
+        match self {
+            Self::Non => Self::AVenir,
+            Self::AVenir => Self::ATester,
+            Self::ATester => Self::AImprimer,
+            Self::AImprimer => Self::Non,
+        }
+    }
+}
+
+/// Équipements de la fiche, dans l'ordre d'affichage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Item {
+    Estop,
+    Limits,
+    Probe,
+    LaserCross,
+    Camera,
+    LaserModule,
+}
+
+impl Item {
+    pub const ALL: [Self; 6] = [Self::Estop, Self::Limits, Self::Probe, Self::LaserCross, Self::Camera, Self::LaserModule];
+
+    pub fn index(self) -> usize {
+        self as usize
+    }
+}
+
 impl Equipment {
+    /// Équipement présent (fins de course : les trois axes).
+    pub fn present(&self, i: Item) -> bool {
+        match i {
+            Item::Estop => self.estop,
+            Item::Limits => self.can_home(),
+            Item::Probe => self.probe,
+            Item::LaserCross => self.laser_cross,
+            Item::Camera => self.camera,
+            Item::LaserModule => self.laser_module,
+        }
+    }
+
+    pub fn set_present(&mut self, i: Item, on: bool) {
+        match i {
+            Item::Estop => self.estop = on,
+            Item::Limits => self.limits = [on; 3],
+            Item::Probe => self.probe = on,
+            Item::LaserCross => self.laser_cross = on,
+            Item::Camera => self.camera = on,
+            Item::LaserModule => self.laser_module = on,
+        }
+    }
+
     /// Prise d'origine `$H` possible : fins de course sur les trois axes.
     pub fn can_home(&self) -> bool {
         self.limits.iter().all(|l| *l)
@@ -162,6 +245,17 @@ mod tests {
         assert!(!e.can_home());
         e.limits = [true; 3];
         assert!(e.can_home());
+    }
+
+    #[test]
+    fn presence_and_plans() {
+        let mut e = Equipment::default();
+        e.set_present(Item::Limits, true);
+        assert!(e.can_home() && e.present(Item::Limits));
+        e.set_present(Item::Camera, true);
+        assert!(e.camera);
+        assert_eq!(Plan::AImprimer.next(), Plan::Non);
+        assert_eq!(Item::ALL.iter().map(|i| i.index()).collect::<Vec<_>>(), vec![0, 1, 2, 3, 4, 5]);
     }
 
     #[test]

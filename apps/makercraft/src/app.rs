@@ -483,6 +483,10 @@ impl App {
             let t = p.text(pos2(x, r.center().y), Align2::LEFT_CENTER, n, theme::mono(12.0), pal.weak);
             x = t.right() + 18.0;
         }
+        if self.atelier == Atelier::Machines {
+            let t = p.text(pos2(x, r.center().y), Align2::LEFT_CENTER, self.machines.status_summary(), f.clone(), pal.weak);
+            x = t.right() + 18.0;
+        }
         let right = p.text(pos2(r.right() - 16.0, r.center().y), Align2::RIGHT_CENTER, format!("Unités : {}", self.prefs.units.label()), f.clone(), pal.weak);
         let ver = p.text(pos2(right.left() - 22.0, r.center().y), Align2::RIGHT_CENTER, concat!("MakerCraft ", env!("CARGO_PKG_VERSION")), f.clone(), pal.dim);
         let max = ver.left() - 30.0 - x;

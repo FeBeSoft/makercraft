@@ -25,14 +25,6 @@ impl Units {
             Self::Inch => "pouce",
         }
     }
-
-    /// Valeur en mm affichée dans l'unité choisie, avec son symbole.
-    pub fn fmt(self, mm: f64) -> String {
-        match self {
-            Self::Mm => format!("{mm:.2} mm"),
-            Self::Inch => format!("{:.4} in", mm / 25.4),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -174,11 +166,5 @@ mod tests {
         assert_eq!(partial.units, Units::Inch);
         assert_eq!(partial.baud, 115_200);
         assert_eq!(partial.theme, ThemeChoice::Dark, "thème sombre par défaut");
-    }
-
-    #[test]
-    fn units_format() {
-        assert_eq!(Units::Mm.fmt(25.4), "25.40 mm");
-        assert_eq!(Units::Inch.fmt(25.4), "1.0000 in");
     }
 }

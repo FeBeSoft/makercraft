@@ -103,24 +103,36 @@ fn iso(p: &eframe::egui::Painter, pal: &Palette, rect: Rect, s: &Scene) {
     };
     let (tx, ty) = (s.travel[0], s.travel[1]);
     let face = |z: f64| vec![at(0.0, 0.0, z), at(tx, 0.0, z), at(tx, ty, z), at(0.0, ty, z)];
-    // table puis martyr
+    // table alu à rainures, puis martyr
     p.add(Shape::convex_polygon(face(0.0), theme::alpha(pal.stock_line, 0.35), Stroke::new(1.0, pal.stock_line)));
+    let mut y = 10.0;
+    while y < ty {
+        p.line_segment([at(-6.0, y, 0.0), at(tx + 6.0, y, 0.0)], Stroke::new(2.0, theme::alpha(pal.weak, 0.45)));
+        y += 15.0;
+    }
     let m = s.spoilboard_mm;
     p.add(Shape::convex_polygon(vec![at(0.0, 0.0, 0.0), at(tx, 0.0, 0.0), at(tx, 0.0, m), at(0.0, 0.0, m)], theme::alpha(pal.stock_fill, 0.9), Stroke::new(1.0, pal.stock_line)));
     p.add(Shape::convex_polygon(vec![at(tx, 0.0, 0.0), at(tx, ty, 0.0), at(tx, ty, m), at(tx, 0.0, m)], theme::alpha(pal.stock_fill, 0.7), Stroke::new(1.0, pal.stock_line)));
     p.add(Shape::convex_polygon(face(m), pal.stock_fill, Stroke::new(1.2, pal.stock_line)));
     p.text(at(tx, 0.0, 0.0) + vec2(10.0, 4.0), Align2::LEFT_CENTER, "X", theme::bold(12.0), pal.weak);
     p.text(at(0.0, ty, 0.0) + vec2(-10.0, 4.0), Align2::RIGHT_CENTER, "Y", theme::bold(12.0), pal.weak);
-    // zéro pièce
+    // zéro pièce : repère X rouge, Y vert, Z bleu
     let w = on_table(s, s.wco);
-    cross(p, at(w[0], w[1], m), 9.0, pal.orange);
-    // outil : fût de broche et pointe
+    let o = at(w[0], w[1], m);
+    let len = 25.0;
+    for (d, c) in [([len, 0.0, 0.0], pal.red), ([0.0, len, 0.0], pal.green), ([0.0, 0.0, len], pal.blue)] {
+        let e = at(w[0] + d[0], w[1] + d[1], m + d[2]);
+        p.arrow(o, e - o, Stroke::new(2.0, c));
+    }
+    // outil : pointe, fraise et corps de broche
     let t = on_table(s, s.mpos);
-    let tip = at(t[0], t[1], t[2].max(m));
-    let top_pt = at(t[0], t[1], t[2].max(m) + 40.0);
+    let z = t[2].max(m);
+    let tip = at(t[0], t[1], z);
     p.line_segment([at(t[0], t[1], m), tip], Stroke::new(1.0, theme::alpha(pal.blue, 0.45)));
-    p.line_segment([top_pt, tip], Stroke::new(7.0, theme::alpha(pal.blue, 0.85)));
-    p.circle_filled(tip, 4.0, pal.blue);
+    p.line_segment([at(t[0], t[1], z + 18.0), tip], Stroke::new(3.0, pal.weak));
+    let body = [at(t[0] - 12.0, t[1] + 12.0, z + 18.0), at(t[0] + 12.0, t[1] - 12.0, z + 18.0), at(t[0] + 12.0, t[1] - 12.0, z + 70.0), at(t[0] - 12.0, t[1] + 12.0, z + 70.0)];
+    p.add(Shape::convex_polygon(body.to_vec(), theme::alpha(pal.text, 0.75), Stroke::new(1.0, pal.weak)));
+    p.circle_filled(tip, 3.5, pal.blue);
 }
 
 fn cross(p: &eframe::egui::Painter, c: Pos2, r: f32, color: Color32) {

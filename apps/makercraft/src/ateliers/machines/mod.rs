@@ -142,6 +142,12 @@ pub struct Machines {
     page: Page,
     view: vue::View,
     console_open: bool,
+    /// Photo de la machine : fichier et texture (aucune si illisible).
+    photo_tex: Option<(PathBuf, Option<egui::TextureHandle>)>,
+    /// Position machine au moment du zéro table (coin avant gauche).
+    table_origin: [f64; 3],
+    /// Fenêtre « Refaire le Z » ouverte : pas choisi et épaisseur de la cale (mm).
+    z_redo: Option<(f64, f64)>,
 }
 
 impl Default for Machines {
@@ -181,6 +187,9 @@ impl Default for Machines {
             page: Page::Fiche,
             view: vue::View::Iso,
             console_open: true,
+            photo_tex: None,
+            table_origin: [0.0; 3],
+            z_redo: None,
         }
     }
 }
@@ -229,6 +238,31 @@ impl Machines {
     /// Courses de la machine choisie (300 x 180 x 45 sans profil).
     fn travel(&self) -> [f64; 3] {
         self.profile().map_or([300.0, 180.0, 45.0], |p| p.travel_mm)
+    }
+
+    /// Position de l'outil sur la table (mm), si la position machine est connue.
+    fn table_pos(&self) -> Option<[f64; 3]> {
+        let m = &self.status.mpos;
+        match self.reference {
+            Reference::None => None,
+            Reference::TableZero => Some([m.x - self.table_origin[0], m.y - self.table_origin[1], m.z - self.table_origin[2]]),
+            Reference::Homed => Some([m.x, m.y, m.z]),
+        }
+    }
+
+    /// Résumé pour la barre d'état de l'application.
+    pub fn status_summary(&self) -> String {
+        if !self.connected() {
+            return "Déconnectée".to_owned();
+        }
+        let link = if self.emulator { "Émulateur".to_owned() } else { self.port.clone() };
+        let buffer = self.status.buffer.map(|(_, rx)| format!(" · Tampon {rx} octets")).unwrap_or_default();
+        let zero = match self.reference {
+            Reference::None => "Position non référencée",
+            Reference::TableZero => "Zéro table valable",
+            Reference::Homed => "Axes référencés",
+        };
+        format!("Connecté · {link}{buffer} · {zero}")
     }
 
     fn rpm_max(&self) -> f64 {
@@ -443,6 +477,7 @@ impl Machines {
     fn select_profile(&mut self, i: usize, prefs_equipment: Option<Equipment>) {
         self.profile = i;
         self.equipment = prefs_equipment.unwrap_or_default();
+        self.photo_tex = None;
         self.tools = match ToolDb::open(&Prefs::dir().join("outils")) {
             Ok(db) => self.profiles.get(i).and_then(|p| db.profile_tools(&p.id).ok()).unwrap_or_default(),
             Err(_) => Vec::new(),
@@ -569,6 +604,8 @@ impl Machines {
             }
             "machine.zero_table" if !running && r.edit_fiche => {
                 if self.connected() {
+                    let m = &self.status.mpos;
+                    self.table_origin = [m.x, m.y, m.z];
                     self.reference = Reference::TableZero;
                     self.log("Zéro table pris à la position actuelle (coin avant gauche) pour la séance");
                 }
