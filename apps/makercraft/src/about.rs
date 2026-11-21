@@ -6,9 +6,15 @@ pub const AUTHOR: &str = "Emmanuel Firre";
 pub const COPYRIGHT: &str = "© 2026 Emmanuel Firre";
 pub const LICENSE: &str = "GPL-3.0 ou ultérieure";
 pub const SITE: &str = "https://makercraft.fe-be.fr/";
-/// Adresse propre au logiciel, puis adresse principale FeBe.
+/// Adresse propre au logiciel (les autres contacts FeBe sont sur son site).
 pub const CONTACT: &str = "makercraft@fe-be.fr";
-pub const CONTACT_FEBE: &str = "contact@fe-be.fr";
+/// Étape de développement affichée avec le numéro de version.
+pub const STAGE: &str = "bêta";
+
+/// « v0.1.0 bêta ».
+pub fn version_label() -> String {
+    format!("v{} {STAGE}", env!("CARGO_PKG_VERSION"))
+}
 /// Dépôt GitHub du logiciel : vide tant qu'il n'est pas publié.
 pub const GITHUB_REPO: &str = "";
 pub const GITHUB_ACCOUNT: &str = "https://github.com/FeBeSoft";
@@ -59,6 +65,11 @@ pub fn liens() -> Vec<(&'static str, &'static str)> {
 /// Adresse d'un lien commun par son libellé (ex. « Facebook »).
 pub fn lien(label: &str) -> Option<&'static str> {
     liens().into_iter().find(|(l, _)| l.eq_ignore_ascii_case(label)).map(|(_, u)| u)
+}
+
+/// Texte des droits sans les deux premières lignes (nom et ©), affichées à part.
+pub fn rights_body() -> &'static str {
+    RIGHTS.splitn(3, '\n').nth(2).unwrap_or(RIGHTS).trim_start()
 }
 
 /// Bibliothèques et leur version, lues dans Cargo.lock à la compilation.
@@ -133,7 +144,7 @@ pub const SOURCES: &[(&str, &str, &str, &str)] = &[
 /// Informations à copier pour un signalement.
 pub fn version_info() -> String {
     format!(
-        "MakerCraft {}\nCadCraft {}, SolidCraft {}, eframe/egui {}\nSystème : {} {}\nRéglages : {}",
+        "MakerCraft {} {STAGE}\nCadCraft {}, SolidCraft {}, eframe/egui {}\nSystème : {} {}\nRéglages : {}",
         env!("CARGO_PKG_VERSION"),
         version_of("cadcraft-engine"),
         version_of("solidcraft-kernel"),
@@ -165,5 +176,7 @@ mod tests {
         assert!(liens().iter().all(|(_, u)| u.starts_with("https://")), "liens FeBe en https");
         assert_ne!(version_of("eframe"), "?");
         assert!(main_library().starts_with("egui / eframe 0."));
+        assert!(rights_body().starts_with("Ce programme"));
+        assert!(version_label().ends_with("bêta"));
     }
 }

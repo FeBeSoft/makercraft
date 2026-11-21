@@ -83,6 +83,22 @@ pub enum Icon {
     Help,
     /// Roue crantée à 6 dents (options).
     Settings,
+    /// Enveloppe (contact par courriel).
+    Mail,
+    /// Globe (site web).
+    Globe,
+    /// Deux personnes (réseau social).
+    People,
+    /// Cœur (soutien, Patreon).
+    Heart,
+    /// Chevrons de code (dépôt de sources).
+    Code,
+    /// Fiche d'identité (onglet Fiche).
+    IdCard,
+    /// Croix de déplacement (onglet Pilotage).
+    Jog,
+    /// Curseurs de réglage (onglet Réglages Grbl).
+    Sliders,
 }
 
 /// Point relatif au carré `r` : (0,0) coin haut gauche, (1,1) coin bas droit.
@@ -393,6 +409,50 @@ pub fn paint(p: &Painter, r: Rect, icon: Icon, c: Color32) {
             }
             p.add(Shape::line(pts, s));
             p.circle_stroke(cen, r.width() * 0.14, s);
+        }
+        Icon::Mail => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.08, 0.22), at(r, 0.92, 0.78)), cr, s, StrokeKind::Middle);
+            line(p, r, &[(0.1, 0.26), (0.5, 0.56), (0.9, 0.26)], s);
+        }
+        Icon::Globe => {
+            p.circle_stroke(r.center(), r.width() * 0.42, s);
+            line(p, r, &[(0.08, 0.5), (0.92, 0.5)], s);
+            line(p, r, &[(0.5, 0.08), (0.36, 0.3), (0.32, 0.5), (0.36, 0.7), (0.5, 0.92)], s);
+            line(p, r, &[(0.5, 0.08), (0.64, 0.3), (0.68, 0.5), (0.64, 0.7), (0.5, 0.92)], s);
+        }
+        Icon::People => {
+            p.circle_stroke(at(r, 0.36, 0.32), r.width() * 0.13, s);
+            line(p, r, &[(0.12, 0.82), (0.16, 0.62), (0.36, 0.52), (0.56, 0.62), (0.6, 0.82)], s);
+            p.circle_stroke(at(r, 0.7, 0.36), r.width() * 0.1, s);
+            line(p, r, &[(0.66, 0.56), (0.82, 0.6), (0.9, 0.78)], s);
+        }
+        Icon::Heart => {
+            line(p, r, &[(0.5, 0.86), (0.14, 0.5), (0.1, 0.32), (0.2, 0.18), (0.36, 0.16), (0.5, 0.3), (0.64, 0.16), (0.8, 0.18), (0.9, 0.32), (0.86, 0.5), (0.5, 0.86)], s);
+        }
+        Icon::Code => {
+            line(p, r, &[(0.3, 0.26), (0.08, 0.5), (0.3, 0.74)], s);
+            line(p, r, &[(0.7, 0.26), (0.92, 0.5), (0.7, 0.74)], s);
+            line(p, r, &[(0.58, 0.18), (0.42, 0.82)], s);
+        }
+        Icon::IdCard => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.06, 0.2), at(r, 0.94, 0.8)), cr, s, StrokeKind::Middle);
+            p.circle_stroke(at(r, 0.3, 0.42), r.width() * 0.08, s);
+            line(p, r, &[(0.18, 0.66), (0.3, 0.56), (0.42, 0.66)], s);
+            line(p, r, &[(0.54, 0.4), (0.84, 0.4)], s);
+            line(p, r, &[(0.54, 0.56), (0.78, 0.56)], s);
+        }
+        Icon::Jog => {
+            line(p, r, &[(0.5, 0.08), (0.5, 0.92)], s);
+            line(p, r, &[(0.08, 0.5), (0.92, 0.5)], s);
+            for pts in [[(0.38, 0.2), (0.5, 0.08), (0.62, 0.2)], [(0.38, 0.8), (0.5, 0.92), (0.62, 0.8)], [(0.2, 0.38), (0.08, 0.5), (0.2, 0.62)], [(0.8, 0.38), (0.92, 0.5), (0.8, 0.62)]] {
+                line(p, r, &pts, s);
+            }
+        }
+        Icon::Sliders => {
+            for (x, k) in [(0.24, 0.32), (0.5, 0.66), (0.76, 0.44)] {
+                line(p, r, &[(x, 0.08), (x, 0.92)], s);
+                p.rect_filled(Rect::from_center_size(at(r, x, k), vec2(r.width() * 0.2, r.height() * 0.1)), CornerRadius::same(2), c);
+            }
         }
     }
 }

@@ -41,11 +41,23 @@ pub struct Item {
     pub checked: Option<bool>,
     pub tone: Tone,
     pub tip: String,
+    /// Liste déroulante (rangée de petits boutons) : (libellé, actif) de chaque choix ; vide pour
+    /// un bouton. Le choix fait arrive par `Ribbon::picked`.
+    pub choices: Vec<(String, bool)>,
+    /// Rang du choix affiché.
+    pub selected: usize,
+    /// Largeur de la liste déroulante (px).
+    pub width: f32,
 }
 
 impl Item {
     pub fn large(id: &'static str, label: &'static str, icon: Icon) -> Self {
-        Self { id, label, icon, large: true, enabled: true, checked: None, tone: Tone::Plain, tip: String::new() }
+        Self { id, label, icon, large: true, enabled: true, checked: None, tone: Tone::Plain, tip: String::new(), choices: Vec::new(), selected: 0, width: 0.0 }
+    }
+
+    /// Liste déroulante dans une colonne de petits boutons.
+    pub fn choice(id: &'static str, label: &'static str, icon: Icon, choices: Vec<(String, bool)>, selected: usize, width: f32) -> Self {
+        Self { large: false, choices, selected, width, ..Self::large(id, label, icon) }
     }
 
     pub fn small(id: &'static str, label: &'static str, icon: Icon) -> Self {
@@ -95,6 +107,8 @@ impl Tab {
 pub struct Ribbon {
     pub tab: usize,
     pub collapsed: bool,
+    /// Dernier choix fait dans une liste déroulante : (identifiant, rang).
+    pub picked: Option<(&'static str, usize)>,
 }
 
 fn tone_color(pal: &Palette, t: Tone) -> Color32 {
@@ -156,7 +170,7 @@ impl Ribbon {
     }
 
     /// Corps du ruban (groupes de l'onglet actif) dans `r`. Renvoie la commande cliquée.
-    pub fn body_ui(&self, ui: &mut Ui, r: Rect, pal: &Palette, tabs: &[Tab]) -> Option<&'static str> {
+    pub fn body_ui(&mut self, ui: &mut Ui, r: Rect, pal: &Palette, tabs: &[Tab]) -> Option<&'static str> {
         let tab = tabs.get(self.tab)?;
         let p = ui.painter().clone();
         if tab.groups.is_empty() {
@@ -183,12 +197,19 @@ impl Ribbon {
                     // colonne de petits boutons (trois au plus)
                     let col: Vec<&Item> = g.items[i..].iter().take_while(|it| !it.large).take(3).collect();
                     let font = theme::regular(12.5);
-                    let w = col.iter().map(|it| p.layout_no_wrap(it.label.to_owned(), font.clone(), pal.text).size().x).fold(0.0, f32::max) + 36.0;
+                    let w = col
+                        .iter()
+                        .map(|it| if it.choices.is_empty() { p.layout_no_wrap(it.label.to_owned(), font.clone(), pal.text).size().x + 36.0 } else { it.width })
+                        .fold(0.0, f32::max);
                     let ch = col.len() as f32 * SMALL_H + (col.len().saturating_sub(1)) as f32 * 2.0;
                     let mut y = top + ((GROUP_H - 8.0) - ch) / 2.0;
                     for it in &col {
                         let br = Rect::from_min_size(pos2(x, y), vec2(w, SMALL_H));
-                        if button(ui, &p, pal, br, it, false) {
+                        if !it.choices.is_empty() {
+                            if let Some(k) = choice(ui, &p, pal, br, it) {
+                                self.picked = Some((it.id, k));
+                            }
+                        } else if button(ui, &p, pal, br, it, false) {
                             clicked = Some(it.id);
                         }
                         y += SMALL_H + 2.0;
@@ -213,6 +234,29 @@ impl Ribbon {
 fn large_width(p: &egui::Painter, label: &str) -> f32 {
     let w = p.layout_no_wrap(label.to_owned(), theme::regular(12.5), Color32::WHITE).size().x + 16.0;
     w.clamp(LARGE_MIN_W, LARGE_MAX_W)
+}
+
+/// Liste déroulante du ruban (icône puis liste) ; renvoie le rang choisi.
+fn choice(ui: &mut Ui, p: &egui::Painter, pal: &Palette, r: Rect, it: &Item) -> Option<usize> {
+    let icon_c = if it.enabled { tone_color(pal, it.tone) } else { theme::alpha(pal.dim, 0.7) };
+    icons::paint(p, Rect::from_center_size(pos2(r.left() + 12.0, r.center().y), vec2(16.0, 16.0)), it.icon, icon_c);
+    let area = Rect::from_min_max(pos2(r.left() + 26.0, r.top()), r.max);
+    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(area).layout(egui::Layout::left_to_right(Align::Center)));
+    child.spacing_mut().interact_size.y = SMALL_H - 2.0;
+    let mut picked = None;
+    let shown = it.choices.get(it.selected).map_or("", |c| c.0.as_str());
+    child.add_enabled_ui(it.enabled, |ui| {
+        let r = egui::ComboBox::from_id_salt(("ruban-liste", it.id)).width(area.width() - 8.0).selected_text(shown).show_ui(ui, |ui| {
+            for (k, (label, on)) in it.choices.iter().enumerate() {
+                if ui.add_enabled(*on, egui::Button::selectable(k == it.selected, label.as_str())).clicked() {
+                    picked = Some(k);
+                }
+            }
+        });
+        let tip = if it.tip.is_empty() { it.label.to_owned() } else { format!("{} : {}", it.label, it.tip) };
+        r.response.on_hover_text(tip).widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, it.enabled, it.label));
+    });
+    picked
 }
 
 /// Dessine un bouton du ruban ; renvoie vrai s'il a été cliqué.

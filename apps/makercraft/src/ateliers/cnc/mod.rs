@@ -661,7 +661,19 @@ fn view_clone(g: &Group) -> Group {
 }
 
 fn clone_item(i: &Item) -> Item {
-    Item { id: i.id, label: i.label, icon: i.icon, large: i.large, enabled: i.enabled, checked: i.checked, tone: i.tone, tip: i.tip.clone() }
+    Item {
+        id: i.id,
+        label: i.label,
+        icon: i.icon,
+        large: i.large,
+        enabled: i.enabled,
+        checked: i.checked,
+        tone: i.tone,
+        tip: i.tip.clone(),
+        choices: i.choices.clone(),
+        selected: i.selected,
+        width: i.width,
+    }
 }
 
 /// Pince ER11 (profil de l'atelier) et queue (banque d'outils) de chaque outil du travail, pour le

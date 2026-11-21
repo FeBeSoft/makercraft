@@ -61,8 +61,6 @@ pub enum Page {
 }
 
 impl Page {
-    const ALL: [Self; 5] = [Self::Fiche, Self::Pilotage, Self::Calibrage, Self::Reglages, Self::Entretien];
-
     fn label(self) -> &'static str {
         match self {
             Self::Fiche => "Fiche",
@@ -486,6 +484,36 @@ impl Machines {
         };
     }
 
+    /// Choix fait dans une liste déroulante du ruban.
+    pub fn choose(&mut self, id: &str, i: usize, prefs: &Prefs, req: &mut Vec<Request>) {
+        if self.connected() {
+            return;
+        }
+        match id {
+            "machine.choix.profil" if i < self.profiles.len() => {
+                let eq = self.profiles.get(i).and_then(|p| prefs.equipment.get(&p.id).cloned());
+                self.select_profile(i, eq);
+            }
+            "machine.choix.port" => {
+                if i == 0 {
+                    self.emulator = true;
+                } else if let Some(p) = self.ports.get(i - 1) {
+                    self.emulator = false;
+                    self.port = p.name.clone();
+                } else {
+                    self.refresh_ports();
+                    req.push(Request::Status(format!("{} port(s) série trouvé(s)", self.ports.len())));
+                }
+            }
+            "machine.choix.vitesse" => {
+                if let Some(b) = BAUDS.get(i) {
+                    self.baud = *b;
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Onglets du ruban de l'atelier.
     pub fn ribbon(&self) -> Vec<Tab> {
         let r = self.rights();
@@ -499,9 +527,26 @@ impl Machines {
             Item::large("machine.connecter", "Connecter", Icon::Plug).tone(Tone::Component).tip(format!("Se connecter à {what}"))
         };
         let home_tip = if self.equipment.can_home() { "Prise d'origine machine par les fins de course" } else { "Fins de course à déclarer dans la fiche" };
+        let busy = connected;
+        let mut machines: Vec<(String, bool)> = self.profiles.iter().map(|p| (p.name.clone(), true)).collect();
+        machines.push(("Isel CPM 2018-TS (à venir)".to_owned(), false));
+        let mut ports = vec![(EMULATOR.to_owned(), true)];
+        ports.extend(self.ports.iter().map(|p| (format!("{}  {}", p.name, p.description), true)));
+        ports.push(("Actualiser la liste des ports".to_owned(), true));
+        let port_sel = if self.emulator { 0 } else { self.ports.iter().position(|p| p.name == self.port).map_or(0, |i| i + 1) };
+        let bauds: Vec<(String, bool)> = BAUDS.iter().map(|b| (format!("{b} bauds"), true)).collect();
+        let baud_sel = BAUDS.iter().position(|b| *b == self.baud).unwrap_or(4);
         vec![Tab::new(
             "Machine",
             vec![
+                Group {
+                    label: "Machine",
+                    items: vec![
+                        Item::choice("machine.choix.profil", "Machine", Icon::Gantry, machines, self.profile, 240.0).enabled(!busy).tip("machine de la banque"),
+                        Item::choice("machine.choix.port", "Port", Icon::Plug, ports, port_sel, 240.0).enabled(!busy).tip("l'émulateur ne commande aucune machine réelle"),
+                        Item::choice("machine.choix.vitesse", "Vitesse série", Icon::Rapids, bauds, baud_sel, 240.0).enabled(!busy && !self.emulator),
+                    ],
+                },
                 Group { label: "Connexion", items: vec![link] },
                 Group {
                     label: "Programme",
@@ -649,10 +694,18 @@ impl Machines {
         self.rail_ui(&mut r, pal, req);
         let mut b = ui.new_child(UiBuilder::new().max_rect(body));
         let ui = &mut b;
-        self.header(ui, pal, prefs, req);
-        ui.add_space(10.0);
-        self.tabs(ui, pal);
-        ui.add_space(12.0);
+        let _ = prefs;
+        ui.horizontal(|ui| {
+            let (ir, _) = ui.allocate_exact_size(vec2(26.0, 26.0), Sense::hover());
+            crate::icons::paint(ui.painter(), ir, Icon::Gantry, pal.orange);
+            ui.label(RichText::new(self.page.label()).font(theme::bold(19.0)).color(pal.orange));
+            if self.mode != Mode::Maker {
+                widgets::pill(ui, &format!("mode {}", self.mode.label()), pal.blue_soft, pal.text);
+            }
+        });
+        let r = ui.available_rect_before_wrap();
+        ui.painter().hline(r.x_range(), r.top() + 4.0, Stroke::new(1.0, pal.card_line));
+        ui.add_space(14.0);
         match self.page {
             Page::Fiche => self.fiche_ui(ui, pal, req),
             Page::Pilotage => self.pilotage_ui(ui, pal, units, req),
@@ -665,148 +718,41 @@ impl Machines {
         }
     }
 
-    /// Rail de gauche (images de référence) : Bibliothèque d'outils, Machines, Liste d'achat,
-    /// Journal ; en bas Documentation, Aide, Options. Ce qui n'existe pas encore est grisé.
+    /// Rail de gauche : les pages de la machine (Fiche, Pilotage, Calibrage, Réglages Grbl,
+    /// Entretien et journal), puis Bibliothèque d'outils et Liste d'achat ; en bas Documentation,
+    /// Aide, Options. Ce qui n'existe pas encore est grisé ; le mode élève masque les réglages.
     fn rail_ui(&mut self, ui: &mut Ui, pal: &Palette, req: &mut Vec<Request>) {
         let full = ui.max_rect();
         ui.painter().rect_filled(full, CornerRadius::same(12), pal.panel);
-        let journal = self.rights().expert_tabs;
-        let top: [(Icon, &str, Option<&str>, bool); 4] = [
-            (Icon::Library, "Bibliothèque d'outils", None, false),
-            (Icon::Gantry, "Machines", Some("machines"), true),
-            (Icon::Cart, "Liste d'achat", None, false),
-            (Icon::Journal, "Journal", Some("journal"), journal),
-        ];
-        let bottom: [(Icon, &str, Option<&str>, bool); 3] = [(Icon::Book, "Documentation", None, false), (Icon::Help, "Aide", None, false), (Icon::Settings, "Options", Some("options"), true)];
-        let item_h = 70.0;
-        let mut y = full.top() + 10.0;
-        let mut hit = None;
-        for (icon, label, id, on) in top {
-            let r = Rect::from_min_size(pos2(full.left(), y), vec2(full.width(), item_h));
-            let active = id == Some("machines") || (id == Some("journal") && self.page == Page::Entretien);
-            if rail_item(ui, pal, r, icon, label, on, active) {
-                hit = id;
-            }
-            y += item_h + 4.0;
-        }
-        let mut y = full.bottom() - 10.0 - 3.0 * (item_h + 4.0);
-        for (icon, label, id, on) in bottom {
-            let r = Rect::from_min_size(pos2(full.left(), y), vec2(full.width(), item_h));
-            if rail_item(ui, pal, r, icon, label, on, false) {
-                hit = id;
-            }
-            y += item_h + 4.0;
-        }
-        match hit {
-            Some("journal") => self.page = Page::Entretien,
-            Some("options") => req.push(Request::Options),
-            _ => {}
-        }
-    }
-
-    /// En-tête commun : machine, port, état, connexion.
-    fn header(&mut self, ui: &mut Ui, pal: &Palette, prefs: &Prefs, req: &mut Vec<Request>) {
-        let busy = self.connected();
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 10.0;
-            ui.label(RichText::new("Machines").font(theme::bold(20.0)).color(pal.text));
-            ui.add_space(6.0);
-            let current = self.profile().map_or_else(|| "aucune machine dans la banque".to_owned(), |p| p.name.clone());
-            let mut pick = None;
-            ui.add_enabled_ui(!busy, |ui| {
-                egui::ComboBox::from_id_salt("mach-profil").width(240.0).selected_text(current).show_ui(ui, |ui| {
-                    for (i, p) in self.profiles.iter().enumerate() {
-                        if ui.selectable_label(i == self.profile, &p.name).clicked() {
-                            pick = Some(i);
-                        }
-                    }
-                    ui.add_enabled(false, egui::Button::new("Isel CPM 2018-TS (à venir)"));
-                });
-            });
-            if let Some(i) = pick {
-                let eq = self.profiles.get(i).and_then(|p| prefs.equipment.get(&p.id).cloned());
-                self.select_profile(i, eq);
-            }
-            ui.add_space(6.0);
-            ui.add_enabled_ui(!busy, |ui| {
-                let shown = if self.emulator { EMULATOR.to_owned() } else if self.port.is_empty() { "aucun port".to_owned() } else { self.port.clone() };
-                let r = egui::ComboBox::from_id_salt("mach-port").width(230.0).selected_text(shown).show_ui(ui, |ui| {
-                    if ui.selectable_label(self.emulator, EMULATOR).clicked() {
-                        self.emulator = true;
-                    }
-                    for p in &self.ports {
-                        if ui.selectable_label(!self.emulator && self.port == p.name, format!("{}  {}", p.name, p.description)).clicked() {
-                            self.emulator = false;
-                            self.port = p.name.clone();
-                        }
-                    }
-                });
-                if r.response.clicked() {
-                    self.refresh_ports();
-                }
-                if !self.emulator {
-                    egui::ComboBox::from_id_salt("mach-baud").width(120.0).selected_text(format!("{} bauds", self.baud)).show_ui(ui, |ui| {
-                        for b in BAUDS {
-                            ui.selectable_value(&mut self.baud, b, format!("{b} bauds"));
-                        }
-                    });
-                }
-            });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if busy {
-                    if widgets::button(ui, pal, Some(Icon::Unplug), "Déconnecter", Kind::Plain, true).clicked() {
-                        self.command("machine.deconnecter", req);
-                    }
-                } else if widgets::button(ui, pal, Some(Icon::Plug), "Connecter", Kind::Component, true).clicked() {
-                    self.command("machine.connecter", req);
-                }
-                widgets::pill(ui, self.state_label(), self.state_color(pal), pal.on_blue);
-                if self.mode != Mode::Maker {
-                    widgets::pill(ui, &format!("mode {}", self.mode.label()), pal.blue_soft, pal.text);
-                }
-            });
-        });
-    }
-
-    fn state_color(&self, pal: &Palette) -> egui::Color32 {
-        match self.status.state {
-            _ if !self.connected() => pal.weak,
-            MachineState::Idle => pal.ok,
-            MachineState::Run | MachineState::Jog | MachineState::Home => pal.blue,
-            MachineState::Hold | MachineState::Door | MachineState::Check | MachineState::Tool | MachineState::Sleep => pal.warn,
-            MachineState::Alarm => pal.bad,
-            _ => pal.weak,
-        }
-    }
-
-    fn tabs(&mut self, ui: &mut Ui, pal: &Palette) {
         let expert = self.rights().expert_tabs;
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            for p in Page::ALL {
-                if p.expert() && !expert {
-                    continue;
-                }
-                let on = self.page == p;
-                let font = theme::bold(14.0);
-                let g = ui.painter().layout_no_wrap(p.label().to_owned(), font, if on { pal.text } else { pal.weak });
-                let (rect, resp) = ui.allocate_exact_size(g.size() + vec2(28.0, 18.0), Sense::click());
-                resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, true, on, p.label()));
-                if resp.hovered() && !on {
-                    ui.painter().rect_filled(rect, egui::CornerRadius::same(8), pal.hover);
-                }
-                ui.painter().galley(rect.center() - g.size() / 2.0 - vec2(0.0, 1.0), g, pal.text);
-                if on {
-                    let y = rect.bottom() - 1.5;
-                    ui.painter().line_segment([egui::pos2(rect.left() + 8.0, y), egui::pos2(rect.right() - 8.0, y)], egui::Stroke::new(3.0, pal.orange));
-                }
-                if resp.clicked() {
-                    self.page = p;
-                }
+        let item_h = 62.0;
+        let mut y = full.top() + 8.0;
+        let pages = [(Page::Fiche, Icon::IdCard), (Page::Pilotage, Icon::Jog), (Page::Calibrage, Icon::Zero), (Page::Reglages, Icon::Sliders), (Page::Entretien, Icon::Journal)];
+        for (page, icon) in pages {
+            if page.expert() && !expert {
+                continue;
             }
-        });
-        let r = ui.available_rect_before_wrap();
-        ui.painter().hline(r.x_range(), r.top(), egui::Stroke::new(1.0, pal.card_line));
+            let r = Rect::from_min_size(pos2(full.left(), y), vec2(full.width(), item_h));
+            if rail_item(ui, pal, r, icon, page.label(), true, self.page == page) {
+                self.page = page;
+            }
+            y += item_h + 2.0;
+        }
+        ui.painter().hline(full.x_range().shrink(14.0), y + 4.0, Stroke::new(1.0, pal.card_line));
+        y += 10.0;
+        for (icon, label) in [(Icon::Library, "Bibliothèque d'outils"), (Icon::Cart, "Liste d'achat")] {
+            let r = Rect::from_min_size(pos2(full.left(), y), vec2(full.width(), item_h));
+            rail_item(ui, pal, r, icon, label, false, false);
+            y += item_h + 2.0;
+        }
+        let mut y = full.bottom() - 8.0 - 3.0 * (item_h + 2.0);
+        for (icon, label, on) in [(Icon::Book, "Documentation", false), (Icon::Help, "Aide", false), (Icon::Settings, "Options", true)] {
+            let r = Rect::from_min_size(pos2(full.left(), y), vec2(full.width(), item_h));
+            if rail_item(ui, pal, r, icon, label, on, false) && on {
+                req.push(Request::Options);
+            }
+            y += item_h + 2.0;
+        }
     }
 
     /// Onglet Calibrage : en attendant les assistants (t026g), la prise du zéro table à la main.

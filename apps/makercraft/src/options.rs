@@ -59,11 +59,13 @@ pub struct Options {
     pub draft: Prefs,
     /// Photo de l'auteur (fichier commun FeBe), chargée à la première ouverture de l'onglet.
     author_tex: Option<TextureHandle>,
+    /// Préférences à l'ouverture, pour savoir si « Fermer » doit enregistrer quelque chose.
+    orig: Prefs,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Self { open: false, page: Page::General, tab: 0, draft: Prefs::default(), author_tex: None }
+        Self { open: false, page: Page::General, tab: 0, draft: Prefs::default(), author_tex: None, orig: Prefs::default() }
     }
 }
 
@@ -80,6 +82,7 @@ impl Options {
     /// Ouvre la fenêtre sur une page, avec une copie des préférences actuelles.
     pub fn show_page(&mut self, prefs: &Prefs, page: Page) {
         self.draft = prefs.clone();
+        self.orig = prefs.clone();
         self.page = page;
         self.tab = 0;
         self.open = true;
@@ -135,24 +138,37 @@ impl Options {
                 let mut fui = ui.new_child(
                     UiBuilder::new().max_rect(foot.shrink2(vec2(18.0, 11.0))).layout(egui::Layout::left_to_right(egui::Align::Center)),
                 );
-                if widgets::button(&mut fui, pal, None, "Réinitialiser", Kind::Plain, self.page == Page::General)
-                    .on_hover_text("Remet les réglages de cette page à leur valeur d'origine")
-                    .clicked()
-                {
-                    let d = Prefs::default();
-                    self.draft.theme = d.theme;
-                    self.draft.units = d.units;
-                    self.draft.remember_atelier = d.remember_atelier;
+                if self.page == Page::About {
+                    // pages en lecture seule : un seul bouton ; les réglages modifiés ailleurs
+                    // avant d'arriver ici sont enregistrés
+                    fui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if widgets::button(ui, pal, None, "Fermer", Kind::Primary, true).clicked() {
+                            if self.draft != self.orig {
+                                out = Outcome::Apply(self.draft.clone());
+                            }
+                            close = true;
+                        }
+                    });
+                } else {
+                    if widgets::button(&mut fui, pal, None, "Réinitialiser", Kind::Plain, self.page == Page::General)
+                        .on_hover_text("Remet les réglages de cette page à leur valeur d'origine")
+                        .clicked()
+                    {
+                        let d = Prefs::default();
+                        self.draft.theme = d.theme;
+                        self.draft.units = d.units;
+                        self.draft.remember_atelier = d.remember_atelier;
+                    }
+                    fui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if widgets::button(ui, pal, None, "Appliquer", Kind::Primary, true).clicked() {
+                            out = Outcome::Apply(self.draft.clone());
+                            close = true;
+                        }
+                        if widgets::button(ui, pal, None, "Annuler", Kind::Plain, true).clicked() {
+                            close = true;
+                        }
+                    });
                 }
-                fui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if widgets::button(ui, pal, None, "Appliquer", Kind::Primary, true).clicked() {
-                        out = Outcome::Apply(self.draft.clone());
-                        close = true;
-                    }
-                    if widgets::button(ui, pal, None, "Annuler", Kind::Plain, true).clicked() {
-                        close = true;
-                    }
-                });
             });
         if close || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
             self.open = false;
@@ -234,6 +250,15 @@ impl Options {
             self.author_tex = Some(ui.ctx().load_texture("auteur", egui::ColorImage::from_rgba_unmultiplied(size, img.as_raw()), egui::TextureOptions::LINEAR));
         }
         let author = self.author_tex.clone();
+        if self.page == Page::About && matches!(self.tab, 1..=3) {
+            // en-tête fixe, seul le texte défile
+            match self.tab {
+                1 => about_author(ui, pal, author.as_ref()),
+                2 => about_rights(ui, pal),
+                _ => about_rgpd(ui, pal),
+            }
+            return None;
+        }
         let mut out = None;
         ScrollArea::vertical().id_salt(("options", self.page_key(), self.tab)).auto_shrink([false, false]).show(ui, |ui| {
             ui.set_width(ui.available_width() - 6.0);
@@ -249,9 +274,6 @@ impl Options {
                 (Page::Files, _) => self.recents(ui, pal),
                 (Page::Extension(i), _) => out = extension(ui, pal, host, i),
                 (Page::About, 0) => about_software(ui, pal, host, logo),
-                (Page::About, 1) => about_author(ui, pal, author.as_ref()),
-                (Page::About, 2) => about_rights(ui, pal),
-                (Page::About, 3) => about_rgpd(ui, pal),
                 (Page::About, 4) => about_sources(ui, pal),
                 (Page::About, 5) => about_updates(ui, pal),
                 (Page::About, _) => about_contact(ui, pal),
@@ -437,33 +459,27 @@ fn text_box_lie(ui: &mut Ui, pal: &Palette, text: &str) {
         });
 }
 
-/// Ligne « libellé gris : valeur » ; plusieurs liens possibles (libellé, adresse ; adresse vide :
-/// texte simple). `None` : « bientôt ».
-fn kv(ui: &mut Ui, pal: &Palette, key: &str, values: &[(&str, &str)], tip: Option<&str>) {
-    ui.horizontal(|ui| {
-        let (r, _) = ui.allocate_exact_size(vec2(78.0, 18.0), Sense::hover());
-        ui.painter().text(r.left_center(), Align2::LEFT_CENTER, key, theme::regular(13.0), pal.weak);
-        ui.vertical(|ui| {
-            ui.spacing_mut().item_spacing.y = 1.0;
-            if values.is_empty() {
-                ui.label(RichText::new("bientôt").size(13.5).color(pal.dim));
-            }
-            for (text, url) in values {
-                let r = if url.is_empty() { ui.add(egui::Label::new(RichText::new(*text).size(13.5)).wrap()) } else { ui.hyperlink_to(RichText::new(*text).size(13.5).color(pal.blue), *url) };
-                if let Some(t) = tip {
-                    r.on_hover_text(t);
-                }
-            }
-        });
-    });
-}
-
 /// Adresse sans « https:// » ni barre finale, pour l'affichage.
 fn short(url: &str) -> &str {
     url.trim_start_matches("https://").trim_start_matches("www.").trim_end_matches('/')
 }
 
-/// Onglet « Le logiciel » : icône | fiche | contacts et sites, puis la présentation.
+/// Petit bouton à icône ouvrant une adresse (adresse en info-bulle).
+fn link_icon(ui: &mut Ui, pal: &Palette, icon: Icon, what: &str, url: &str) {
+    let (r, resp) = ui.allocate_exact_size(vec2(30.0, 30.0), Sense::click());
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Link, true, what));
+    let c = if resp.hovered() { pal.blue } else { pal.weak };
+    if resp.hovered() {
+        ui.painter().rect_filled(r, CornerRadius::same(6), pal.hover);
+    }
+    icons::paint(ui.painter(), r.shrink(6.0), icon, c);
+    let shown = url.trim_start_matches("mailto:").split('?').next().unwrap_or(url).to_owned();
+    if resp.on_hover_text(format!("{what} : {}", short(&shown))).clicked() {
+        ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+    }
+}
+
+/// Onglet « Le logiciel » : icône | fiche (contacts et sites en petites icônes), puis la présentation.
 fn about_software(ui: &mut Ui, pal: &Palette, host: &Host, logo: Option<&TextureHandle>) {
     ui.add_space(4.0);
     ui.horizontal_top(|ui| {
@@ -474,43 +490,39 @@ fn about_software(ui: &mut Ui, pal: &Palette, host: &Host, logo: Option<&Texture
             }
             None => icons::paint(ui.painter(), r, Icon::Machines, pal.orange),
         }
-        ui.add_space(12.0);
-        let col = (ui.available_width() - 16.0) / 2.0;
+        ui.add_space(14.0);
         ui.vertical(|ui| {
-            ui.set_width(col);
             ui.horizontal(|ui| {
                 ui.label(RichText::new("MakerCraft").font(theme::bold(20.0)));
-                widgets::pill(ui, concat!("v", env!("CARGO_PKG_VERSION")), pal.blue_soft, pal.blue);
+                widgets::pill(ui, &about::version_label(), pal.blue_soft, pal.blue);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.spacing_mut().item_spacing.x = 2.0;
+                    // ordre inversé (de droite à gauche) : contact, site, Facebook, Patreon, GitHub
+                    let gh = if about::GITHUB_REPO.is_empty() { about::GITHUB_ACCOUNT } else { about::GITHUB_REPO };
+                    link_icon(ui, pal, Icon::Code, "GitHub", gh);
+                    if let Some(u) = about::lien("Patreon") {
+                        link_icon(ui, pal, Icon::Heart, "Patreon", u);
+                    }
+                    if let Some(u) = about::lien("Facebook") {
+                        link_icon(ui, pal, Icon::People, "Facebook", u);
+                    }
+                    link_icon(ui, pal, Icon::Globe, "Site", about::SITE);
+                    link_icon(ui, pal, Icon::Mail, "Contact", &format!("mailto:{}?subject=MakerCraft", about::CONTACT));
+                });
             });
-            kv(ui, pal, "Auteur", &[(about::AUTHOR, "")], None);
-            kv(ui, pal, "Droits", &[(about::COPYRIGHT, "")], None);
-            kv(ui, pal, "Licence", &[(about::LICENSE, "")], None);
+            ui.add_space(4.0);
             let tip = format!("Déclaration RGPD FeBe : version {}", about::rgpd_version());
-            kv(ui, pal, "RGPD", &[(about::rgpd_reference(), "")], Some(&tip));
             let lib = about::main_library();
-            kv(ui, pal, "Bibliothèque", &[(lib.as_str(), "")], None);
-        });
-        ui.add_space(16.0);
-        ui.vertical(|ui| {
-            ui.set_width(col);
-            ui.add_space(28.0);
-            let mail = format!("mailto:{}?subject=MakerCraft", about::CONTACT);
-            let mail_febe = format!("mailto:{}?subject=MakerCraft", about::CONTACT_FEBE);
-            kv(ui, pal, "Contact", &[(about::CONTACT, mail.as_str()), (about::CONTACT_FEBE, mail_febe.as_str())], None);
-            let febe = about::lien("FeBe").unwrap_or("https://www.fe-be.fr/");
-            kv(ui, pal, "Sites", &[(short(about::SITE), about::SITE), (short(febe), febe)], None);
-            if let Some(u) = about::lien("Facebook") {
-                kv(ui, pal, "Facebook", &[("FeBeSoft", u)], None);
-            }
-            if let Some(u) = about::lien("Patreon") {
-                kv(ui, pal, "Patreon", &[("FeBeSoft", u)], None);
-            }
-            let mut gh: Vec<(&str, &str)> = Vec::new();
-            if !about::GITHUB_REPO.is_empty() {
-                gh.push((short(about::GITHUB_REPO), about::GITHUB_REPO));
-            }
-            gh.push((short(about::GITHUB_ACCOUNT), about::GITHUB_ACCOUNT));
-            kv(ui, pal, "GitHub", &gh, if about::GITHUB_REPO.is_empty() { Some("Dépôt de MakerCraft pas encore publié") } else { None });
+            egui::Grid::new("fiche-logiciel").num_columns(2).spacing(vec2(16.0, 6.0)).show(ui, |ui| {
+                for (k, v, t) in [("Auteur", about::AUTHOR, None), ("Droits", about::COPYRIGHT, None), ("Licence", about::LICENSE, None), ("RGPD", about::rgpd_reference(), Some(tip.as_str())), ("Bibliothèque", lib.as_str(), None)] {
+                    ui.label(RichText::new(k).size(13.0).color(pal.weak));
+                    let r = ui.label(RichText::new(v).size(13.5));
+                    if let Some(t) = t {
+                        r.on_hover_text(t);
+                    }
+                    ui.end_row();
+                }
+            });
         });
     });
     ui.add_space(10.0);
@@ -524,10 +536,8 @@ fn about_software(ui: &mut Ui, pal: &Palette, host: &Host, logo: Option<&Texture
     }
 }
 
-/// Onglet « Auteur » : photo commune et bio commune (liens intégrés), puis la phrase propre au
-/// logiciel.
+/// Onglet « L'Auteur » : la photo reste en place, la bio défile à côté.
 fn about_author(ui: &mut Ui, pal: &Palette, photo: Option<&TextureHandle>) {
-    ui.add_space(4.0);
     ui.horizontal_top(|ui| {
         if let Some(t) = photo {
             let s = t.size_vec2();
@@ -538,17 +548,28 @@ fn about_author(ui: &mut Ui, pal: &Palette, photo: Option<&TextureHandle>) {
         }
         ui.vertical(|ui| {
             ui.label(RichText::new(about::AUTHOR).font(theme::bold(19.0)));
-            text_box_lie(ui, pal, &format!("{}\n\n{}", about::BIO.trim(), about::ORIGIN));
+            ScrollArea::vertical().id_salt("a-propos-bio").auto_shrink([false, false]).show(ui, |ui| {
+                ui.set_width(ui.available_width() - 6.0);
+                text_box_lie(ui, pal, &format!("{}\n\n{}", about::BIO.trim(), about::ORIGIN));
+            });
         });
     });
 }
 
+/// Onglet « RGPD » : règlement et version de la déclaration sur une ligne fixe, le texte défile.
 fn about_rgpd(ui: &mut Ui, pal: &Palette) {
-    ui.add_space(4.0);
-    kv(ui, pal, "Règlement", &[(about::rgpd_reference(), "")], None);
-    kv(ui, pal, "Déclaration", &[(about::rgpd_version(), "")], None);
+    ui.horizontal_wrapped(|ui| {
+        ui.label(RichText::new("Règlement").size(13.0).color(pal.weak));
+        ui.label(RichText::new(about::rgpd_reference()).size(13.5));
+        ui.add_space(14.0);
+        ui.label(RichText::new("Déclaration FeBe").size(13.0).color(pal.weak));
+        ui.label(RichText::new(about::rgpd_version()).size(13.5));
+    });
     ui.add_space(6.0);
-    text_box(ui, pal, &about::rgpd());
+    ScrollArea::vertical().id_salt("a-propos-rgpd").auto_shrink([false, false]).show(ui, |ui| {
+        ui.set_width(ui.available_width() - 6.0);
+        text_box(ui, pal, &about::rgpd());
+    });
 }
 
 fn about_sources(ui: &mut Ui, pal: &Palette) {
@@ -563,36 +584,62 @@ fn about_sources(ui: &mut Ui, pal: &Palette) {
     text_box(ui, pal, about::THANKS);
 }
 
+/// Onglet « Droits d'auteur » : nom et droits fixes en haut, le texte défile.
 fn about_rights(ui: &mut Ui, pal: &Palette) {
-    ui.add_space(4.0);
-    text_box(ui, pal, about::RIGHTS);
-    ui.add_space(6.0);
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Texte intégral : fichier LICENSE ·").size(12.5).color(pal.weak));
-        ui.hyperlink_to(RichText::new("gnu.org/licenses/gpl-3.0").size(12.5).color(pal.blue), "https://www.gnu.org/licenses/gpl-3.0.html");
+        ui.label(RichText::new("MakerCraft").font(theme::bold(16.0)));
+        ui.label(RichText::new(about::COPYRIGHT).size(14.0));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.hyperlink_to(RichText::new("gnu.org/licenses/gpl-3.0").size(12.5).color(pal.blue), "https://www.gnu.org/licenses/gpl-3.0.html");
+            ui.label(RichText::new("Texte intégral : fichier LICENSE ·").size(12.5).color(pal.weak));
+        });
+    });
+    ui.add_space(6.0);
+    ScrollArea::vertical().id_salt("a-propos-droits").auto_shrink([false, false]).show(ui, |ui| {
+        ui.set_width(ui.available_width() - 6.0);
+        text_box(ui, pal, about::rights_body());
     });
 }
 
+/// Badge à deux tons, à la manière des badges des dépôts GitHub : nom | version.
+fn version_badge(ui: &mut Ui, pal: &Palette, name: &str, version: &str) {
+    let font = theme::bold(11.5);
+    let gn = ui.painter().layout_no_wrap(name.to_owned(), font.clone(), Color32::WHITE);
+    let gv = ui.painter().layout_no_wrap(version.to_owned(), font, Color32::WHITE);
+    let (wn, wv) = (gn.size().x + 14.0, gv.size().x + 14.0);
+    let h = 20.0;
+    let (r, _) = ui.allocate_exact_size(vec2(wn + wv, h), Sense::hover());
+    let left = Rect::from_min_size(r.min, vec2(wn, h));
+    let right = Rect::from_min_max(pos2(left.right(), r.top()), r.max);
+    let p = ui.painter();
+    p.rect_filled(left, CornerRadius { nw: 4, sw: 4, ne: 0, se: 0 }, Color32::from_gray(85));
+    p.rect_filled(right, CornerRadius { nw: 0, sw: 0, ne: 4, se: 4 }, pal.blue);
+    p.galley(pos2(left.left() + 7.0, r.center().y - gn.size().y / 2.0), gn, Color32::WHITE);
+    p.galley(pos2(right.left() + 7.0, r.center().y - gv.size().y / 2.0), gv, Color32::WHITE);
+}
+
 fn about_updates(ui: &mut Ui, pal: &Palette) {
-    widgets::option_row(ui, pal, "MakerCraft", concat!("v", env!("CARGO_PKG_VERSION"), " (alpha)"), |_| {});
+    widgets::option_row(ui, pal, "MakerCraft", &about::version_label(), |_| {});
     widgets::option_row(ui, pal, "Vérification des mises à jour", "Pas encore disponible : MakerCraft ne fait aucune connexion réseau. Quand elle viendra, elle lira seulement version.json sur makercraft.fe-be.fr et pourra être désactivée.", |_| {});
-    ui.add_space(6.0);
-    ui.label(RichText::new("Versions des sources utilisées (lues dans Cargo.lock à la compilation)").font(theme::bold(14.0)));
-    for (name, v) in about::versions() {
-        widgets::option_row(ui, pal, name, v, |_| {});
-    }
+    ui.add_space(8.0);
+    ui.label(RichText::new("Versions des sources utilisées").font(theme::bold(14.0)));
+    ui.label(RichText::new("Lues dans Cargo.lock à la compilation.").size(12.0).color(pal.weak));
+    ui.add_space(4.0);
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+        for (name, v) in about::versions() {
+            version_badge(ui, pal, name, v);
+        }
+    });
 }
 
 fn about_contact(ui: &mut Ui, pal: &Palette) {
     ui.add_space(4.0);
-    text_box(ui, pal, "Pour une idée, un atelier à ajouter ou un problème, écris à l'adresse de MakerCraft en joignant les informations de version. Pour le reste, l'adresse principale de FeBe.");
+    text_box(ui, pal, "Pour une idée, un atelier à ajouter ou un problème, écris à l'adresse de MakerCraft en joignant les informations de version. Les autres contacts FeBe sont sur le site de MakerCraft.");
     ui.add_space(8.0);
     ui.horizontal(|ui| {
         if widgets::button(ui, pal, None, about::CONTACT, Kind::Primary, true).clicked() {
             ui.ctx().open_url(egui::OpenUrl::new_tab(format!("mailto:{}?subject=MakerCraft", about::CONTACT)));
-        }
-        if widgets::button(ui, pal, None, about::CONTACT_FEBE, Kind::Plain, true).clicked() {
-            ui.ctx().open_url(egui::OpenUrl::new_tab(format!("mailto:{}?subject=MakerCraft", about::CONTACT_FEBE)));
         }
         if widgets::button(ui, pal, None, "Copier les informations de version", Kind::Plain, true).clicked() {
             ui.ctx().copy_text(about::version_info());

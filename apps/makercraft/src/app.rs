@@ -56,6 +56,8 @@ enum Action {
     Command(CommandSpec),
     /// Commande du ruban de l'atelier actif.
     Ribbon(&'static str),
+    /// Choix dans une liste déroulante du ruban : identifiant et rang choisi.
+    RibbonChoice(&'static str, usize),
     Quit,
 }
 
@@ -174,6 +176,13 @@ impl App {
             Action::Options(page) => self.options.show_page(&self.prefs, page),
             Action::Command(spec) => self.command = Some(CommandDialog::new(&spec)),
             Action::Ribbon(id) => self.ribbon_command(id),
+            Action::RibbonChoice(id, i) => {
+                if id.starts_with("machine.") {
+                    let mut req = Vec::new();
+                    self.machines.choose(id, i, &self.prefs, &mut req);
+                    self.machines_requests(req);
+                }
+            }
             Action::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
         }
     }
@@ -338,6 +347,9 @@ impl App {
             if let Some(id) = self.ribbon.body_ui(ui, br, pal, &tabs) {
                 actions.push(Action::Ribbon(id));
             }
+            if let Some((id, i)) = self.ribbon.picked.take() {
+                actions.push(Action::RibbonChoice(id, i));
+            }
         }
     }
 
@@ -481,7 +493,7 @@ impl App {
             x = t.right() + 18.0;
         }
         let right = p.text(pos2(r.right() - 16.0, r.center().y), Align2::RIGHT_CENTER, format!("Unités : {}", self.prefs.units.label()), f.clone(), pal.weak);
-        let ver = p.text(pos2(right.left() - 22.0, r.center().y), Align2::RIGHT_CENTER, concat!("MakerCraft ", env!("CARGO_PKG_VERSION")), f.clone(), pal.dim);
+        let ver = p.text(pos2(right.left() - 22.0, r.center().y), Align2::RIGHT_CENTER, format!("MakerCraft {}", crate::about::version_label()), f.clone(), pal.dim);
         let max = ver.left() - 30.0 - x;
         if max > 40.0 {
             let mut job = egui::text::LayoutJob::simple_singleline(self.status.clone(), f, pal.text);
