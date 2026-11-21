@@ -98,7 +98,7 @@ impl Atelier {
     pub fn contents(self) -> &'static str {
         match self {
             Self::Cnc => "Machine · Brut · Dessin · Parcours · Simulation · Usinage",
-            Self::Machines => "Connexion · État · Déplacement · Programme · Console",
+            Self::Machines => "Fiche · Pilotage · Calibrage · Réglages Grbl · Entretien et journal",
             Self::CncUsinage3d | Self::CncGravure | Self::Laser | Self::Pcb => "",
         }
     }

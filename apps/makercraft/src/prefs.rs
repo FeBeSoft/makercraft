@@ -1,9 +1,12 @@
 //! Préférences de l'utilisateur, enregistrées en JSON dans
 //! `%APPDATA%\FeBe\MakerCraft\preferences.json` (ou `~/.config/FeBe/MakerCraft` ailleurs).
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+
+use crate::ateliers::machines::equip::Equipment;
 
 /// Nombre de fichiers récents gardés.
 pub const MAX_RECENTS: usize = 8;
@@ -39,9 +42,32 @@ pub enum ThemeChoice {
     Dark,
 }
 
+/// Mode d'utilisation : maker (seul à l'atelier), prof ou élève (en classe).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum Mode {
+    #[default]
+    Maker,
+    Prof,
+    Eleve,
+}
+
+impl Mode {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Maker => "maker",
+            Self::Prof => "prof",
+            Self::Eleve => "élève",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Prefs {
+    /// Mode d'utilisation (choix dans les Options à venir, t100 ; maker par défaut).
+    pub mode: Mode,
+    /// Équipements déclarés par machine (identifiant du profil de la banque).
+    pub equipment: BTreeMap<String, Equipment>,
     pub units: Units,
     pub theme: ThemeChoice,
     /// Fichiers ouverts récemment, le plus récent d'abord.
@@ -60,6 +86,8 @@ pub struct Prefs {
 impl Default for Prefs {
     fn default() -> Self {
         Self {
+            mode: Mode::Maker,
+            equipment: BTreeMap::new(),
             units: Units::Mm,
             theme: ThemeChoice::Dark,
             recents: Vec::new(),

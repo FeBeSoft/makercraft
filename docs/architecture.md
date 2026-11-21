@@ -76,7 +76,10 @@ apps/makercraft/src/
   hote.rs        hôte d'extensions : machine, c2d, cam, dao, cao, mkc ; menu « Extensions » construit
                  depuis les CommandSpec ; fenêtre d'exécution d'une commande (paramètres JSON)
   ateliers/      mod.rs (familles CNC / Laser / PCB / Machines, écran « à venir »),
-                 machines.rs (pilotage Grbl), cnc/ :
+                 machines/ (page Machines en onglets : mod.rs en-tête, connexion, commandes ;
+                 fiche.rs ; pilotage.rs ; vue.rs vue 3D / 2D au Painter ; equip.rs équipements
+                 déclarés, référence des axes, garde des déplacements, droits maker / prof / élève),
+                 cnc/ :
     mod.rs         atelier CNC : étapes Machine > Brut > Dessin > Parcours > Simulation > Usinage
                    (un onglet de ruban chacune), panneau de l'étape | dessin 2D | vue 3D, projet .mkc
     panels.rs      panneau de gauche de chaque étape (machine, brut et brides, contours, réglages

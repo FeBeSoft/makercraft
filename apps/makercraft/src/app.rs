@@ -66,7 +66,7 @@ impl App {
         let prefs = Prefs::load();
         let (host, host_error) = hote::load();
         let menus = hote::menu_tree(&host);
-        let mut machines = machines::Machines::with_port(prefs.port.clone(), prefs.baud);
+        let mut machines = machines::Machines::from_prefs(&prefs);
         machines.refresh_ports();
         let atelier = if prefs.remember_atelier { Atelier::from_id(&prefs.last_atelier).filter(|a| a.available()) } else { None };
         let mut app = Self {
@@ -398,6 +398,10 @@ impl App {
                     self.prefs.baud = baud;
                     self.save_prefs();
                 }
+                machines::Request::Equipment(id, e) => {
+                    self.prefs.equipment.insert(id, e);
+                    self.save_prefs();
+                }
             }
         }
     }
@@ -501,7 +505,7 @@ impl App {
             }
             Atelier::Machines => {
                 let mut req = Vec::new();
-                self.machines.ui(ui, pal, units, &mut req);
+                self.machines.ui(ui, pal, units, &self.prefs, &mut req);
                 self.machines_requests(req);
             }
             at => ateliers::soon_screen(ui, pal, at),
