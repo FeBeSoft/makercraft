@@ -16,7 +16,7 @@ use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use eframe::egui::{self, Align2, RichText, ScrollArea, Sense, Ui, vec2};
+use eframe::egui::{self, Align2, CornerRadius, Rect, RichText, ScrollArea, Sense, Stroke, Ui, UiBuilder, pos2, vec2};
 use makercraft_ext_machine::codes;
 use makercraft_ext_machine::program::ProgramText;
 use makercraft_ext_machine::transport::{PortInfo, list_ports};
@@ -45,6 +45,8 @@ pub enum Request {
     Port(String, u32),
     /// Mémoriser les équipements déclarés d'une machine (identifiant du profil).
     Equipment(String, Equipment),
+    /// Ouvrir la fenêtre Options de l'application (rail de gauche).
+    Options,
 }
 
 /// Onglets de la page Machines.
@@ -639,6 +641,14 @@ impl Machines {
         if !self.rights().expert_tabs && self.page.expert() {
             self.page = Page::Pilotage;
         }
+        let full = ui.available_rect_before_wrap();
+        ui.allocate_rect(full, Sense::hover());
+        let rail = Rect::from_min_size(full.min, vec2(RAIL_W, full.height()));
+        let body = Rect::from_min_max(pos2(rail.right() + 14.0, full.top()), full.max);
+        let mut r = ui.new_child(UiBuilder::new().max_rect(rail));
+        self.rail_ui(&mut r, pal, req);
+        let mut b = ui.new_child(UiBuilder::new().max_rect(body));
+        let ui = &mut b;
         self.header(ui, pal, prefs, req);
         ui.add_space(10.0);
         self.tabs(ui, pal);
@@ -652,6 +662,45 @@ impl Machines {
         }
         if self.confirm.is_some() {
             self.confirm_window(ui.ctx(), pal);
+        }
+    }
+
+    /// Rail de gauche (images de référence) : Bibliothèque d'outils, Machines, Liste d'achat,
+    /// Journal ; en bas Documentation, Aide, Options. Ce qui n'existe pas encore est grisé.
+    fn rail_ui(&mut self, ui: &mut Ui, pal: &Palette, req: &mut Vec<Request>) {
+        let full = ui.max_rect();
+        ui.painter().rect_filled(full, CornerRadius::same(12), pal.panel);
+        let journal = self.rights().expert_tabs;
+        let top: [(Icon, &str, Option<&str>, bool); 4] = [
+            (Icon::Library, "Bibliothèque d'outils", None, false),
+            (Icon::Gantry, "Machines", Some("machines"), true),
+            (Icon::Cart, "Liste d'achat", None, false),
+            (Icon::Journal, "Journal", Some("journal"), journal),
+        ];
+        let bottom: [(Icon, &str, Option<&str>, bool); 3] = [(Icon::Book, "Documentation", None, false), (Icon::Help, "Aide", None, false), (Icon::Settings, "Options", Some("options"), true)];
+        let item_h = 70.0;
+        let mut y = full.top() + 10.0;
+        let mut hit = None;
+        for (icon, label, id, on) in top {
+            let r = Rect::from_min_size(pos2(full.left(), y), vec2(full.width(), item_h));
+            let active = id == Some("machines") || (id == Some("journal") && self.page == Page::Entretien);
+            if rail_item(ui, pal, r, icon, label, on, active) {
+                hit = id;
+            }
+            y += item_h + 4.0;
+        }
+        let mut y = full.bottom() - 10.0 - 3.0 * (item_h + 4.0);
+        for (icon, label, id, on) in bottom {
+            let r = Rect::from_min_size(pos2(full.left(), y), vec2(full.width(), item_h));
+            if rail_item(ui, pal, r, icon, label, on, false) {
+                hit = id;
+            }
+            y += item_h + 4.0;
+        }
+        match hit {
+            Some("journal") => self.page = Page::Entretien,
+            Some("options") => req.push(Request::Options),
+            _ => {}
         }
     }
 
@@ -844,6 +893,29 @@ fn thousands(v: f64) -> String {
         out.push(c);
     }
     if v < 0.0 { format!("-{out}") } else { out }
+}
+
+/// Largeur du rail de gauche.
+const RAIL_W: f32 = 86.0;
+
+/// Élément du rail : icône au trait, libellé dessous ; renvoie `true` au clic.
+fn rail_item(ui: &mut Ui, pal: &Palette, r: Rect, icon: Icon, label: &str, enabled: bool, active: bool) -> bool {
+    let resp = ui.interact(r, ui.make_persistent_id(("rail", label)), if enabled { Sense::click() } else { Sense::hover() });
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, enabled, active, label));
+    let resp = if enabled { resp } else { resp.on_hover_text("à venir") };
+    let p = ui.painter();
+    if active {
+        p.rect_filled(r.shrink2(vec2(6.0, 2.0)), CornerRadius::same(8), theme::alpha(pal.orange, 0.14));
+        p.line_segment([pos2(r.left() + 3.0, r.top() + 10.0), pos2(r.left() + 3.0, r.bottom() - 10.0)], Stroke::new(3.0, pal.orange));
+    } else if enabled && resp.hovered() {
+        p.rect_filled(r.shrink2(vec2(6.0, 2.0)), CornerRadius::same(8), pal.hover);
+    }
+    let c = if active { pal.orange } else if enabled { pal.text } else { pal.dim };
+    crate::icons::paint(p, Rect::from_center_size(pos2(r.center().x, r.top() + 22.0), vec2(26.0, 26.0)), icon, c);
+    let g = p.layout(label.to_owned(), theme::regular(11.0), c, r.width() - 8.0);
+    let gw = g.size().x;
+    p.galley(pos2(r.center().x - gw / 2.0, r.top() + 40.0), g, c);
+    resp.clicked()
 }
 
 /// Carte « à venir » : ce que l'onglet contiendra.

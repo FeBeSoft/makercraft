@@ -69,6 +69,20 @@ pub enum Icon {
     /// Cube (vue 3D).
     Cube,
     Check,
+    /// Rangée de livres (bibliothèque d'outils).
+    Library,
+    /// Portique de fraiseuse (page Machines).
+    Gantry,
+    /// Chariot (liste d'achat).
+    Cart,
+    /// Carnet à spirale (journal).
+    Journal,
+    /// Livre ouvert (documentation).
+    Book,
+    /// Point d'interrogation cerclé (aide).
+    Help,
+    /// Roue crantée à 6 dents (options).
+    Settings,
 }
 
 /// Point relatif au carré `r` : (0,0) coin haut gauche, (1,1) coin bas droit.
@@ -330,6 +344,56 @@ pub fn paint(p: &Painter, r: Rect, icon: Icon, c: Color32) {
             line(p, r, &[(0.2, 0.5), (0.2, 0.86)], s);
         }
         Icon::Check => line(p, r, &[(0.15, 0.52), (0.4, 0.78), (0.86, 0.24)], Stroke::new(w * 1.3, c)),
+        Icon::Library => {
+            for (x0, x1) in [(0.1, 0.26), (0.3, 0.46)] {
+                p.rect_stroke(Rect::from_min_max(at(r, x0, 0.12), at(r, x1, 0.88)), CornerRadius::ZERO, s, StrokeKind::Middle);
+            }
+            line(p, r, &[(0.56, 0.2), (0.7, 0.16), (0.9, 0.84), (0.76, 0.88), (0.56, 0.2)], s);
+            line(p, r, &[(0.05, 0.94), (0.95, 0.94)], s);
+        }
+        Icon::Gantry => {
+            line(p, r, &[(0.18, 0.86), (0.18, 0.12), (0.82, 0.12), (0.82, 0.86)], s);
+            p.rect_stroke(Rect::from_min_max(at(r, 0.4, 0.2), at(r, 0.6, 0.5)), CornerRadius::ZERO, s, StrokeKind::Middle);
+            line(p, r, &[(0.5, 0.5), (0.5, 0.64)], s);
+            p.rect_stroke(Rect::from_min_max(at(r, 0.06, 0.7), at(r, 0.94, 0.86)), CornerRadius::ZERO, s, StrokeKind::Middle);
+        }
+        Icon::Cart => {
+            line(p, r, &[(0.04, 0.16), (0.2, 0.16), (0.3, 0.64), (0.84, 0.64), (0.94, 0.28), (0.24, 0.28)], s);
+            p.circle_stroke(at(r, 0.36, 0.82), r.width() * 0.07, s);
+            p.circle_stroke(at(r, 0.78, 0.82), r.width() * 0.07, s);
+        }
+        Icon::Journal => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.22, 0.06), at(r, 0.84, 0.94)), cr, s, StrokeKind::Middle);
+            for y in [0.2, 0.4, 0.6, 0.8] {
+                line(p, r, &[(0.14, y), (0.3, y)], s);
+            }
+            line(p, r, &[(0.42, 0.32), (0.72, 0.32)], s);
+            line(p, r, &[(0.42, 0.5), (0.72, 0.5)], s);
+            line(p, r, &[(0.42, 0.68), (0.62, 0.68)], s);
+        }
+        Icon::Book => {
+            line(p, r, &[(0.5, 0.24), (0.3, 0.14), (0.06, 0.16), (0.06, 0.82), (0.3, 0.8), (0.5, 0.9), (0.7, 0.8), (0.94, 0.82), (0.94, 0.16), (0.7, 0.14), (0.5, 0.24), (0.5, 0.9)], s);
+        }
+        Icon::Help => {
+            p.circle_stroke(r.center(), r.width() * 0.42, s);
+            line(p, r, &[(0.36, 0.38), (0.4, 0.28), (0.5, 0.24), (0.6, 0.28), (0.64, 0.38), (0.6, 0.46), (0.5, 0.52), (0.5, 0.62)], s);
+            p.circle_filled(at(r, 0.5, 0.75), w * 0.9, c);
+        }
+        Icon::Settings => {
+            let cen = r.center();
+            let (ro, ri) = (r.width() * 0.44, r.width() * 0.32);
+            let mut pts = Vec::new();
+            for i in 0..24 {
+                let a = (i as f32 + 0.5) / 24.0 * std::f32::consts::TAU;
+                let rad = if (i / 2) % 2 == 0 { ro } else { ri };
+                pts.push(cen + vec2(a.cos(), a.sin()) * rad);
+            }
+            if let Some(first) = pts.first().copied() {
+                pts.push(first);
+            }
+            p.add(Shape::line(pts, s));
+            p.circle_stroke(cen, r.width() * 0.14, s);
+        }
     }
 }
 

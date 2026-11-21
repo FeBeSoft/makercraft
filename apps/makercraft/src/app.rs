@@ -402,6 +402,7 @@ impl App {
                     self.prefs.equipment.insert(id, e);
                     self.save_prefs();
                 }
+                machines::Request::Options => self.options.show_page(&self.prefs, Page::General),
             }
         }
     }
