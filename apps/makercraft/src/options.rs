@@ -37,7 +37,7 @@ impl Page {
             Self::General => &["Interface", "Démarrage"],
             Self::Files => &["Dossiers", "Récents"],
             Self::Extension(_) => &["Commandes"],
-            Self::About => &["Le logiciel", "Auteur", "Droits d'auteur", "RGPD", "Sources", "Mises à jour", "Contact"],
+            Self::About => &["Le logiciel", "L'Auteur", "Droits d'auteur", "RGPD", "Sources", "Mises à jour", "Contact"],
         }
     }
 }
