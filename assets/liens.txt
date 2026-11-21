@@ -1,0 +1,5 @@
+# Liens communs FeBe : affichés dans « À propos », juste après le site du logiciel, dans cet ordre.
+# Une ligne par lien : libellé|adresse. Les lignes vides et celles qui commencent par # sont ignorées.
+FeBe|https://www.fe-be.fr/
+Patreon|https://www.patreon.com/c/FeBeSoft
+Facebook|https://www.facebook.com/FeBeSoft

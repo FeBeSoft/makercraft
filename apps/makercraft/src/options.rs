@@ -12,7 +12,7 @@ use makercraft_ext_api::{CommandSpec, Host};
 
 use crate::about;
 use crate::icons::{self, Icon};
-use crate::prefs::{Prefs, ThemeChoice, Units};
+use crate::prefs::{Mode, Prefs, ThemeChoice, Units};
 use crate::theme::{self, Palette};
 use crate::widgets::{self, Kind};
 
@@ -37,7 +37,7 @@ impl Page {
             Self::General => &["Interface", "Démarrage"],
             Self::Files => &["Dossiers", "Récents"],
             Self::Extension(_) => &["Commandes"],
-            Self::About => &["Auteur", "Remerciements", "Droits d'auteur", "Sources", "Mises à jour", "Confidentialité (RGPD)", "Contact"],
+            Self::About => &["Le logiciel", "Auteur", "Droits d'auteur", "RGPD", "Sources", "Mises à jour", "Contact"],
         }
     }
 }
@@ -57,11 +57,13 @@ pub struct Options {
     tab: usize,
     /// Préférences en cours de modification (appliquées seulement par « Appliquer »).
     pub draft: Prefs,
+    /// Photo de l'auteur (fichier commun FeBe), chargée à la première ouverture de l'onglet.
+    author_tex: Option<TextureHandle>,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Self { open: false, page: Page::General, tab: 0, draft: Prefs::default() }
+        Self { open: false, page: Page::General, tab: 0, draft: Prefs::default(), author_tex: None }
     }
 }
 
@@ -83,7 +85,7 @@ impl Options {
         self.open = true;
     }
 
-    pub fn ui(&mut self, ctx: &egui::Context, pal: &Palette, host: &Host, about_img: Option<&TextureHandle>) -> Outcome {
+    pub fn ui(&mut self, ctx: &egui::Context, pal: &Palette, host: &Host, logo: Option<&TextureHandle>) -> Outcome {
         let mut out = Outcome::None;
         let mut close = false;
         egui::Window::new("Options")
@@ -125,7 +127,7 @@ impl Options {
                 self.nav(&mut nui, pal, host);
                 // contenu
                 let mut bui = ui.new_child(UiBuilder::new().max_rect(body.shrink2(vec2(24.0, 14.0))));
-                if let Some(o) = self.body(&mut bui, pal, host, about_img) {
+                if let Some(o) = self.body(&mut bui, pal, host, logo) {
                     out = o;
                 }
                 // pied
@@ -192,7 +194,7 @@ impl Options {
         }
     }
 
-    fn body(&mut self, ui: &mut Ui, pal: &Palette, host: &Host, about_img: Option<&TextureHandle>) -> Option<Outcome> {
+    fn body(&mut self, ui: &mut Ui, pal: &Palette, host: &Host, logo: Option<&TextureHandle>) -> Option<Outcome> {
         let (title, desc) = match self.page {
             Page::General => ("Général", "Apparence et démarrage de MakerCraft."),
             Page::Files => ("Fichiers et dossiers", "Emplacements utilisés par MakerCraft et fichiers récents."),
@@ -224,6 +226,14 @@ impl Options {
             ui.painter().hline(r.x_range(), r.top() - 1.0, Stroke::new(1.0, pal.card_line));
         }
         ui.add_space(6.0);
+        if self.page == Page::About && self.tab == 1 && self.author_tex.is_none()
+            && let Ok(img) = image::load_from_memory(about::AUTHOR_JPG)
+        {
+            let img = img.to_rgba8();
+            let size = [img.width() as usize, img.height() as usize];
+            self.author_tex = Some(ui.ctx().load_texture("auteur", egui::ColorImage::from_rgba_unmultiplied(size, img.as_raw()), egui::TextureOptions::LINEAR));
+        }
+        let author = self.author_tex.clone();
         let mut out = None;
         ScrollArea::vertical().id_salt(("options", self.page_key(), self.tab)).auto_shrink([false, false]).show(ui, |ui| {
             ui.set_width(ui.available_width() - 6.0);
@@ -238,18 +248,12 @@ impl Options {
                 (Page::Files, 0) => self.files(ui, pal),
                 (Page::Files, _) => self.recents(ui, pal),
                 (Page::Extension(i), _) => out = extension(ui, pal, host, i),
-                (Page::About, 0) => about_author(ui, pal, host, about_img),
-                (Page::About, 1) => {
-                    ui.add_space(4.0);
-                    text_box(ui, pal, about::THANKS);
-                }
+                (Page::About, 0) => about_software(ui, pal, host, logo),
+                (Page::About, 1) => about_author(ui, pal, author.as_ref()),
                 (Page::About, 2) => about_rights(ui, pal),
-                (Page::About, 3) => about_sources(ui, pal),
-                (Page::About, 4) => about_updates(ui, pal),
-                (Page::About, 5) => {
-                    ui.add_space(4.0);
-                    text_box(ui, pal, &about::rgpd());
-                }
+                (Page::About, 3) => about_rgpd(ui, pal),
+                (Page::About, 4) => about_sources(ui, pal),
+                (Page::About, 5) => about_updates(ui, pal),
                 (Page::About, _) => about_contact(ui, pal),
             }
         });
@@ -279,6 +283,24 @@ impl Options {
                 ui.selectable_value(&mut d.units, Units::Inch, "Pouces");
             });
         });
+        widgets::option_row(
+            ui,
+            pal,
+            "Mode d'utilisation",
+            "Maker : tout est permis. Prof et élève : pour la classe ; en mode élève, la fiche machine est en lecture seule, les réglages, la broche, le déverrouillage et la console sont réservés. Le mot de passe du prof viendra ensuite.",
+            |ui| {
+                let label = |m: Mode| match m {
+                    Mode::Maker => "Maker",
+                    Mode::Prof => "Prof",
+                    Mode::Eleve => "Élève",
+                };
+                egui::ComboBox::from_id_salt("mode").width(180.0).selected_text(label(d.mode)).show_ui(ui, |ui| {
+                    for m in [Mode::Maker, Mode::Prof, Mode::Eleve] {
+                        ui.selectable_value(&mut d.mode, m, label(m));
+                    }
+                });
+            },
+        );
     }
 
     fn files(&mut self, ui: &mut Ui, pal: &Palette) {
@@ -415,74 +437,130 @@ fn text_box_lie(ui: &mut Ui, pal: &Palette, text: &str) {
         });
 }
 
-/// Ligne « clé : valeur » de la fiche de l'auteur ; `url` vide : texte simple, `None` : « bientôt ».
-fn kv(ui: &mut Ui, pal: &Palette, key: &str, value: Option<(&str, &str)>) {
+/// Ligne « libellé gris : valeur » ; plusieurs liens possibles (libellé, adresse ; adresse vide :
+/// texte simple). `None` : « bientôt ».
+fn kv(ui: &mut Ui, pal: &Palette, key: &str, values: &[(&str, &str)], tip: Option<&str>) {
     ui.horizontal(|ui| {
-        let (r, _) = ui.allocate_exact_size(vec2(84.0, 18.0), Sense::hover());
+        let (r, _) = ui.allocate_exact_size(vec2(78.0, 18.0), Sense::hover());
         ui.painter().text(r.left_center(), Align2::LEFT_CENTER, key, theme::regular(13.0), pal.weak);
-        match value {
-            Some((text, "")) => {
-                ui.label(RichText::new(text).size(13.5));
-            }
-            Some((text, url)) => {
-                ui.hyperlink_to(RichText::new(text).size(13.5).color(pal.blue), url);
-            }
-            None => {
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.y = 1.0;
+            if values.is_empty() {
                 ui.label(RichText::new("bientôt").size(13.5).color(pal.dim));
             }
-        }
+            for (text, url) in values {
+                let r = if url.is_empty() { ui.add(egui::Label::new(RichText::new(*text).size(13.5)).wrap()) } else { ui.hyperlink_to(RichText::new(*text).size(13.5).color(pal.blue), *url) };
+                if let Some(t) = tip {
+                    r.on_hover_text(t);
+                }
+            }
+        });
     });
 }
 
-fn about_author(ui: &mut Ui, pal: &Palette, host: &Host, img: Option<&TextureHandle>) {
-    if let Some(t) = img {
-        let w = ui.available_width();
-        let s = t.size_vec2();
-        let h = (w * s.y / s.x.max(1.0)).min(170.0);
-        let (r, _) = ui.allocate_exact_size(vec2(w, h), Sense::hover());
-        // recadrage centré de l'illustration sur toute la largeur
-        let vis = (h / (w * s.y / s.x.max(1.0))).min(1.0);
-        let uv = Rect::from_min_max(pos2(0.0, (1.0 - vis) / 2.0), pos2(1.0, (1.0 + vis) / 2.0));
-        ui.painter().image(t.id(), r, uv, Color32::WHITE);
-    }
-    ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        ui.label(RichText::new("MakerCraft").font(theme::bold(20.0)));
-        widgets::pill(ui, concat!("v", env!("CARGO_PKG_VERSION")), pal.blue_soft, pal.blue);
+/// Adresse sans « https:// » ni barre finale, pour l'affichage.
+fn short(url: &str) -> &str {
+    url.trim_start_matches("https://").trim_start_matches("www.").trim_end_matches('/')
+}
+
+/// Onglet « Le logiciel » : icône | fiche | contacts et sites, puis la présentation.
+fn about_software(ui: &mut Ui, pal: &Palette, host: &Host, logo: Option<&TextureHandle>) {
+    ui.add_space(4.0);
+    ui.horizontal_top(|ui| {
+        let (r, _) = ui.allocate_exact_size(vec2(96.0, 96.0), Sense::hover());
+        match logo {
+            Some(t) => {
+                ui.painter().image(t.id(), r, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+            }
+            None => icons::paint(ui.painter(), r, Icon::Machines, pal.orange),
+        }
+        ui.add_space(12.0);
+        let col = (ui.available_width() - 16.0) / 2.0;
+        ui.vertical(|ui| {
+            ui.set_width(col);
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("MakerCraft").font(theme::bold(20.0)));
+                widgets::pill(ui, concat!("v", env!("CARGO_PKG_VERSION")), pal.blue_soft, pal.blue);
+            });
+            kv(ui, pal, "Auteur", &[(about::AUTHOR, "")], None);
+            kv(ui, pal, "Droits", &[(about::COPYRIGHT, "")], None);
+            kv(ui, pal, "Licence", &[(about::LICENSE, "")], None);
+            let tip = format!("Déclaration RGPD FeBe : version {}", about::rgpd_version());
+            kv(ui, pal, "RGPD", &[(about::rgpd_reference(), "")], Some(&tip));
+            let lib = about::main_library();
+            kv(ui, pal, "Bibliothèque", &[(lib.as_str(), "")], None);
+        });
+        ui.add_space(16.0);
+        ui.vertical(|ui| {
+            ui.set_width(col);
+            ui.add_space(28.0);
+            let mail = format!("mailto:{}?subject=MakerCraft", about::CONTACT);
+            let mail_febe = format!("mailto:{}?subject=MakerCraft", about::CONTACT_FEBE);
+            kv(ui, pal, "Contact", &[(about::CONTACT, mail.as_str()), (about::CONTACT_FEBE, mail_febe.as_str())], None);
+            let febe = about::lien("FeBe").unwrap_or("https://www.fe-be.fr/");
+            kv(ui, pal, "Sites", &[(short(about::SITE), about::SITE), (short(febe), febe)], None);
+            if let Some(u) = about::lien("Facebook") {
+                kv(ui, pal, "Facebook", &[("FeBeSoft", u)], None);
+            }
+            if let Some(u) = about::lien("Patreon") {
+                kv(ui, pal, "Patreon", &[("FeBeSoft", u)], None);
+            }
+            let mut gh: Vec<(&str, &str)> = Vec::new();
+            if !about::GITHUB_REPO.is_empty() {
+                gh.push((short(about::GITHUB_REPO), about::GITHUB_REPO));
+            }
+            gh.push((short(about::GITHUB_ACCOUNT), about::GITHUB_ACCOUNT));
+            kv(ui, pal, "GitHub", &gh, if about::GITHUB_REPO.is_empty() { Some("Dépôt de MakerCraft pas encore publié") } else { None });
+        });
     });
-    ui.label(RichText::new(about::TAGLINE).color(pal.weak));
-    ui.add_space(6.0);
-    kv(ui, pal, "Auteur", Some((about::AUTHOR, "")));
-    kv(ui, pal, "Droits", Some((about::COPYRIGHT, "")));
-    kv(ui, pal, "Licence", Some((about::LICENSE, "")));
-    let mail = format!("mailto:{}?subject=MakerCraft", about::CONTACT);
-    kv(ui, pal, "Contact", Some((about::CONTACT, mail.as_str())));
-    kv(ui, pal, "Site", Some(("makercraft.fe-be.fr", about::SITE)));
-    kv(ui, pal, "Facebook", Some(("FeBeSoft", about::FACEBOOK)));
-    kv(ui, pal, "Patreon", Some(("FeBeSoft", about::PATREON)));
-    kv(ui, pal, "GitHub", if about::GITHUB.is_empty() { None } else { Some((about::GITHUB, about::GITHUB)) });
+    ui.add_space(10.0);
+    ui.label(RichText::new(about::TAGLINE).strong());
+    text_box(ui, pal, about::PRESENTATION);
     let exts: Vec<&str> = host.extensions().iter().map(|e| e.0).collect();
-    let exts = exts.join(", ");
-    kv(ui, pal, "Extensions", Some((exts.as_str(), "")));
-    ui.add_space(8.0);
-    text_box_lie(ui, pal, &format!("{}\n\n{}", about::BIO.trim(), about::ORIGIN));
-    ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        if widgets::button(ui, pal, Some(Icon::Open), "Site web", Kind::Plain, true).clicked() {
-            ui.ctx().open_url(egui::OpenUrl::new_tab(about::SITE));
+    ui.label(RichText::new(format!("Extensions chargées : {}", exts.join(", "))).size(12.5).color(pal.weak));
+    ui.add_space(6.0);
+    if widgets::button(ui, pal, None, "Copier les informations de version", Kind::Plain, true).clicked() {
+        ui.ctx().copy_text(about::version_info());
+    }
+}
+
+/// Onglet « Auteur » : photo commune et bio commune (liens intégrés), puis la phrase propre au
+/// logiciel.
+fn about_author(ui: &mut Ui, pal: &Palette, photo: Option<&TextureHandle>) {
+    ui.add_space(4.0);
+    ui.horizontal_top(|ui| {
+        if let Some(t) = photo {
+            let s = t.size_vec2();
+            let w = 150.0;
+            let (r, _) = ui.allocate_exact_size(vec2(w, w * s.y / s.x.max(1.0)), Sense::hover());
+            ui.painter().image(t.id(), r, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+            ui.add_space(12.0);
         }
-        if widgets::button(ui, pal, None, "Copier les informations de version", Kind::Plain, true).clicked() {
-            ui.ctx().copy_text(about::version_info());
-        }
+        ui.vertical(|ui| {
+            ui.label(RichText::new(about::AUTHOR).font(theme::bold(19.0)));
+            text_box_lie(ui, pal, &format!("{}\n\n{}", about::BIO.trim(), about::ORIGIN));
+        });
     });
+}
+
+fn about_rgpd(ui: &mut Ui, pal: &Palette) {
+    ui.add_space(4.0);
+    kv(ui, pal, "Règlement", &[(about::rgpd_reference(), "")], None);
+    kv(ui, pal, "Déclaration", &[(about::rgpd_version(), "")], None);
+    ui.add_space(6.0);
+    text_box(ui, pal, &about::rgpd());
 }
 
 fn about_sources(ui: &mut Ui, pal: &Palette) {
-    for (name, what, url) in about::SOURCES {
-        widgets::option_row(ui, pal, name, what, |ui| {
-            ui.hyperlink_to(RichText::new(url.trim_start_matches("https://")).font(theme::mono(12.0)).color(pal.blue), *url);
+    for (name, lib, what, url) in about::SOURCES {
+        let title = if lib.is_empty() { (*name).to_owned() } else { format!("{name} {}", about::version_of(lib)) };
+        widgets::option_row(ui, pal, &title, what, |ui| {
+            ui.hyperlink_to(RichText::new(short(url)).font(theme::mono(12.0)).color(pal.blue), *url);
         });
     }
+    ui.add_space(8.0);
+    ui.label(RichText::new("Remerciements").font(theme::bold(15.0)));
+    text_box(ui, pal, about::THANKS);
 }
 
 fn about_rights(ui: &mut Ui, pal: &Palette) {
@@ -497,23 +575,24 @@ fn about_rights(ui: &mut Ui, pal: &Palette) {
 
 fn about_updates(ui: &mut Ui, pal: &Palette) {
     widgets::option_row(ui, pal, "MakerCraft", concat!("v", env!("CARGO_PKG_VERSION"), " (alpha)"), |_| {});
-    widgets::option_row(ui, pal, "CadCraft, SolidCraft", "0.20.1 et 0.41.0, dernières releases stables à la compilation", |_| {});
-    widgets::option_row(ui, pal, "egui / eframe", "0.37", |_| {});
+    widgets::option_row(ui, pal, "Vérification des mises à jour", "Pas encore disponible : MakerCraft ne fait aucune connexion réseau. Quand elle viendra, elle lira seulement version.json sur makercraft.fe-be.fr et pourra être désactivée.", |_| {});
     ui.add_space(6.0);
-    text_box(
-        ui,
-        pal,
-        "Tant que le dépôt n'est pas publié, les mises à jour se font à la main : récupérer les sources dans H:\\_src\\makercraft puis cargo build --release -p makercraft.",
-    );
+    ui.label(RichText::new("Versions des sources utilisées (lues dans Cargo.lock à la compilation)").font(theme::bold(14.0)));
+    for (name, v) in about::versions() {
+        widgets::option_row(ui, pal, name, v, |_| {});
+    }
 }
 
 fn about_contact(ui: &mut Ui, pal: &Palette) {
     ui.add_space(4.0);
-    text_box(ui, pal, "Pour une idée, un atelier à ajouter ou un problème, écris à l'adresse ci-dessous en joignant les informations de version.");
+    text_box(ui, pal, "Pour une idée, un atelier à ajouter ou un problème, écris à l'adresse de MakerCraft en joignant les informations de version. Pour le reste, l'adresse principale de FeBe.");
     ui.add_space(8.0);
     ui.horizontal(|ui| {
         if widgets::button(ui, pal, None, about::CONTACT, Kind::Primary, true).clicked() {
             ui.ctx().open_url(egui::OpenUrl::new_tab(format!("mailto:{}?subject=MakerCraft", about::CONTACT)));
+        }
+        if widgets::button(ui, pal, None, about::CONTACT_FEBE, Kind::Plain, true).clicked() {
+            ui.ctx().open_url(egui::OpenUrl::new_tab(format!("mailto:{}?subject=MakerCraft", about::CONTACT_FEBE)));
         }
         if widgets::button(ui, pal, None, "Copier les informations de version", Kind::Plain, true).clicked() {
             ui.ctx().copy_text(about::version_info());

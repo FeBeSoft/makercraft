@@ -21,7 +21,6 @@ use crate::switcher::Switcher;
 use crate::theme::{self, Palette};
 
 pub const ICON_PNG: &[u8] = include_bytes!("../../../assets/branding/makercraft-256.png");
-const ABOUT_JPG: &[u8] = include_bytes!("../../../assets/branding/makercraft-about.jpg");
 
 /// Barre d'accès rapide (logo, menus, document, état de la machine, options).
 const QUICK_H: f32 = 40.0;
@@ -43,7 +42,6 @@ pub struct App {
     machines: machines::Machines,
     options: Options,
     command: Option<CommandDialog>,
-    about_img: Option<TextureHandle>,
     textures_tried: bool,
     status: String,
     /// Images déjà affichées (les premières sont redemandées : la fenêtre apparaît après elles).
@@ -83,7 +81,6 @@ impl App {
             machines,
             options: Options::default(),
             command: None,
-            about_img: None,
             textures_tried: false,
             status: "Prêt".to_owned(),
             frames: 0,
@@ -163,14 +160,9 @@ impl App {
         }
         self.textures_tried = true;
         if let Ok(img) = image::load_from_memory(ICON_PNG) {
-            let rgba = img.resize(64, 64, image::imageops::FilterType::Lanczos3).to_rgba8();
+            let rgba = img.resize(128, 128, image::imageops::FilterType::Lanczos3).to_rgba8();
             let size = [rgba.width() as usize, rgba.height() as usize];
             self.logo = Some(ctx.load_texture("logo", ColorImage::from_rgba_unmultiplied(size, rgba.as_raw()), TextureOptions::LINEAR));
-        }
-        if let Ok(img) = image::load_from_memory(ABOUT_JPG) {
-            let rgba = img.to_rgba8();
-            let size = [rgba.width() as usize, rgba.height() as usize];
-            self.about_img = Some(ctx.load_texture("a-propos", ColorImage::from_rgba_unmultiplied(size, rgba.as_raw()), TextureOptions::LINEAR));
         }
     }
 
@@ -228,7 +220,7 @@ impl eframe::App for App {
         });
 
         if self.options.open {
-            match self.options.ui(&ctx, pal, &self.host, self.about_img.as_ref()) {
+            match self.options.ui(&ctx, pal, &self.host, self.logo.as_ref()) {
                 options::Outcome::Apply(p) => {
                     self.prefs = p;
                     self.save_prefs();
