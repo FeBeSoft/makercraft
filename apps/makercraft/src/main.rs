@@ -15,6 +15,7 @@ mod options;
 mod prefs;
 mod ribbon;
 mod switcher;
+mod texte_lie;
 mod theme;
 mod widgets;
 

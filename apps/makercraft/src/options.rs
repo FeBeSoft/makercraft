@@ -401,6 +401,20 @@ fn text_box(ui: &mut Ui, pal: &Palette, text: &str) {
         });
 }
 
+/// Comme `text_box`, avec liens intégrés `[libellé](adresse)` (bio commune).
+fn text_box_lie(ui: &mut Ui, pal: &Palette, text: &str) {
+    egui::Frame::new()
+        .fill(pal.panel)
+        .stroke(Stroke::new(1.0, pal.card_line))
+        .corner_radius(CornerRadius::same(8))
+        .inner_margin(egui::Margin::same(14))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            let style = crate::texte_lie::Style { taille: Some(13.5), couleur: Some(pal.text), couleur_lien: Some(pal.blue), interligne: None };
+            crate::texte_lie::afficher(ui, text, style);
+        });
+}
+
 /// Ligne « clé : valeur » de la fiche de l'auteur ; `url` vide : texte simple, `None` : « bientôt ».
 fn kv(ui: &mut Ui, pal: &Palette, key: &str, value: Option<(&str, &str)>) {
     ui.horizontal(|ui| {
@@ -451,7 +465,7 @@ fn about_author(ui: &mut Ui, pal: &Palette, host: &Host, img: Option<&TextureHan
     let exts = exts.join(", ");
     kv(ui, pal, "Extensions", Some((exts.as_str(), "")));
     ui.add_space(8.0);
-    text_box(ui, pal, &format!("{}\n\n{}", about::BIO.trim(), about::ORIGIN));
+    text_box_lie(ui, pal, &format!("{}\n\n{}", about::BIO.trim(), about::ORIGIN));
     ui.add_space(8.0);
     ui.horizontal(|ui| {
         if widgets::button(ui, pal, Some(Icon::Open), "Site web", Kind::Plain, true).clicked() {
