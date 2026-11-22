@@ -1,5 +1,11 @@
 blank_issues_enabled: true
 contact_links:
+  - name: Questions et entraide (discussion)
+    url: https://github.com/FeBeSoft/makercraft/discussions/categories/questions-et-entraide
+    about: Une question sur l'installation ou l'usage ? Posez-la ici plutôt que dans une issue.
+  - name: Q&A (discussion, English)
+    url: https://github.com/FeBeSoft/makercraft/discussions/categories/q-a
+    about: A question about installing or using MakerCraft? Ask it here rather than in an issue.
   - name: Discussions (questions, échanges libres / questions, open talk)
     url: https://github.com/FeBeSoft/makercraft/discussions
     about: Pour poser une question ou échanger sur MakerCraft / To ask a question or talk about MakerCraft

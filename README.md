@@ -104,7 +104,7 @@ Le mode se choisit dans **Options > Général**.
 Chaque retour compte, même court : une capture et deux lignes suffisent. Les idées des utilisateurs décident de ce qui arrive dans la v0.2.
 
 - **Par courriel** : [makercraft@fe-be.fr](mailto:makercraft@fe-be.fr) (avec les informations de version : À propos > « Copier les informations de version »).
-- **Sur GitHub** : [signaler un problème ou proposer une idée](https://github.com/FeBeSoft/makercraft/issues/new/choose), ou en parler dans les [Discussions](https://github.com/FeBeSoft/makercraft/discussions).
+- **Sur GitHub** : une question ou une idée dans les [Discussions](https://github.com/FeBeSoft/makercraft/discussions) ([Questions et entraide](https://github.com/FeBeSoft/makercraft/discussions/categories/questions-et-entraide), [Suggestions](https://github.com/FeBeSoft/makercraft/discussions/categories/suggestions)...), un bug précis dans les [issues](https://github.com/FeBeSoft/makercraft/issues/new/choose).
 - **Pour suivre le projet** : [Facebook FeBeSoft](https://www.facebook.com/FeBeSoft) et [Patreon FeBeSoft](https://www.patreon.com/c/FeBeSoft).
 
 À essayer en priorité :
@@ -112,9 +112,10 @@ Chaque retour compte, même court : une capture et deux lignes suffisent. Les id
 1. L'installation et le premier lancement.
 2. Ouvrir `exemple-porte-cles.mkc`, ou importer un DXF, créer des parcours et écrire le G-code.
 3. Se connecter à l'émulateur et jouer le programme.
-4. Avec une machine Grbl : seulement **lire** son état au début, sans usiner. Envoyez-nous ses caractéristiques (modèle, courses, broche, pinces) pour enrichir la banque de machines.
-5. Enseignants : votre avis sur le mode élève et sur l'échange par le Nuage.
-6. Ce qui est clair, ce qui ne l'est pas, ce qui manque par rapport à Carbide Create ou à vos logiciels habituels.
+4. Avec une machine Grbl : seulement **lire** son état au début, sans usiner. Décrivez-la dans [Machines](https://github.com/FeBeSoft/makercraft/discussions/categories/machines) (modèle, courses, broche, pinces) pour enrichir la banque de machines.
+5. Vos outils et leurs conditions de coupe dans [Outils](https://github.com/FeBeSoft/makercraft/discussions/categories/outils).
+6. Enseignants : votre avis sur le mode élève et sur l'échange par le Nuage, dans [En classe](https://github.com/FeBeSoft/makercraft/discussions/categories/en-classe).
+7. Ce qui est clair, ce qui ne l'est pas, ce qui manque par rapport à Carbide Create ou à vos logiciels habituels.
 
 ## Installation
 
@@ -126,7 +127,7 @@ Rien n'est installé ailleurs : les réglages sont dans `%APPDATA%\FeBe\MakerCra
 
 ## English summary
 
-MakerCraft is a free (GPL-3.0) workbench for makers and technology classes. This **test release** (Windows 10/11, 64-bit) includes the CNC 2.5D milling workshop (drawing, DXF/DWG import, toolpaths, checks, Grbl G-code), the Machines workshop (machine sheet, jog, spindle, program sending, emulator, Grbl alarms explained) and the tool library. A classroom mode (teacher / pupil) is available as a preview, without password yet. The interface is in French for now. Feedback is very welcome: [issues](https://github.com/FeBeSoft/makercraft/issues/new/choose), [discussions](https://github.com/FeBeSoft/makercraft/discussions) or [makercraft@fe-be.fr](mailto:makercraft@fe-be.fr).
+MakerCraft is a free (GPL-3.0) workbench for makers and technology classes. This **test release** (Windows 10/11, 64-bit) includes the CNC 2.5D milling workshop (drawing, DXF/DWG import, toolpaths, checks, Grbl G-code), the Machines workshop (machine sheet, jog, spindle, program sending, emulator, Grbl alarms explained) and the tool library. A classroom mode (teacher / pupil) is available as a preview, without password yet. The interface is in French for now. Feedback is very welcome: questions in [Q&A](https://github.com/FeBeSoft/makercraft/discussions/categories/q-a), your machine in [Machine Profiles](https://github.com/FeBeSoft/makercraft/discussions/categories/machine-profiles), your cutting tools in [Tools](https://github.com/FeBeSoft/makercraft/discussions/categories/tools), bugs in the [issues](https://github.com/FeBeSoft/makercraft/issues/new/choose), or by email at [makercraft@fe-be.fr](mailto:makercraft@fe-be.fr).
 
 ## Développement / Development
 
