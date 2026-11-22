@@ -1,0 +1,31 @@
+labels: ["en classe"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Teachers, please share your experience or your needs.
+        No student names or personal data in this form.
+  - type: dropdown
+    id: level
+    attributes:
+      label: Context
+      options:
+        - Middle school
+        - High school
+        - Vocational school or higher education
+        - Makerspace or club
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: machines
+    attributes:
+      label: Machines in the workshop
+      placeholder: "e.g. two 3018 CNCs, a laser..."
+  - type: textarea
+    id: feedback
+    attributes:
+      label: Your feedback or need
+      description: Student mode, teacher rights, sharing projects with students through a cloud drive, workshop organisation...
+    validations:
+      required: true

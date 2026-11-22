@@ -1,0 +1,51 @@
+title: "[Outil] "
+labels: ["outil"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Partagez un outil que vous utilisez, avec ses conditions de coupe.
+        Merci d'indiquer d'où viennent les valeurs (fabricant, essai, autre logiciel) : la bibliothèque note la source de chaque valeur.
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type d'outil
+      options:
+        - Fraise plate
+        - Fraise boule
+        - Fraise en V (gravure)
+        - Foret
+        - Fraise à lamer ou à fraiser
+        - Autre
+    validations:
+      required: true
+  - type: input
+    id: dimensions
+    attributes:
+      label: Dimensions
+      description: Diamètre de coupe, longueur de coupe, longueur totale, queue, nombre de dents, angle pour un V.
+      placeholder: "ex. Ø3,175 x 17 x 38, queue 3,175, 2 dents"
+    validations:
+      required: true
+  - type: input
+    id: fabricant
+    attributes:
+      label: Fabricant et référence
+      placeholder: "ex. Sorotec, HAM 40-5680..., sans marque"
+  - type: textarea
+    id: coupe
+    attributes:
+      label: Matières et conditions de coupe
+      description: Pour chaque matière, vitesse de broche, avance, plongée, profondeur de passe, et la machine utilisée.
+      placeholder: "ex. OSB 9 mm sur 3018-PRO : 10 000 tr/min, 600 mm/min, plongée 200, passe 1 mm"
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source des valeurs
+      placeholder: "ex. fiche du fabricant, essais personnels, Carbide Create..."
+  - type: textarea
+    id: remarques
+    attributes:
+      label: Remarques et photos

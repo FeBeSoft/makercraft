@@ -1,0 +1,51 @@
+title: "[Tool] "
+labels: ["outil"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share a tool you use, with its cutting data.
+        Please say where the values come from (manufacturer, your own tests, another software): the library records the source of each value.
+  - type: dropdown
+    id: type
+    attributes:
+      label: Tool type
+      options:
+        - Flat end mill
+        - Ball end mill
+        - V-bit (engraving)
+        - Drill
+        - Counterbore or countersink
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: dimensions
+    attributes:
+      label: Dimensions
+      description: Cutting diameter, flute length, overall length, shank, number of flutes, angle for a V-bit.
+      placeholder: "e.g. 1/8\" (3.175) x 17 x 38, 1/8\" shank, 2 flutes"
+    validations:
+      required: true
+  - type: input
+    id: maker
+    attributes:
+      label: Manufacturer and reference
+      placeholder: "e.g. Amana, Sorotec, no brand"
+  - type: textarea
+    id: cutting
+    attributes:
+      label: Materials and cutting data
+      description: For each material, spindle speed, feed rate, plunge rate, depth of cut, and the machine used.
+      placeholder: "e.g. MDF 6 mm on a 3018-PRO: 10,000 rpm, 600 mm/min, plunge 200, depth 1 mm"
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source of the values
+      placeholder: "e.g. manufacturer data sheet, own tests, Carbide Create..."
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes and photos

@@ -1,0 +1,19 @@
+labels: ["réalisation"]
+body:
+  - type: textarea
+    id: piece
+    attributes:
+      label: Votre réalisation
+      description: Glissez vos photos ici, et dites-nous ce que c'est.
+    validations:
+      required: true
+  - type: input
+    id: machine
+    attributes:
+      label: Machine et matière
+      placeholder: "ex. 3018-PRO, OSB 9 mm"
+  - type: textarea
+    id: outils
+    attributes:
+      label: Outils et réglages utilisés
+      description: Fraises, profondeurs de passe, vitesses... (facultatif)

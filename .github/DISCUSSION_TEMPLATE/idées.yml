@@ -1,0 +1,14 @@
+labels: ["idée"]
+body:
+  - type: textarea
+    id: idee
+    attributes:
+      label: Votre idée
+      description: Ce que vous aimeriez faire avec MakerCraft, et pourquoi.
+    validations:
+      required: true
+  - type: textarea
+    id: ailleurs
+    attributes:
+      label: Comment faites-vous aujourd'hui ?
+      description: Avec quel logiciel, et ce qui vous gêne (facultatif).

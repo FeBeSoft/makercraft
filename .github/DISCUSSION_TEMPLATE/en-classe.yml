@@ -1,0 +1,31 @@
+labels: ["en classe"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Enseignants, merci de partager votre expérience ou vos besoins.
+        Pas de nom d'élève ni de donnée personnelle dans ce formulaire.
+  - type: dropdown
+    id: niveau
+    attributes:
+      label: Contexte
+      options:
+        - Collège (technologie)
+        - Lycée
+        - Enseignement professionnel ou supérieur
+        - Fablab ou association
+        - Autre
+    validations:
+      required: true
+  - type: input
+    id: machines
+    attributes:
+      label: Machines de l'atelier
+      placeholder: "ex. 2 CNC 3018, une Isel, un laser..."
+  - type: textarea
+    id: avis
+    attributes:
+      label: Votre avis ou votre besoin
+      description: Mode élève, droits du prof, échange des projets par le Nuage, organisation de l'atelier...
+    validations:
+      required: true

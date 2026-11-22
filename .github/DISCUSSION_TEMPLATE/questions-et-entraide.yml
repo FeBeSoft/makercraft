@@ -1,0 +1,15 @@
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Votre question
+      description: Ce que vous cherchez à faire, ce qui se passe, et une capture si possible.
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: Informations de version
+      description: À propos > « Copier les informations de version », puis collez ici.
+      render: text

@@ -1,0 +1,47 @@
+title: "[Machine] "
+labels: ["machine"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de décrire votre machine : ces informations servent à créer de nouveaux profils.
+        Ne lancez aucun usinage pour remplir ce formulaire : la lecture de l'état suffit.
+  - type: input
+    id: modele
+    attributes:
+      label: Modèle de la machine
+      placeholder: "ex. Genmitsu 3018-PRO, CNC maison..."
+    validations:
+      required: true
+  - type: input
+    id: controleur
+    attributes:
+      label: Carte et micrologiciel
+      description: Réponse à la commande $I si vous la connaissez.
+      placeholder: "ex. Grbl 1.1h, grblHAL, carte Woodpecker..."
+  - type: input
+    id: courses
+    attributes:
+      label: Courses utiles X / Y / Z (mm)
+      placeholder: "ex. 300 x 180 x 45"
+  - type: input
+    id: broche
+    attributes:
+      label: Broche ou laser
+      placeholder: "ex. moteur 775 10 000 tr/min, broche 500 W, laser 5 W..."
+  - type: input
+    id: pinces
+    attributes:
+      label: Pinces disponibles
+      placeholder: "ex. ER11 : 3,175 / 4 / 6"
+  - type: textarea
+    id: reglages
+    attributes:
+      label: Réglages Grbl ($$)
+      description: Collez la réponse à la commande $$ (facultatif).
+      render: text
+  - type: textarea
+    id: remarques
+    attributes:
+      label: Équipements et remarques
+      description: Fins de course, palpeur, caméra, table martyre, photos...

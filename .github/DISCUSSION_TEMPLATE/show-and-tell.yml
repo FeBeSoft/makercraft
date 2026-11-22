@@ -1,0 +1,19 @@
+labels: ["réalisation"]
+body:
+  - type: textarea
+    id: piece
+    attributes:
+      label: What you made
+      description: Drop your photos here and tell us what it is.
+    validations:
+      required: true
+  - type: input
+    id: machine
+    attributes:
+      label: Machine and material
+      placeholder: "e.g. 3018-PRO, 6 mm plywood"
+  - type: textarea
+    id: tools
+    attributes:
+      label: Tools and settings used
+      description: End mills, depth of cut, speeds... (optional)

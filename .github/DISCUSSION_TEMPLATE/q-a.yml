@@ -1,0 +1,18 @@
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: The interface is in French for now; questions in English are welcome.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What you are trying to do, what happens, and a screenshot if possible.
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: Version information
+      description: "À propos (About) > « Copier les informations de version » (Copy version information), then paste here."
+      render: text

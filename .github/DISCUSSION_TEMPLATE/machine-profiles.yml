@@ -1,0 +1,47 @@
+title: "[Machine] "
+labels: ["machine"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe your machine: this information is used to create new machine profiles.
+        Do not run any job to fill in this form: reading the machine state is enough.
+  - type: input
+    id: model
+    attributes:
+      label: Machine model
+      placeholder: "e.g. Genmitsu 3018-PRO, home-made CNC..."
+    validations:
+      required: true
+  - type: input
+    id: controller
+    attributes:
+      label: Board and firmware
+      description: Answer to the $I command, if you know it.
+      placeholder: "e.g. Grbl 1.1h, grblHAL, Woodpecker board..."
+  - type: input
+    id: travel
+    attributes:
+      label: Usable travel X / Y / Z (mm)
+      placeholder: "e.g. 300 x 180 x 45"
+  - type: input
+    id: spindle
+    attributes:
+      label: Spindle or laser
+      placeholder: "e.g. 775 motor 10,000 rpm, 500 W spindle, 5 W laser..."
+  - type: input
+    id: collets
+    attributes:
+      label: Available collets
+      placeholder: "e.g. ER11: 1/8\" (3.175) / 4 / 6"
+  - type: textarea
+    id: settings
+    attributes:
+      label: Grbl settings ($$)
+      description: Paste the answer to the $$ command (optional).
+      render: text
+  - type: textarea
+    id: notes
+    attributes:
+      label: Equipment and notes
+      description: Limit switches, probe, camera, spoilboard, photos...
