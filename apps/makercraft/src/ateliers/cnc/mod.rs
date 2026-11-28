@@ -747,6 +747,7 @@ impl Cnc {
         }
         self.view2d.editable = self.step == Step::Dessin;
         self.view2d.free_scale = !self.props.linked;
+        self.view2d.stock = self.stock_rect();
         let stock = self.stock_rect();
         let clamps: Vec<[f64; 4]> = {
             let (ox, oy) = toolpaths::stock_offset(&self.project);

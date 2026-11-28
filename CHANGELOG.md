@@ -72,6 +72,8 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
   Raccord lisse, Doublons ; groupe Aides : lignes de construction et cotes sur leurs contours
   Construction et Cotes (jamais usinés, contour courant rétabli ensuite), Mesurer (distance,
   aire) avec le résultat sous la vue.
+- Dessin : calculs dans les valeurs saisies (W/2+5, @(10+5)*2,0 ; W et H : largeur et hauteur
+  du brut) ; accroches sur les coins, milieux des bords et centre du brut.
 - Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
   rétablissent, chevrons étroits aux extrémités du ruban.
 

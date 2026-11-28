@@ -141,6 +141,10 @@ pub struct SketchView {
     zoom_menu: Option<(Pos2, u64)>,
     /// Messages de CadCraft déjà montrés (résultats de mesure...).
     log_seen: usize,
+    /// Brut (xmin, ymin, xmax, ymax), pour ses accroches et les variables W, H des expressions.
+    pub stock: [f64; 4],
+    /// Accroche sur un coin, un milieu de bord ou le centre du brut.
+    stock_snap: Option<(WVec, &'static str)>,
     /// Finesse et transformation du dernier affichage.
     tol: f64,
     xf: Option<Xf>,
@@ -227,12 +231,14 @@ impl SketchView {
             s.cursor = w;
             self.cursor = Some(w);
             self.snap = None;
+            self.stock_snap = None;
             if editable && ((running && !s.picking_objects()) || self.node_drag.is_some())
                 && let Ok(d) = s.doc()
             {
                 let base = s.current_prompt().and_then(|p| p.base);
                 if !self.aids.osnap_off {
                     self.snap = snap::osnap(d, &doc::Space::Model, w, APERTURE_PX / xf.scale, self.aids.osmode(), base, false);
+                    self.stock_snap = if self.snap.is_none() { stock_point(self.stock, w, APERTURE_PX / xf.scale) } else { None };
                 }
             }
             if self.drag.is_none()
@@ -276,7 +282,7 @@ impl SketchView {
         if resp.drag_stopped() {
             if let (Some(i), Some(h), Some(p)) = (self.node_drag.take(), self.nodes, pointer) {
                 // sommet déplacé : accroche, sinon aides au tracé (grille...)
-                let w = self.snap.as_ref().map_or_else(|| self.aids.constrain(xf.to_world(p), None), |hit| hit.point);
+                let w = self.snap.as_ref().map(|hit| hit.point).or(self.stock_snap.map(|(q, _)| q)).unwrap_or_else(|| self.aids.constrain(xf.to_world(p), None));
                 if let Err(e) = sketch.session.grip_edit(h, i, w, makercraft_dao::sketch::engine::grips::GripMode::Stretch) {
                     out.status = Some(e.to_string());
                 }
@@ -309,6 +315,8 @@ impl SketchView {
                     }
                 } else if let Some(hit) = self.snap {
                     s.input_snapped(hit)
+                } else if let Some((q, _)) = self.stock_snap {
+                    s.input(Input::Point(q))
                 } else {
                     let base = s.current_prompt().and_then(|p| p.base);
                     s.input(Input::Point(self.aids.constrain(w, base)))
@@ -411,7 +419,7 @@ impl SketchView {
             && let Ok(d) = s.doc()
         {
             let base = s.current_prompt().and_then(|p| p.base);
-            let preview = s.preview(self.snap.as_ref().map_or_else(|| self.aids.constrain(c, base), |h| h.point));
+            let preview = s.preview(self.snap.as_ref().map(|h| h.point).or(self.stock_snap.map(|(q, _)| q)).unwrap_or_else(|| self.aids.constrain(c, base)));
             if !preview.is_empty() {
                 let opts = render::Options { tolerance: tol, ..render::Options::default() };
                 let pl = render::build_entities(d, preview.iter(), &opts);
@@ -422,6 +430,11 @@ impl SketchView {
             let c = xf.to_screen(h.point);
             p.rect_stroke(Rect::from_center_size(c, vec2(11.0, 11.0)), CornerRadius::ZERO, Stroke::new(1.6, pal.orange), StrokeKind::Middle);
             p.text(c + vec2(10.0, -10.0), Align2::LEFT_BOTTOM, snap_label(h.name), theme::regular(11.5), pal.orange);
+        }
+        if let Some((q, name)) = self.stock_snap {
+            let c = xf.to_screen(q);
+            p.rect_stroke(Rect::from_center_size(c, vec2(11.0, 11.0)), CornerRadius::ZERO, Stroke::new(1.6, pal.orange), StrokeKind::Middle);
+            p.text(c + vec2(10.0, -10.0), Align2::LEFT_BOTTOM, name, theme::regular(11.5), pal.orange);
         }
         if let Some(c) = self.cursor {
             let pos = self.snap.as_ref().map_or(c, |h| h.point);
@@ -633,7 +646,7 @@ impl SketchView {
             .id(id)
             .font(theme::mono(13.0))
             .hint_text(if prompt.is_some() {
-                "valeur, x,y ou @dx,dy, Entrée"
+                "valeur, x,y ou @dx,dy (calculs : W/2+5), Entrée"
             } else if self.no_commands {
                 "commandes du ruban (commandes tapées : voir Options)"
             } else {
@@ -655,7 +668,14 @@ impl SketchView {
                     out.open_dims = !s.selection().is_empty();
                     Ok(())
                 }
-            } else if s.running.is_none() && self.no_commands {
+            } else if s.running.is_some() {
+                // valeur demandée par la commande : expressions évaluées (W, H : brut)
+                let (w, h) = (self.stock[2] - self.stock[0], self.stock[3] - self.stock[1]);
+                match with_expressions(&text, w, h) {
+                    Ok(t) => s.cmdline(&t).map_err(|e| e.to_string()),
+                    Err(e) => Err(e),
+                }
+            } else if self.no_commands {
                 Err("commandes de CadCraft désactivées (Options > Général > Dessin) : utiliser le ruban".to_owned())
             } else {
                 s.cmdline(&command_alias(&text)).map_err(|e| e.to_string())
@@ -876,6 +896,121 @@ fn status<T, E: std::fmt::Display>(r: Result<T, E>) -> Option<String> {
     r.err().map(|e| e.to_string())
 }
 
+/// Accroche du brut la plus proche de `w` à moins de `ap` mm : coins, milieux des bords, centre.
+fn stock_point(b: [f64; 4], w: WVec, ap: f64) -> Option<(WVec, &'static str)> {
+    if b[2] - b[0] <= 0.0 || b[3] - b[1] <= 0.0 {
+        return None;
+    }
+    let (cx, cy) = ((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0);
+    let pts = [
+        (b[0], b[1], "coin du brut"),
+        (b[2], b[1], "coin du brut"),
+        (b[2], b[3], "coin du brut"),
+        (b[0], b[3], "coin du brut"),
+        (cx, b[1], "milieu du bord"),
+        (b[2], cy, "milieu du bord"),
+        (cx, b[3], "milieu du bord"),
+        (b[0], cy, "milieu du bord"),
+        (cx, cy, "centre du brut"),
+    ];
+    pts.iter()
+        .map(|&(x, y, n)| (WVec::new(x, y), n))
+        .filter(|(q, _)| (q.x - w.x).hypot(q.y - w.y) <= ap)
+        .min_by(|a, b| (a.0.x - w.x).hypot(a.0.y - w.y).total_cmp(&(b.0.x - w.x).hypot(b.0.y - w.y)))
+}
+
+/// Remplace dans une saisie (`x,y`, `@dx,dy`, `<angle`, `longueur`) chaque partie qui est un
+/// calcul par sa valeur. `W` et `H` : largeur et hauteur du brut. Le point décimal est `.`, la
+/// virgule séparant les coordonnées.
+pub fn with_expressions(text: &str, w: f64, h: f64) -> Result<String, String> {
+    let parts: Vec<String> = text
+        .split(',')
+        .map(|part| {
+            let t = part.trim();
+            let (prefix, body) = match t.chars().next() {
+                Some(c @ ('@' | '<')) => (c.to_string(), &t[1..]),
+                _ => (String::new(), t),
+            };
+            let calc = body.chars().any(|c| matches!(c, '+' | '*' | '/' | '(' | ')' | 'W' | 'H' | 'w' | 'h')) || body.trim_start_matches('-').contains('-');
+            if !calc || body.chars().any(|c| c.is_alphabetic() && !matches!(c, 'W' | 'H' | 'w' | 'h')) {
+                return Ok(part.to_owned());
+            }
+            eval(body, w, h).map(|v| format!("{prefix}{}", trim_num(v)))
+        })
+        .collect::<Result<_, _>>()?;
+    Ok(parts.join(","))
+}
+
+fn trim_num(v: f64) -> String {
+    let s = format!("{v:.6}");
+    s.trim_end_matches('0').trim_end_matches('.').to_owned()
+}
+
+/// Calcul simple : + - * / parenthèses, nombres (point décimal), W et H.
+fn eval(s: &str, w: f64, h: f64) -> Result<f64, String> {
+    let chars: Vec<char> = s.chars().filter(|c| !c.is_whitespace()).collect();
+    let mut i = 0;
+    let v = expr(&chars, &mut i, w, h)?;
+    if i != chars.len() {
+        return Err(format!("calcul incompris : « {s} »"));
+    }
+    if v.is_finite() { Ok(v) } else { Err(format!("calcul impossible : « {s} »")) }
+}
+
+fn expr(c: &[char], i: &mut usize, w: f64, h: f64) -> Result<f64, String> {
+    let mut v = term(c, i, w, h)?;
+    while let Some(op) = c.get(*i).copied().filter(|o| matches!(o, '+' | '-')) {
+        *i += 1;
+        let r = term(c, i, w, h)?;
+        v = if op == '+' { v + r } else { v - r };
+    }
+    Ok(v)
+}
+
+fn term(c: &[char], i: &mut usize, w: f64, h: f64) -> Result<f64, String> {
+    let mut v = factor(c, i, w, h)?;
+    while let Some(op) = c.get(*i).copied().filter(|o| matches!(o, '*' | '/')) {
+        *i += 1;
+        let r = factor(c, i, w, h)?;
+        v = if op == '*' { v * r } else { v / r };
+    }
+    Ok(v)
+}
+
+fn factor(c: &[char], i: &mut usize, w: f64, h: f64) -> Result<f64, String> {
+    match c.get(*i) {
+        Some('-') => {
+            *i += 1;
+            Ok(-factor(c, i, w, h)?)
+        }
+        Some('(') => {
+            *i += 1;
+            let v = expr(c, i, w, h)?;
+            if c.get(*i) != Some(&')') {
+                return Err("parenthèse fermante manquante".into());
+            }
+            *i += 1;
+            Ok(v)
+        }
+        Some('W' | 'w') => {
+            *i += 1;
+            Ok(w)
+        }
+        Some('H' | 'h') => {
+            *i += 1;
+            Ok(h)
+        }
+        _ => {
+            let start = *i;
+            while c.get(*i).is_some_and(|d| d.is_ascii_digit() || *d == '.') {
+                *i += 1;
+            }
+            let n: String = c[start..*i].iter().collect();
+            n.parse::<f64>().map_err(|_| "nombre attendu dans le calcul".to_owned())
+        }
+    }
+}
+
 /// Nombre sans zéros inutiles (2,5 ; 10).
 fn fmt_num(v: f64) -> String {
     let s = format!("{v:.2}");
@@ -985,6 +1120,23 @@ mod tests {
         let w = WVec::new(12.5, -4.0);
         let back = xf.to_world(xf.to_screen(w));
         assert!((back.x - w.x).abs() < 1e-3 && (back.y - w.y).abs() < 1e-3);
+    }
+
+    #[test]
+    fn expressions_in_input() {
+        assert_eq!(with_expressions("W/2+5,H/2", 100.0, 60.0).as_deref(), Ok("55,30"));
+        assert_eq!(with_expressions("@(10+5)*2,-3", 0.0, 0.0).as_deref(), Ok("@30,-3"));
+        assert_eq!(with_expressions("25.4", 0.0, 0.0).as_deref(), Ok("25.4"));
+        assert_eq!(with_expressions("<45", 0.0, 0.0).as_deref(), Ok("<45"));
+        assert!(with_expressions("W/(2", 100.0, 0.0).is_err());
+    }
+
+    #[test]
+    fn stock_snaps_corners_and_centre() {
+        let b = [0.0, 0.0, 100.0, 60.0];
+        assert_eq!(stock_point(b, WVec::new(99.0, 1.0), 3.0).map(|p| p.1), Some("coin du brut"));
+        assert_eq!(stock_point(b, WVec::new(50.5, 30.0), 3.0).map(|p| p.1), Some("centre du brut"));
+        assert!(stock_point(b, WVec::new(20.0, 20.0), 3.0).is_none());
     }
 
     #[test]
