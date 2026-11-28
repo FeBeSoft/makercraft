@@ -113,6 +113,28 @@ impl Sketch {
         self.drawing()?.model.iter().find(|e| e.handle == h).map(|e| e.common.layer.clone())
     }
 
+    /// Étire les objets `hs` de `sx` en X et `sy` en Y depuis `base` (mm), en une seule étape
+    /// d'annulation. Échelle non uniforme : un cercle devient une ellipse, un arc un arc
+    /// d'ellipse, les arcs des polylignes des segments fins (0,01 mm). Facteurs positifs.
+    pub fn stretch(&mut self, hs: &[doc::Handle], base: cgeom::Vec2, sx: f64, sy: f64) -> Result<(), String> {
+        if !(sx > 0.0 && sy > 0.0 && sx.is_finite() && sy.is_finite()) {
+            return Err("facteurs d'échelle invalides".to_owned());
+        }
+        let selection = self.session.selection();
+        let st = self.session.state_mut().map_err(|e| e.to_string())?;
+        let snap = cadcraft_engine::Snapshot { label: "Étirer".into(), doc: st.doc.clone(), selection };
+        let m = cgeom::Mat3::translate(base)
+            .then_before(cgeom::Mat3::scale(sx, sy))
+            .then_before(cgeom::Mat3::translate(cgeom::Vec2::new(-base.x, -base.y)));
+        let d = std::sync::Arc::make_mut(&mut st.doc);
+        for h in hs {
+            d.model.modify(*h, |e| stretch_kind(&mut e.kind, &m, sx, sy));
+        }
+        st.push_undo(snap);
+        st.revision += 1;
+        Ok(())
+    }
+
     /// Rayon de l'objet `h` s'il s'agit d'un cercle ou d'un arc.
     pub fn radius_of(&self, h: doc::Handle) -> Option<f64> {
         let e = self.drawing()?.model.iter().find(|e| e.handle == h)?;
@@ -205,8 +227,92 @@ fn close_path(layer: &str, mut pts: Vec<Vec2>) -> Path2 {
     Path2 { layer: layer.to_owned(), points: pts, closed }
 }
 
+/// Échelle non uniforme d'un objet (`m` : la même transformation en matrice).
+fn stretch_kind(kind: &mut doc::EntityKind, m: &cgeom::Mat3, sx: f64, sy: f64) {
+    use std::f64::consts::{FRAC_PI_2, TAU};
+    let uniform = (sx - sy).abs() <= 1e-12 * sx.max(sy);
+    match kind {
+        doc::EntityKind::Circle(c) if !uniform => {
+            let ctr = m.apply(c.center.xy());
+            let (ax, ay) = (c.radius * sx, c.radius * sy);
+            let major = if ax >= ay { cgeom::Vec3::new(ax, 0.0, 0.0) } else { cgeom::Vec3::new(0.0, ay, 0.0) };
+            *kind = doc::EntityKind::Ellipse(doc::Ellipse { center: cgeom::Vec3::new(ctr.x, ctr.y, c.center.z), major, ratio: ax.min(ay) / ax.max(ay), start: 0.0, end: TAU });
+        }
+        doc::EntityKind::Arc(a) if !uniform => {
+            let ctr = m.apply(a.center.xy());
+            let (ax, ay) = (a.radius * sx, a.radius * sy);
+            // paramètre de l'ellipse : compté depuis le grand axe
+            let (major, shift) = if ax >= ay { (cgeom::Vec3::new(ax, 0.0, 0.0), 0.0) } else { (cgeom::Vec3::new(0.0, ay, 0.0), FRAC_PI_2) };
+            *kind = doc::EntityKind::Ellipse(doc::Ellipse {
+                center: cgeom::Vec3::new(ctr.x, ctr.y, a.center.z),
+                major,
+                ratio: ax.min(ay) / ax.max(ay),
+                start: a.start - shift,
+                end: a.end - shift,
+            });
+        }
+        doc::EntityKind::LwPolyline(p) if !uniform && p.vertices.iter().any(|v| v.bulge.abs() > 1e-12) => {
+            let pts = flatten_bulges(&p.vertices, p.closed, 0.01);
+            p.vertices = pts.into_iter().map(|q| cgeom::PolyVertex { p: m.apply(q), bulge: 0.0, start_width: 0.0, end_width: 0.0 }).collect();
+        }
+        k => k.transform(m),
+    }
+}
+
+/// Sommets d'une polyligne à arcs (renflements) remplacés par des segments à `tol` près.
+pub fn flatten_bulges(v: &[cgeom::PolyVertex], closed: bool, tol: f64) -> Vec<cgeom::Vec2> {
+    let n = v.len();
+    let mut out = Vec::with_capacity(n * 4);
+    let count = if closed { n } else { n.saturating_sub(1) };
+    if let Some(first) = v.first() {
+        out.push(first.p);
+    }
+    for i in 0..count {
+        let (Some(a), Some(b)) = (v.get(i), v.get((i + 1) % n.max(1))) else { continue };
+        let last = closed && i + 1 == n;
+        let b2 = a.bulge;
+        if b2.abs() > 1e-12 {
+            let (dx, dy) = (b.p.x - a.p.x, b.p.y - a.p.y);
+            let d = (dx * dx + dy * dy).sqrt();
+            if d > 1e-12 {
+                let theta = 4.0 * b2.atan();
+                let r = d * (1.0 + b2 * b2) / (4.0 * b2.abs());
+                // centre : à gauche de la corde pour un renflement positif (sens trigonométrique)
+                let k = (1.0 - b2 * b2) / (4.0 * b2);
+                let (cx, cy) = (a.p.x + dx / 2.0 - dy * k, a.p.y + dy / 2.0 + dx * k);
+                let a0 = (a.p.y - cy).atan2(a.p.x - cx);
+                let step = if r > tol { 2.0 * (1.0 - tol / r).acos() } else { theta.abs() };
+                let segs = ((theta.abs() / step.max(1e-3)).ceil() as usize).clamp(2, 720);
+                for s in 1..segs {
+                    let t = a0 + theta * s as f64 / segs as f64;
+                    out.push(cgeom::Vec2::new(cx + r * t.cos(), cy + r * t.sin()));
+                }
+            }
+        }
+        if !last {
+            out.push(b.p);
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn bulge_semicircle_flattened_on_the_circle() {
+        let v = [
+            cgeom::PolyVertex { p: cgeom::Vec2::new(0.0, 0.0), bulge: 1.0, start_width: 0.0, end_width: 0.0 },
+            cgeom::PolyVertex { p: cgeom::Vec2::new(2.0, 0.0), bulge: 0.0, start_width: 0.0, end_width: 0.0 },
+        ];
+        let pts = flatten_bulges(&v, false, 0.01);
+        assert!(pts.len() > 10);
+        for q in &pts {
+            let r = ((q.x - 1.0).powi(2) + q.y.powi(2)).sqrt();
+            assert!((r - 1.0).abs() < 1e-9, "point hors du cercle : {q:?}");
+            assert!(q.y <= 1e-9, "arc positif : sous la corde de gauche à droite");
+        }
+    }
+
     use super::*;
 
     #[test]

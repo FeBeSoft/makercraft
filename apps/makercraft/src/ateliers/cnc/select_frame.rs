@@ -1,9 +1,10 @@
 //! Cadre de sélection de la vue 2D, façon Carbide Create : un cadre pointillé autour de la
 //! sélection, huit poignées d'échelle et une poignée de rotation. On glisse dans le cadre pour
-//! déplacer, sur une poignée pour mettre à l'échelle (proportions gardées, depuis le coin ou le
-//! côté opposé ; Maj : depuis le centre), sur la poignée ronde pour tourner (Maj : pas de 15°).
-//! Le geste est appliqué au relâchement par les commandes `move`, `scale` et `rotate` de CadCraft,
-//! donc annulable comme les autres.
+//! déplacer, sur une poignée pour mettre à l'échelle (depuis le coin ou le côté opposé ; Maj :
+//! depuis le centre), sur la poignée ronde pour tourner (Maj : pas de 15°). Proportions liées
+//! ou non selon le réglage des Propriétés, Ctrl l'inverse le temps du geste.
+//! Le geste est appliqué au relâchement par les commandes `move`, `scale` et `rotate` de CadCraft
+//! (l'échelle non uniforme par `Sketch::stretch`), donc annulable comme les autres.
 
 use eframe::egui::{self, Color32, CornerRadius, CursorIcon, Painter, Pos2, Rect, Stroke, StrokeKind, vec2};
 use makercraft_dao::Sketch;
@@ -51,6 +52,8 @@ impl Grip {
 pub enum Xform {
     Move(WVec),
     Scale { base: WVec, factor: f64 },
+    /// Échelle non uniforme.
+    Stretch { base: WVec, sx: f64, sy: f64 },
     Rotate { base: WVec, deg: f64 },
 }
 
@@ -59,6 +62,7 @@ impl Xform {
         match self {
             Self::Move(d) => p + d,
             Self::Scale { base, factor } => base + (p - base) * factor,
+            Self::Stretch { base, sx, sy } => WVec::new(base.x + (p.x - base.x) * sx, base.y + (p.y - base.y) * sy),
             Self::Rotate { base, deg } => {
                 let (s, c) = deg.to_radians().sin_cos();
                 let v = p - base;
@@ -71,6 +75,7 @@ impl Xform {
         match self {
             Self::Move(d) => d.x.abs() < 1e-9 && d.y.abs() < 1e-9,
             Self::Scale { factor, .. } => (factor - 1.0).abs() < 1e-9,
+            Self::Stretch { sx, sy, .. } => (sx - 1.0).abs() < 1e-9 && (sy - 1.0).abs() < 1e-9,
             Self::Rotate { deg, .. } => deg.abs() < 1e-9,
         }
     }
@@ -80,10 +85,16 @@ impl Xform {
         if self.is_identity() || hs.is_empty() {
             return Ok(());
         }
+        let x = match self {
+            Self::Stretch { base, sx, sy } if (sx - sy).abs() < 1e-12 => Self::Scale { base, factor: sx },
+            Self::Stretch { base, sx, sy } => return sketch.stretch(hs, base, sx, sy),
+            x => x,
+        };
         let handles: Vec<String> = hs.iter().map(|h| h.hex()).collect();
-        let (id, params) = match self {
+        let (id, params) = match x {
             Self::Move(d) => ("move", json!({ "handles": handles, "delta": [d.x, d.y] })),
             Self::Scale { base, factor } => ("scale", json!({ "handles": handles, "base": [base.x, base.y], "factor": factor })),
+            Self::Stretch { .. } => return Ok(()),
             Self::Rotate { base, deg } => ("rotate", json!({ "handles": handles, "base": [base.x, base.y], "angle": deg })),
         };
         sketch.session.execute(id, &params).map(|_| ()).map_err(|e| e.to_string())
@@ -99,8 +110,9 @@ pub struct Drag {
 }
 
 impl Drag {
-    /// Transformation pour le curseur `cur` ; `shift` : depuis le centre ou pas de 15°.
-    pub fn xform(&self, cur: WVec, shift: bool) -> Xform {
+    /// Transformation pour le curseur `cur` ; `shift` : depuis le centre ou pas de 15° ;
+    /// `free` : proportions déliées (largeur et hauteur indépendantes).
+    pub fn xform(&self, cur: WVec, shift: bool, free: bool) -> Xform {
         let b = self.bbox;
         let center = WVec::new((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0);
         match self.grip {
@@ -123,6 +135,10 @@ impl Drag {
                 let base = if shift { center } else { corner(b, (i + 2) % 4) };
                 let a = self.start - base;
                 let v = cur - base;
+                if free {
+                    let k = |num: f64, den: f64| if den.abs() > 1e-9 { (num / den).max(1e-3) } else { 1.0 };
+                    return Xform::Stretch { base, sx: k(v.x, a.x), sy: k(v.y, a.y) };
+                }
                 let n = a.x * a.x + a.y * a.y;
                 let factor = if n > 1e-12 { (v.x * a.x + v.y * a.y) / n } else { 1.0 };
                 Xform::Scale { base, factor: factor.max(1e-3) }
@@ -136,7 +152,12 @@ impl Drag {
                     let d = self.start.x - base.x;
                     if d.abs() > 1e-9 { (cur.x - base.x) / d } else { 1.0 }
                 };
-                Xform::Scale { base, factor: factor.max(1e-3) }
+                let factor = factor.max(1e-3);
+                match (free, i % 2 == 0) {
+                    (false, _) => Xform::Scale { base, factor },
+                    (true, true) => Xform::Stretch { base, sx: 1.0, sy: factor },
+                    (true, false) => Xform::Stretch { base, sx: factor, sy: 1.0 },
+                }
             }
         }
     }
@@ -310,7 +331,7 @@ mod tests {
     #[test]
     fn corner_scale_keeps_opposite_corner() {
         let d = Drag { grip: Grip::Corner(2), start: WVec::new(10.0, 10.0), bbox: [0.0, 0.0, 10.0, 10.0] };
-        let x = d.xform(WVec::new(20.0, 20.0), false);
+        let x = d.xform(WVec::new(20.0, 20.0), false, false);
         assert_eq!(x, Xform::Scale { base: WVec::new(0.0, 0.0), factor: 2.0 });
         assert!(close(x.apply(WVec::new(10.0, 0.0)), WVec::new(20.0, 0.0)));
     }
@@ -318,13 +339,23 @@ mod tests {
     #[test]
     fn rotation_snaps_with_shift() {
         let d = Drag { grip: Grip::Rotate, start: WVec::new(5.0, 20.0), bbox: [0.0, 0.0, 10.0, 10.0] };
-        let Xform::Rotate { deg, .. } = d.xform(WVec::new(-9.0, 6.0), true) else { panic!("rotation attendue") };
+        let Xform::Rotate { deg, .. } = d.xform(WVec::new(-9.0, 6.0), true, false) else { panic!("rotation attendue") };
         assert!((deg - 90.0).abs() < 1e-9);
     }
 
     #[test]
     fn edge_scale_from_opposite_edge() {
         let d = Drag { grip: Grip::Edge(1), start: WVec::new(10.0, 5.0), bbox: [0.0, 0.0, 10.0, 10.0] };
-        assert_eq!(d.xform(WVec::new(5.0, 0.0), false), Xform::Scale { base: WVec::new(0.0, 5.0), factor: 0.5 });
+        assert_eq!(d.xform(WVec::new(5.0, 0.0), false, false), Xform::Scale { base: WVec::new(0.0, 5.0), factor: 0.5 });
+        // proportions déliées : un seul axe
+        assert_eq!(d.xform(WVec::new(5.0, 0.0), false, true), Xform::Stretch { base: WVec::new(0.0, 5.0), sx: 0.5, sy: 1.0 });
+    }
+
+    #[test]
+    fn free_corner_stretches_both_axes() {
+        let d = Drag { grip: Grip::Corner(2), start: WVec::new(10.0, 10.0), bbox: [0.0, 0.0, 10.0, 10.0] };
+        let x = d.xform(WVec::new(20.0, 5.0), false, true);
+        assert_eq!(x, Xform::Stretch { base: WVec::new(0.0, 0.0), sx: 2.0, sy: 0.5 });
+        assert!(close(x.apply(WVec::new(10.0, 10.0)), WVec::new(20.0, 5.0)));
     }
 }

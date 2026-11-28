@@ -53,11 +53,13 @@ pub struct PropsState {
     pub anchor: u8,
     /// Valeur en cours de saisie (pas encore appliquée).
     edit: Option<(Field, f64)>,
+    /// Proportions liées : largeur et hauteur changent ensemble (échelle uniforme).
+    pub linked: bool,
 }
 
 impl Default for PropsState {
     fn default() -> Self {
-        Self { anchor: 6, edit: None }
+        Self { anchor: 6, edit: None, linked: true }
     }
 }
 
@@ -96,12 +98,30 @@ pub fn editor(ui: &mut Ui, pal: &Palette, st: &mut PropsState, sketch: &mut Sket
     if let Some(v) = field(ui, st, Field::Y, "Y", a.y, -1e6, " mm", true) {
         todo = Some(Xform::Move(WVec::new(0.0, v - a.y)));
     }
+    let linked = st.linked;
+    let size = |k: f64, horizontal: bool| match (linked, horizontal) {
+        (true, _) => Xform::Scale { base: a, factor: k },
+        (false, true) => Xform::Stretch { base: a, sx: k, sy: 1.0 },
+        (false, false) => Xform::Stretch { base: a, sx: 1.0, sy: k },
+    };
     if let Some(v) = field(ui, st, Field::W, "Largeur", w, 1e-3, " mm", w > 1e-9) {
-        todo = Some(Xform::Scale { base: a, factor: v / w });
+        todo = Some(size(v / w, true));
     }
     if let Some(v) = field(ui, st, Field::H, "Hauteur", h, 1e-3, " mm", h > 1e-9) {
-        todo = Some(Xform::Scale { base: a, factor: v / h });
+        todo = Some(size(v / h, false));
     }
+    ui.horizontal(|ui| {
+        ui.add_space(94.0);
+        let (b, resp) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::click());
+        if resp.hovered() {
+            ui.painter().rect_filled(b, CornerRadius::same(5), pal.hover);
+        }
+        crate::icons::paint(ui.painter(), b.shrink(3.0), crate::icons::Icon::Link, if st.linked { pal.blue } else { pal.dim });
+        if resp.on_hover_text("Proportions liées : largeur et hauteur changent ensemble (Ctrl inverse sur les poignées)").clicked() {
+            st.linked = !st.linked;
+        }
+        ui.label(RichText::new(if st.linked { "Proportions liées" } else { "Proportions libres : un cercle étiré devient une ellipse" }).size(12.0).color(pal.weak));
+    });
     if let [one] = sel
         && let Some(r) = sketch.radius_of(*one)
         && let Some(v) = field(ui, st, Field::Radius, "Rayon", r, 1e-3, " mm", true)
@@ -117,7 +137,7 @@ pub fn editor(ui: &mut Ui, pal: &Palette, st: &mut PropsState, sketch: &mut Sket
     {
         msg = Some(e);
     }
-    ui.label(RichText::new("Largeur et hauteur gardent les proportions. Entrée ou sortie du champ : appliqué (annulable).").size(12.0).color(pal.weak));
+    ui.label(RichText::new("Entrée ou sortie du champ : appliqué (annulable).").size(12.0).color(pal.weak));
     msg
 }
 

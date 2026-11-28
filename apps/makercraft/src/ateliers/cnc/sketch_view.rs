@@ -66,6 +66,8 @@ pub struct SketchView {
     pub editable: bool,
     /// Ne pas marquer l'origine (zéro pièce) dans la vue.
     pub hide_origin: bool,
+    /// Proportions déliées (Propriétés) : les poignées étirent sur un axe ; Ctrl inverse.
+    pub free_scale: bool,
     /// Commandes de CadCraft refusées dans la ligne de commande (Options) : seules les valeurs
     /// demandées par une commande en cours y passent.
     pub no_commands: bool,
@@ -142,7 +144,8 @@ impl SketchView {
         // cadre de sélection : objets choisis, modifiables, hors commande
         let frame_sel = if editable && !running { sketch.editable(&sketch.session.selection()) } else { Vec::new() };
         let frame = if frame_sel.is_empty() { None } else { select_frame::bbox(&list, &frame_sel) };
-        let (shift, pointer) = ui.input(|i| (i.modifiers.shift, i.pointer.interact_pos()));
+        let (shift, ctrl, pointer) = ui.input(|i| (i.modifiers.shift, i.modifiers.command, i.pointer.interact_pos()));
+        let free = self.free_scale != ctrl;
         let cmd_id = ui.scope_id().with("ligne-de-commande");
         let typing = ui.memory(|m| m.has_focus(cmd_id));
 
@@ -189,7 +192,7 @@ impl SketchView {
                 st.set_view_quiet(v);
             }
         }
-        let active = self.drag.zip(pointer).map(|(d, p)| d.xform(xf.to_world(p), shift));
+        let active = self.drag.zip(pointer).map(|(d, p)| d.xform(xf.to_world(p), shift, free));
         if resp.drag_stopped() {
             if let (Some(x), Some(_)) = (active, self.drag.take()) {
                 if let Err(e) = x.execute(sketch, &frame_sel) {

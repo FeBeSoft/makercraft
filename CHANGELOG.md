@@ -23,8 +23,11 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
   commandes français dans la ligne de commande.
 - Dessin : sélection façon Carbide Create. Rectangle glissé (vers la droite : objets
   entièrement dedans ; vers la gauche : objets touchés), cadre orange à huit poignées et poignée
-  de rotation : glisser déplace, met à l'échelle (proportions gardées) et tourne ; Maj : depuis
-  le centre, rotation par pas de 15°. Entrée ouvre la boîte des cotes, à la manière de Galaad.
+  de rotation : glisser déplace, met à l'échelle et tourne ; Maj : depuis le centre, rotation
+  par pas de 15°. Entrée ouvre la boîte des cotes, à la manière de Galaad.
+- Dessin : échelle uniforme ou non, au choix (bouton « Proportions liées » des Propriétés, Ctrl
+  l'inverse sur les poignées). Étiré, un cercle devient une ellipse, un arc un arc d'ellipse et
+  les arcs des polylignes des segments fins (0,01 mm) ; une seule étape d'annulation.
 - Dessin : colonne de droite à un panneau à la fois, onglets en bas : Propriétés (X, Y,
   largeur, hauteur, rayon, rotation, point de référence 3 x 3), 3D, Commentaires (par contour,
   enregistrés dans le `.mkc`).
