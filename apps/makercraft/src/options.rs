@@ -49,6 +49,8 @@ pub enum Outcome {
     Apply(Prefs),
     /// Ouvrir la fenêtre d'exécution d'une commande d'extension.
     Run(CommandSpec),
+    /// Vérifier les mises à jour maintenant (À propos > Mises à jour).
+    CheckUpdates,
 }
 
 pub struct Options {
@@ -295,7 +297,11 @@ impl Options {
                 (Page::Extension(i), _) => out = extension(ui, pal, host, i),
                 (Page::About, 0) => about_software(ui, pal, host, logo),
                 (Page::About, 4) => about_sources(ui, pal),
-                (Page::About, 5) => about_updates(ui, pal),
+                (Page::About, 5) => {
+                    if about_updates(ui, pal, &self.orig) {
+                        out = Some(Outcome::CheckUpdates);
+                    }
+                }
                 (Page::About, _) => about_contact(ui, pal),
             }
         });
@@ -641,9 +647,22 @@ fn version_badge(ui: &mut Ui, pal: &Palette, name: &str, version: &str) {
     p.galley(pos2(right.left() + 7.0, r.center().y - gv.size().y / 2.0), gv, Color32::WHITE);
 }
 
-fn about_updates(ui: &mut Ui, pal: &Palette) {
+/// Onglet Mises à jour de l'À propos ; renvoie vrai si on demande une vérification.
+fn about_updates(ui: &mut Ui, pal: &Palette, prefs: &Prefs) -> bool {
+    let mut check = false;
     widgets::option_row(ui, pal, "MakerCraft", &about::version_label(), |_| {});
-    widgets::option_row(ui, pal, "Vérification des mises à jour", "Pas encore disponible : MakerCraft ne fait aucune connexion réseau. Quand elle viendra, elle lira seulement version.json sur makercraft.fe-be.fr et pourra être désactivée.", |_| {});
+    let demarrage = if prefs.check_updates { "activée" } else { "désactivée (par défaut)" };
+    let help = format!(
+        "MakerCraft demande à GitHub (FeBeSoft/makercraft) la dernière version publiée, préversions comprises : quand on clique sur « Mettre à jour » dans la barre du haut, ou sur « Vérifier maintenant ». Au démarrage : {demarrage}, à régler dans Options > Général > Démarrage. Seule l'adresse IP de l'ordinateur est transmise à GitHub ; aucune autre donnée."
+    );
+    widgets::option_row(ui, pal, "Vérification des mises à jour", &help, |ui| {
+        if widgets::button(ui, pal, None, "Vérifier maintenant", Kind::Plain, true).clicked() {
+            check = true;
+        }
+    });
+    if !prefs.skipped_version.is_empty() {
+        widgets::option_row(ui, pal, "Version passée", &format!("{} : vous avez choisi de ne plus la proposer. Une version plus récente sera proposée normalement.", prefs.skipped_version), |_| {});
+    }
     ui.add_space(8.0);
     ui.label(RichText::new("Versions des sources utilisées").font(theme::bold(14.0)));
     ui.label(RichText::new("Lues dans Cargo.lock à la compilation.").size(12.0).color(pal.weak));
@@ -654,6 +673,7 @@ fn about_updates(ui: &mut Ui, pal: &Palette) {
             version_badge(ui, pal, name, v);
         }
     });
+    check
 }
 
 fn about_contact(ui: &mut Ui, pal: &Palette) {

@@ -367,6 +367,7 @@ impl eframe::App for App {
                     self.status = "Options enregistrées".to_owned();
                 }
                 options::Outcome::Run(spec) => actions.push(Action::Command(spec)),
+                options::Outcome::CheckUpdates => self.updater.start(),
                 options::Outcome::None => {}
             }
         }
