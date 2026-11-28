@@ -85,6 +85,15 @@ impl Xform {
         if self.is_identity() || hs.is_empty() {
             return Ok(());
         }
+        let finite = match self {
+            Self::Move(d) => d.x.is_finite() && d.y.is_finite(),
+            Self::Scale { base, factor } => base.x.is_finite() && base.y.is_finite() && factor.is_finite() && factor > 0.0,
+            Self::Stretch { base, sx, sy } => base.x.is_finite() && base.y.is_finite() && sx.is_finite() && sy.is_finite() && sx > 0.0 && sy > 0.0,
+            Self::Rotate { base, deg } => base.x.is_finite() && base.y.is_finite() && deg.is_finite(),
+        };
+        if !finite {
+            return Err("valeur hors limites : modification ignorée".to_owned());
+        }
         let x = match self {
             Self::Stretch { base, sx, sy } if (sx - sy).abs() < 1e-12 => Self::Scale { base, factor: sx },
             Self::Stretch { base, sx, sy } => return sketch.stretch(hs, base, sx, sy),

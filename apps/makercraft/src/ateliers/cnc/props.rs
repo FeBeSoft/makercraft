@@ -152,14 +152,20 @@ fn field(ui: &mut Ui, st: &mut PropsState, f: Field, label: &str, value: f64, mi
     ui.horizontal(|ui| {
         let (r, _) = ui.allocate_exact_size(vec2(90.0, 20.0), Sense::hover());
         ui.painter().text(r.left_center(), Align2::LEFT_CENTER, label, theme::regular(13.0), ui.visuals().weak_text_color());
-        let dv = DragValue::new(&mut v).range(min..=1e6).speed(0.1).max_decimals(3).suffix(suffix).update_while_editing(false);
-        let resp = ui.add_enabled(enabled, dv);
+        if !enabled {
+            // largeur ou hauteur nulle (trait horizontal ou vertical) : rien à mettre à l'échelle
+            ui.label(RichText::new(format!("{value:.3}{suffix}")).color(ui.visuals().weak_text_color()));
+            return;
+        }
+        // pas de rabot silencieux d'une valeur hors limites : seule une saisie modifie le dessin
+        let dv = DragValue::new(&mut v).range(min..=1e6).clamp_existing_to_range(false).speed(0.1).max_decimals(3).suffix(suffix).update_while_editing(false);
+        let resp = ui.add(dv);
         if resp.changed() {
             st.edit = Some((f, v));
         }
         if resp.drag_stopped() || (resp.changed() && !resp.dragged()) {
             st.edit = None;
-            if (v - value).abs() > 1e-9 {
+            if v.is_finite() && (v - value).abs() > 1e-9 {
                 commit = Some(v);
             }
         }
