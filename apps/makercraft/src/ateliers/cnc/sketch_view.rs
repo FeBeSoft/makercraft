@@ -384,6 +384,15 @@ impl SketchView {
     fn command_line(&mut self, ui: &mut Ui, r: Rect, pal: &Palette, sketch: &mut Sketch, id: egui::Id, out: &mut Outcome) {
         let s = &mut sketch.session;
         let mut c = ui.new_child(UiBuilder::new().max_rect(r).layout(egui::Layout::left_to_right(egui::Align::Center)));
+        // ligne de commande vide et active : Ctrl+Z / Ctrl+Y annulent et rétablissent le dessin
+        if self.cmdline.is_empty() && s.running.is_none() && c.memory(|m| m.has_focus(id)) {
+            let shortcut = |m: egui::Modifiers, k: Key| egui::KeyboardShortcut::new(m, k);
+            let redo = c.input_mut(|i| i.consume_shortcut(&shortcut(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, Key::Z)) || i.consume_shortcut(&shortcut(egui::Modifiers::COMMAND, Key::Y)));
+            let undo = !redo && c.input_mut(|i| i.consume_shortcut(&shortcut(egui::Modifiers::COMMAND, Key::Z)));
+            if undo || redo {
+                out.status = s.cmdline(if undo { "undo" } else { "redo" }).err().map(|e| e.to_string());
+            }
+        }
         let prompt = s.current_prompt();
         let msg = prompt.as_ref().map_or_else(|| "Commande".to_owned(), |p| translate(&p.message));
         c.label(RichText::new(msg).font(theme::bold(13.0)).color(if prompt.is_some() { pal.orange } else { pal.weak }));

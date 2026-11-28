@@ -339,7 +339,10 @@ fn scroll_arrow(ui: &mut Ui, pal: &Palette, r: Rect, right: bool) -> bool {
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, label));
     let p = ui.painter();
     p.rect_filled(r, CornerRadius::same(4), if resp.hovered() { pal.hover } else { theme::mix(pal.bar, pal.blue, 0.12) });
-    icons::paint(p, Rect::from_center_size(r.center(), vec2(12.0, 12.0)), if right { Icon::Right } else { Icon::Left }, pal.text);
+    // chevron étroit, plus haut que large : « < » ou « > »
+    let (c, h, w) = (r.center(), (r.height() * 0.32).min(14.0), (r.width() * 0.22).min(4.0));
+    let s = if right { 1.0 } else { -1.0 };
+    p.add(egui::Shape::line(vec![pos2(c.x - s * w, c.y - h), pos2(c.x + s * w, c.y), pos2(c.x - s * w, c.y + h)], egui::Stroke::new(1.8, pal.text)));
     resp.clicked()
 }
 

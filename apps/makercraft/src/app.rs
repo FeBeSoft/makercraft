@@ -219,6 +219,15 @@ impl eframe::App for App {
         if self.atelier == Atelier::Cnc && ctx.input_mut(|i| i.consume_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::S))) {
             actions.push(Action::Ribbon("cnc.enregistrer"));
         }
+        // Ctrl+Z / Ctrl+Y (ou Ctrl+Maj+Z) : annuler, rétablir, hors saisie de texte
+        if self.atelier == Atelier::Cnc && !ctx.egui_wants_keyboard_input() {
+            if ctx.input_mut(|i| i.consume_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND | Modifiers::SHIFT, Key::Z)) || i.consume_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::Y))) {
+                actions.push(Action::Ribbon("cnc.retablir"));
+            }
+            if ctx.input_mut(|i| i.consume_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::Z))) {
+                actions.push(Action::Ribbon("cnc.annuler"));
+            }
+        }
 
         egui::CentralPanel::default().frame(egui::Frame::new().fill(pal.window)).show(ui, |ui| {
             let full = ui.max_rect();
