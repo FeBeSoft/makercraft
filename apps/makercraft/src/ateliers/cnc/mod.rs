@@ -124,6 +124,8 @@ pub struct Cnc {
     pub(crate) delete_contour: Option<String>,
     /// Contour courant à rétablir après une ligne de construction ou une cote.
     restore_layer: Option<String>,
+    /// Boîte des dégagements d'angle : (T-bone, rayon de la fraise).
+    relief: Option<(bool, f64)>,
 }
 
 /// Boîte des formes paramétrées (étoile, oblong).
@@ -175,6 +177,7 @@ impl Default for Cnc {
             renaming: None,
             delete_contour: None,
             restore_layer: None,
+            relief: None,
         }
     }
 }
@@ -519,6 +522,11 @@ impl Cnc {
                             modify("cnc.cmd.reverse", "Inverser le sens", Icon::Redo).more().tip("Inverser le sens de parcours d'un tracé (utile aux parcours d'usinage)"),
                             modify("cnc.cmd.blend", "Raccord lisse", Icon::Spline).more().tip("Courbe de raccord continue entre deux tracés"),
                             modify("cnc.cmd.overkill", "Doublons", Icon::Trash).more().tip("Supprimer les objets en double et les traits superposés"),
+                            modify("cnc.reparer", "Réparer", Icon::Repair).more().tip("Fermer les tracés presque fermés (0,05 mm) et joindre ceux qui se touchent"),
+                            modify("cnc.degagement", "Dégagements", Icon::Dogbone).more().tip("Dégagements d'angle pour l'assemblage : la fraise atteint le fond des coins").variants(vec![
+                                Variant::new("cnc.degagement", "Dogbone (selon la bissectrice)", "Dogbone", Icon::Dogbone),
+                                Variant::new("cnc.degagement_t", "T-bone (dans le prolongement d'un côté)", "T-bone", Icon::Dogbone),
+                            ]),
                             modify("cnc.cmd.erase", "Effacer", Icon::Trash).more(),
                         ],
                     },
@@ -535,6 +543,12 @@ impl Cnc {
                                 Variant::new("cnc.cmd.dimradius", "Rayon", "Cote R", Icon::Dim),
                                 Variant::new("cnc.cmd.dimdiameter", "Diamètre", "Cote Ø", Icon::Dim),
                                 Variant::new("cnc.cmd.dimangular", "Angle", "Cote angle", Icon::Dim),
+                            ]),
+                            modify("cnc.cmd.autoconstrain", "Contraintes", Icon::Constraint).tip("Contraintes géométriques et cotes pilotantes de CadCraft").variants(vec![
+                                Variant::new("cnc.cmd.autoconstrain", "Automatiques (sur la sélection)", "Contraintes", Icon::Constraint),
+                                Variant::new("cnc.cmd.geomconstraint", "Géométrique (parallèle, perpendiculaire...)", "Contrainte", Icon::Constraint),
+                                Variant::new("cnc.cmd.dimconstraint", "Cote pilotante", "Cote pilote", Icon::Constraint),
+                                Variant::new("cnc.cmd.delconstraint", "Supprimer les contraintes", "Sans contrainte", Icon::Constraint),
                             ]),
                             modify("cnc.cmd.dist", "Mesurer", Icon::Measure).tip("Distance entre deux points ; le résultat s'affiche sous la vue").variants(vec![
                                 Variant::new("cnc.cmd.dist", "Distance", "Mesurer", Icon::Measure),
@@ -683,6 +697,19 @@ impl Cnc {
             }
             "cnc.retourner_h" | "cnc.retourner_v" => self.flip(id == "cnc.retourner_h", req),
             "cnc.remplir_brut" => self.fill_stock(req),
+            "cnc.reparer" => {
+                if let Some((sel, _)) = self.selection_box(req) {
+                    match self.sketch.repair(&sel, 0.05) {
+                        Ok(n) => req.push(Request::Status(format!("Réparé : {n} tracé(s) fermé(s), tracés qui se touchent joints"))),
+                        Err(e) => req.push(Request::Status(e)),
+                    }
+                }
+            }
+            "cnc.degagement" | "cnc.degagement_t" => {
+                if self.selection_box(req).is_some() {
+                    self.relief = Some((id == "cnc.degagement_t", self.relief.map_or(1.5875, |r| r.1)));
+                }
+            }
             "cnc.etoile" | "cnc.oblong" => {
                 self.step = Step::Dessin;
                 let s = self.stock_rect();
@@ -799,6 +826,7 @@ impl Cnc {
             }
             self.explode_window(ui, req);
             self.shape_window(ui, req);
+            self.relief_window(ui, req);
             // objets des contours cachés ou verrouillés : hors sélection
             let sel = self.sketch.session.selection();
             let ok = self.sketch.editable(&sel);
@@ -960,6 +988,44 @@ impl Cnc {
         }
         if !open || cancel || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
             self.shape = None;
+        }
+    }
+
+    /// Boîte des dégagements d'angle : rayon de la fraise, puis Appliquer.
+    fn relief_window(&mut self, ui: &mut Ui, req: &mut Vec<Request>) {
+        let Some((tbone, mut r)) = self.relief else { return };
+        let mut go = None;
+        egui::Modal::new(egui::Id::unique("degagements")).show(ui.ctx(), |ui| {
+            ui.set_width(360.0);
+            ui.label(egui::RichText::new(if tbone { "Dégagements T-bone" } else { "Dégagements dogbone" }).strong().size(15.0));
+            ui.label("À chaque coin saillant des tracés fermés choisis (poche, trou, mortaise) : une boucle du diamètre de la fraise, pour que la pièce qui s'emboîte aille jusqu'au fond.");
+            ui.horizontal(|ui| {
+                ui.label("Rayon de la fraise");
+                ui.add(egui::DragValue::new(&mut r).range(0.05..=25.0).speed(0.01).max_decimals(4).suffix(" mm"));
+                ui.label(egui::RichText::new(format!("(Ø {})", (r * 2000.0).round() / 1000.0)).weak());
+            });
+            ui.horizontal(|ui| {
+                if ui.button("Appliquer").clicked() {
+                    go = Some(true);
+                }
+                if ui.button("Annuler").clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                    go = Some(false);
+                }
+            });
+        });
+        self.relief = Some((tbone, r));
+        match go {
+            Some(true) => {
+                self.relief = None;
+                let sel = self.sketch.editable(&self.sketch.session.selection());
+                match self.sketch.relieve_corners(&sel, r, tbone) {
+                    Ok(0) => req.push(Request::Status("Aucun coin à dégager : il faut des polylignes fermées sans arcs".into())),
+                    Ok(n) => req.push(Request::Status(format!("{n} dégagement(s) ajouté(s)"))),
+                    Err(e) => req.push(Request::Status(e)),
+                }
+            }
+            Some(false) => self.relief = None,
+            None => {}
         }
     }
 

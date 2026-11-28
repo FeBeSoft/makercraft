@@ -125,6 +125,8 @@ pub struct SketchView {
     pub hide_origin: bool,
     /// Aides au tracé : accroches, grille, ortho, polaire.
     pub aids: Aids,
+    /// Point du sommet visé par le dernier clic droit en édition des nœuds.
+    node_menu: Option<WVec>,
     /// Édition des nœuds (double-clic sur un objet) : l'objet, et la poignée glissée.
     nodes: Option<doc::Handle>,
     node_drag: Option<usize>,
@@ -449,7 +451,16 @@ impl SketchView {
 
         // ----------------------------------------------------------------- menus
         if editable {
-            resp.context_menu(|ui| context_menu(ui, sketch, &list, &mut out));
+            if resp.secondary_clicked() {
+                self.node_menu = self.nodes.zip(resp.interact_pointer_pos()).and_then(|(h, m)| {
+                    sketch.session.grips_of(h).ok()?.into_iter().find(|q| xf.to_screen(*q).distance(m) <= 8.0)
+                });
+            }
+            let node = self.nodes.zip(self.node_menu);
+            resp.context_menu(|ui| match node {
+                Some((h, at)) => vertex_menu(ui, sketch, h, at, &mut out),
+                None => context_menu(ui, sketch, &list, &mut out),
+            });
         }
         self.zoom_popup(ui, sketch, &list, view);
 
@@ -467,6 +478,22 @@ impl SketchView {
                 out.status = Some(translate(m));
             }
             self.log_seen = n;
+        }
+        // saisie au curseur : longueur et angle depuis le point précédent
+        if editable
+            && let Some(c) = self.cursor
+            && let Some(base) = sketch.session.current_prompt().and_then(|p| p.base)
+            && let Some(m) = pointer
+        {
+            let to = self.snap.as_ref().map(|h| h.point).or(self.stock_snap.map(|(q, _)| q)).unwrap_or_else(|| self.aids.constrain(c, Some(base)));
+            let d = to - base;
+            let text = format!("L {}   {}°", fmt_num((d.x.hypot(d.y) * 100.0).round() / 100.0), fmt_num((d.y.atan2(d.x).to_degrees() * 10.0).round() / 10.0));
+            let font = theme::mono(11.5);
+            let g = ui.painter().layout_no_wrap(text, font, pal.text);
+            let r = Rect::from_min_size(m + vec2(16.0, 14.0), g.size() + vec2(10.0, 6.0));
+            let p = ui.painter_at(canvas);
+            p.rect(r, CornerRadius::same(4), pal.card, Stroke::new(1.0, pal.blue), StrokeKind::Inside);
+            p.galley(r.min + vec2(5.0, 3.0), g, pal.text);
         }
         let after = sketch.session.state().map_or(0, |st| Arc::as_ptr(&st.doc) as usize);
         out.changed = before != after;
@@ -892,6 +919,22 @@ fn context_menu(ui: &mut Ui, sketch: &mut Sketch, list: &render::DisplayList, ou
     }
     if ui.button("Tout désélectionner (Échap)").clicked() {
         sketch.session.set_selection(Vec::new());
+    }
+}
+
+/// Menu d'un sommet en édition des nœuds (clic droit sur une poignée).
+fn vertex_menu(ui: &mut Ui, sketch: &mut Sketch, h: doc::Handle, at: WVec, out: &mut Outcome) {
+    use makercraft_dao::sketch::VertexOp;
+    ui.set_min_width(220.0);
+    for (label, op) in [
+        ("Supprimer le sommet", VertexOp::Delete),
+        ("Segment suivant en arc", VertexOp::Arc),
+        ("Segment suivant en droite", VertexOp::Straight),
+        ("Ajouter un sommet ici (milieu)", VertexOp::Insert),
+    ] {
+        if ui.button(label).clicked() {
+            out.status = sketch.vertex_op(h, at, op).err();
+        }
     }
 }
 

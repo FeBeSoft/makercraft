@@ -171,6 +171,12 @@ pub enum Icon {
     Dim,
     /// Mesurer une distance.
     Measure,
+    /// Contraintes (deux traits et la marque d'angle droit).
+    Constraint,
+    /// Réparer un tracé (deux bouts rapprochés).
+    Repair,
+    /// Dégagement d'angle (dogbone).
+    Dogbone,
     #[expect(dead_code, reason = "réseau le long d'un tracé : en attente d'un réseau associatif dans CadCraft")]
     ArrayPath,
 }
@@ -803,6 +809,23 @@ pub fn paint(p: &Painter, r: Rect, icon: Icon, c: Color32) {
                 let x = 0.04 + 0.115 * k as f32;
                 line(p, r, &[(x, 0.35), (x, if k % 2 == 0 { 0.55 } else { 0.47 })], Stroke::new(w * 0.6, c));
             }
+        }
+        Icon::Constraint => {
+            line(p, r, &[(0.15, 0.1), (0.15, 0.85), (0.9, 0.85)], s);
+            line(p, r, &[(0.15, 0.62), (0.38, 0.62), (0.38, 0.85)], Stroke::new(w * 0.6, c));
+            p.circle_filled(at(r, 0.15, 0.1), w * 1.3, c);
+            p.circle_filled(at(r, 0.9, 0.85), w * 1.3, c);
+        }
+        Icon::Repair => {
+            line(p, r, &[(0.06, 0.7), (0.42, 0.3)], s);
+            line(p, r, &[(0.58, 0.3), (0.94, 0.7)], s);
+            p.extend(Shape::dashed_line(&[at(r, 0.42, 0.3), at(r, 0.58, 0.3)], Stroke::new(w * 0.6, c), w * 1.5, w));
+            p.circle_stroke(at(r, 0.5, 0.3), r.width() * 0.12, Stroke::new(w * 0.6, c));
+        }
+        Icon::Dogbone => {
+            line(p, r, &[(0.08, 0.9), (0.08, 0.42), (0.42, 0.42)], s);
+            line(p, r, &[(0.08, 0.9), (0.92, 0.9), (0.92, 0.42), (0.58, 0.42)], s);
+            p.circle_stroke(at(r, 0.5, 0.3), r.width() * 0.14, s);
         }
         Icon::Link => {
             let k = CornerRadius::same((r.width() * 0.16) as u8);

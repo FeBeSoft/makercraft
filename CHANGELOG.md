@@ -75,6 +75,12 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
 - Dessin : calculs dans les valeurs saisies (W/2+5, @(10+5)*2,0 ; W et H : largeur et hauteur
   du brut) ; accroches sur les coins, milieux des bords et centre du brut.
 - Dessin : clic droit sur la sélection > Envoyer dans le contour (changer les objets de contour).
+- Dessin : menu d'un sommet en édition des nœuds (supprimer, segment en arc ou en droite,
+  ajouter un sommet au milieu) ; longueur et angle affichés près du curseur ; Contraintes
+  (automatiques, géométriques, cotes pilotantes) ; Réparer (fermer les tracés presque fermés,
+  joindre) ; Dégagements dogbone et T-bone au rayon de la fraise.
+- Ruban : le petit ruban des autres fonctions d'un groupe reste dans la fenêtre et défile avec
+  des chevrons quand il est trop large.
 - Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
   rétablissent, chevrons étroits aux extrémités du ruban.
 

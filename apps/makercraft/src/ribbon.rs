@@ -156,6 +156,8 @@ pub struct Ribbon {
     pub chosen_changed: bool,
     /// Barre des variantes ouverte : bouton, position, passe d'ouverture.
     flyout: Option<(&'static str, egui::Pos2, u64)>,
+    /// Défilement du petit ruban des autres fonctions d'un groupe (px).
+    more_scroll: f32,
 }
 
 fn tone_color(pal: &Palette, t: Tone) -> Color32 {
@@ -363,14 +365,31 @@ impl Ribbon {
         {
             let mut picked = None;
             let mut flyout_req = None;
-            let area = egui::Area::new(ui.scope_id().with(("ruban-plus", self.tab, gi))).order(egui::Order::Foreground).fixed_pos(at).show(ui.ctx(), |ui| {
+            // le petit ruban reste dans la fenêtre : au-delà de sa largeur, il défile avec des
+            // chevrons aux extrémités, affichés seulement quand ils servent
+            let screen = ui.ctx().content_rect();
+            let items: Vec<&Item> = g.items.iter().filter(|it| it.more).collect();
+            let widths: Vec<f32> = items.iter().map(|it| large_width(ui.painter(), self.shown(it).1)).collect();
+            let total = widths.iter().sum::<f32>() + 2.0 * widths.len().saturating_sub(1) as f32;
+            let max_w = (screen.width() - 40.0).max(160.0);
+            let over = total > max_w;
+            let row_w = if over { max_w } else { total };
+            let x = at.x.min(screen.right() - row_w - 28.0).max(screen.left() + 8.0);
+            let view_w = if over { row_w - 2.0 * ARROW_W - 4.0 } else { row_w };
+            let max_scroll = (total - view_w).max(0.0);
+            self.more_scroll = self.more_scroll.clamp(0.0, max_scroll);
+            let area = egui::Area::new(ui.scope_id().with(("ruban-plus", self.tab, gi))).order(egui::Order::Foreground).fixed_pos(pos2(x, at.y)).show(ui.ctx(), |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        for it in g.items.iter().filter(|it| it.more) {
-                            let w = large_width(ui.painter(), it.label);
-                            let (br, _) = ui.allocate_exact_size(vec2(w, GROUP_H - 8.0), Sense::hover());
-                            let painter = ui.painter().clone();
-                            let (c, menu) = button(ui, &painter, pal, br, it, true, self.shown(it));
+                    let (row, _) = ui.allocate_exact_size(vec2(row_w, GROUP_H - 8.0), Sense::hover());
+                    let inner = if over { Rect::from_min_max(pos2(row.left() + ARROW_W + 2.0, row.top()), pos2(row.right() - ARROW_W - 2.0, row.bottom())) } else { row };
+                    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(inner).id_salt("ruban-plus-corps"));
+                    child.set_clip_rect(inner.intersect(ui.clip_rect()));
+                    let painter = child.painter().clone();
+                    let mut bx = inner.left() - self.more_scroll;
+                    for (it, w) in items.iter().zip(&widths) {
+                        let br = Rect::from_min_size(pos2(bx, inner.top()), vec2(*w, GROUP_H - 8.0));
+                        if br.intersects(inner) {
+                            let (c, menu) = button(&child, &painter, pal, br, it, true, self.shown(it));
                             if c {
                                 picked = Some(self.shown(it).0);
                             }
@@ -378,7 +397,17 @@ impl Ribbon {
                                 flyout_req = Some((it.id, br.left_bottom() + vec2(0.0, 2.0)));
                             }
                         }
-                    });
+                        bx += w + 2.0;
+                    }
+                    if over {
+                        let step = (view_w * 0.6).max(60.0);
+                        if self.more_scroll > 0.5 && scroll_arrow(ui, pal, Rect::from_min_max(row.min, pos2(row.left() + ARROW_W, row.bottom())), false) {
+                            self.more_scroll = (self.more_scroll - step).max(0.0);
+                        }
+                        if self.more_scroll < max_scroll - 0.5 && scroll_arrow(ui, pal, Rect::from_min_max(pos2(row.right() - ARROW_W, row.top()), row.max), true) {
+                            self.more_scroll = (self.more_scroll + step).min(max_scroll);
+                        }
+                    }
                     ui.label(egui::RichText::new(format!("{}, autres fonctions", g.label)).size(11.0).color(pal.dim));
                 });
             });

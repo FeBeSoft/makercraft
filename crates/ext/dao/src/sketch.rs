@@ -149,6 +149,116 @@ impl Sketch {
         Ok(self.drawing().and_then(|d| d.model.handles().into_iter().find(|h| !before.contains(h))))
     }
 
+    /// Modifie des objets en une seule étape d'annulation (`f` sur chaque objet `hs`).
+    fn edit_entities(&mut self, label: &str, hs: &[doc::Handle], mut f: impl FnMut(&mut doc::EntityKind)) -> Result<(), String> {
+        let selection = self.session.selection();
+        let st = self.session.state_mut().map_err(|e| e.to_string())?;
+        let snap = cadcraft_engine::Snapshot { label: label.into(), doc: st.doc.clone(), selection };
+        let d = std::sync::Arc::make_mut(&mut st.doc);
+        for h in hs {
+            d.model.modify(*h, |e| f(&mut e.kind));
+        }
+        st.push_undo(snap);
+        st.revision += 1;
+        Ok(())
+    }
+
+    /// Opération sur le sommet d'une polyligne situé en `at` (édition des nœuds). Un point qui
+    /// n'est pas un sommet (milieu d'un segment) reçoit un nouveau sommet avec `VertexOp::Insert`.
+    pub fn vertex_op(&mut self, h: doc::Handle, at: cgeom::Vec2, op: VertexOp) -> Result<(), String> {
+        let d = self.drawing().ok_or("pas de dessin")?;
+        let e = d.model.get(h).ok_or("objet introuvable")?;
+        let doc::EntityKind::LwPolyline(p) = &e.kind else { return Err("seulement sur une polyligne (Décomposer, puis Joindre)".into()) };
+        let near = |q: cgeom::Vec2| (q.x - at.x).hypot(q.y - at.y) < 1e-6;
+        let idx = p.vertices.iter().position(|v| near(v.p));
+        let (n, closed) = (p.vertices.len(), p.closed);
+        // segment dont `at` est le milieu, pour l'insertion
+        let seg = (0..if closed { n } else { n.saturating_sub(1) }).find(|&i| {
+            let (a, b) = (p.vertices[i].p, p.vertices[(i + 1) % n].p);
+            near(cgeom::Vec2::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0))
+        });
+        match (op, idx, seg) {
+            (VertexOp::Delete, Some(i), _) if n > 2 => self.edit_entities("Supprimer le sommet", &[h], |k| {
+                if let doc::EntityKind::LwPolyline(p) = k {
+                    p.vertices.remove(i);
+                }
+            }),
+            (VertexOp::Delete, Some(_), _) => Err("une polyligne garde au moins deux sommets".into()),
+            (VertexOp::Arc | VertexOp::Straight, Some(i), _) => {
+                // tan(90° / 4) : quart de cercle
+                let bulge = if op == VertexOp::Arc { (std::f64::consts::FRAC_PI_2 / 4.0).tan() } else { 0.0 };
+                self.edit_entities("Segment suivant", &[h], |k| {
+                    if let doc::EntityKind::LwPolyline(p) = k
+                        && let Some(v) = p.vertices.get_mut(i)
+                    {
+                        v.bulge = bulge;
+                    }
+                })
+            }
+            (VertexOp::Insert, None, Some(i)) => self.edit_entities("Ajouter un sommet", &[h], |k| {
+                if let doc::EntityKind::LwPolyline(p) = k
+                    && let Some(v) = p.vertices.get_mut(i)
+                {
+                    v.bulge = 0.0;
+                    p.vertices.insert(i + 1, cgeom::PolyVertex { p: at, bulge: 0.0, start_width: 0.0, end_width: 0.0 });
+                }
+            }),
+            _ => Err("pas de sommet à cet endroit".into()),
+        }
+    }
+
+    /// Réparer : ferme les polylignes presque fermées (extrémités à moins de `tol` mm) et
+    /// joint les tracés qui se touchent (`join` de CadCraft). Renvoie le nombre de fermetures.
+    pub fn repair(&mut self, hs: &[doc::Handle], tol: f64) -> Result<usize, String> {
+        let d = self.drawing().ok_or("pas de dessin")?;
+        let to_close: Vec<doc::Handle> = hs
+            .iter()
+            .copied()
+            .filter(|h| {
+                d.model.get(*h).is_some_and(|e| match &e.kind {
+                    doc::EntityKind::LwPolyline(p) => !p.closed && p.vertices.len() > 2 && p.vertices.first().zip(p.vertices.last()).is_some_and(|(a, b)| (a.p.x - b.p.x).hypot(a.p.y - b.p.y) <= tol),
+                    _ => false,
+                })
+            })
+            .collect();
+        if !to_close.is_empty() {
+            self.edit_entities("Réparer", &to_close, |k| {
+                if let doc::EntityKind::LwPolyline(p) = k {
+                    p.vertices.pop();
+                    p.closed = true;
+                }
+            })?;
+        }
+        let rest: Vec<String> = hs.iter().filter(|h| !to_close.contains(h)).map(|h| h.hex()).collect();
+        if rest.len() > 1 {
+            // joindre peut ne rien trouver à joindre : ce n'est pas une erreur ici
+            let _ = self.session.execute("join", &makercraft_ext_api::json!({ "handles": rest }));
+        }
+        Ok(to_close.len())
+    }
+
+    /// Dégagements d'angle (dogbone ou T-bone) de rayon `r` aux coins saillants des polylignes
+    /// fermées `hs` (coins que la fraise ne peut pas atteindre dans une poche ou un trou) : une
+    /// boucle circulaire de diamètre 2r au coin, selon la bissectrice (dogbone) ou dans le
+    /// prolongement du segment qui arrive (T-bone). Renvoie le nombre de coins traités.
+    pub fn relieve_corners(&mut self, hs: &[doc::Handle], r: f64, tbone: bool) -> Result<usize, String> {
+        if !(r > 0.0 && r.is_finite()) {
+            return Err("rayon de fraise positif attendu".into());
+        }
+        let mut count = 0;
+        self.edit_entities(if tbone { "T-bone" } else { "Dogbone" }, hs, |k| {
+            if let doc::EntityKind::LwPolyline(p) = k
+                && p.closed
+                && p.vertices.iter().all(|v| v.bulge.abs() < 1e-12)
+            {
+                let (v, n) = relief_vertices(&p.vertices, r, tbone);
+                count += n;
+                p.vertices = v;
+            }
+        })?;
+        Ok(count)
+    }
+
     /// Paramètres du réseau associatif `h` (None si ce n'en est pas un).
     pub fn array_of(&self, h: doc::Handle) -> Option<doc::ArrayParams> {
         let d = self.drawing()?;
@@ -271,6 +381,56 @@ fn close_path(layer: &str, mut pts: Vec<Vec2>) -> Path2 {
     Path2 { layer: layer.to_owned(), points: pts, closed }
 }
 
+/// Opération sur un sommet de polyligne (édition des nœuds).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VertexOp {
+    Delete,
+    /// Le segment qui part du sommet devient un arc (quart de cercle), ou une droite.
+    Arc,
+    Straight,
+    /// Nouveau sommet au milieu d'un segment.
+    Insert,
+}
+
+/// Sommets d'un polygone fermé avec une boucle de dégagement à chaque coin saillant.
+pub fn relief_vertices(v: &[cgeom::PolyVertex], r: f64, tbone: bool) -> (Vec<cgeom::PolyVertex>, usize) {
+    let n = v.len();
+    if n < 3 {
+        return (v.to_vec(), 0);
+    }
+    // orientation : aire signée positive = sens trigonométrique
+    let area: f64 = (0..n).map(|i| {
+        let (a, b) = (v[i].p, v[(i + 1) % n].p);
+        a.x * b.y - b.x * a.y
+    }).sum();
+    let s = if area >= 0.0 { 1.0 } else { -1.0 };
+    let unit = |x: f64, y: f64| {
+        let l = x.hypot(y);
+        if l > 1e-12 { (x / l, y / l) } else { (0.0, 0.0) }
+    };
+    let mut out = Vec::with_capacity(n * 3);
+    let mut count = 0;
+    for i in 0..n {
+        let (pp, p, pn) = (v[(i + n - 1) % n].p, v[i].p, v[(i + 1) % n].p);
+        let e1 = unit(p.x - pp.x, p.y - pp.y);
+        let e2 = unit(pn.x - p.x, pn.y - p.y);
+        let z = e1.0 * e2.1 - e1.1 * e2.0;
+        let vertex = |q: cgeom::Vec2, bulge: f64| cgeom::PolyVertex { p: q, bulge, start_width: 0.0, end_width: 0.0 };
+        // coin saillant (tourne du côté de l'intérieur), pas un alignement
+        if s * z > 1e-9 {
+            let b = if tbone { e1 } else { unit(e1.0 - e2.0, e1.1 - e2.1) };
+            let q = cgeom::Vec2::new(p.x + 2.0 * r * b.0, p.y + 2.0 * r * b.1);
+            out.push(vertex(p, s));
+            out.push(vertex(q, s));
+            out.push(vertex(p, 0.0));
+            count += 1;
+        } else {
+            out.push(vertex(p, 0.0));
+        }
+    }
+    (out, count)
+}
+
 /// Calques de repère, jamais usinés : lignes de construction et cotes.
 pub const REFERENCE_LAYERS: [&str; 2] = ["Construction", "Cotes"];
 
@@ -384,6 +544,24 @@ pub fn flatten_bulges(v: &[cgeom::PolyVertex], closed: bool, tol: f64) -> Vec<cg
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn dogbone_on_each_corner_of_a_square() {
+        use super::cgeom::{PolyVertex, Vec2};
+        let sq: Vec<PolyVertex> = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
+            .iter()
+            .map(|&(x, y)| PolyVertex { p: Vec2::new(x, y), bulge: 0.0, start_width: 0.0, end_width: 0.0 })
+            .collect();
+        let (v, n) = super::relief_vertices(&sq, 1.5, false);
+        assert_eq!(n, 4);
+        assert_eq!(v.len(), 12);
+        // coin (10, 0) : boucle vers l'extérieur, selon la bissectrice (diamètre 3 mm)
+        let q = v[4].p;
+        assert!((q.x - (10.0 + 3.0 / 2f64.sqrt())).abs() < 1e-9 && (q.y + 3.0 / 2f64.sqrt()).abs() < 1e-9);
+        // T-bone : dans le prolongement du segment qui arrive (selon +X au coin (10, 0))
+        let (t, _) = super::relief_vertices(&sq, 1.5, true);
+        assert!((t[4].p.x - 13.0).abs() < 1e-9 && t[4].p.y.abs() < 1e-9);
+    }
+
     #[test]
     fn layer_colors_never_repeat() {
         let mut used = Vec::new();
