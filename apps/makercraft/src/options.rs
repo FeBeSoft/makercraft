@@ -157,6 +157,7 @@ impl Options {
                         let d = Prefs::default();
                         self.draft.theme = d.theme;
                         self.draft.units = d.units;
+                        self.draft.extensions_menu = d.extensions_menu;
                         self.draft.remember_atelier = d.remember_atelier;
                         self.draft.check_updates = d.check_updates;
                         self.draft.cadcraft_commands = d.cadcraft_commands;
@@ -312,6 +313,9 @@ impl Options {
 
     fn general_interface(&mut self, ui: &mut Ui, pal: &Palette) {
         let d = &mut self.draft;
+        widgets::option_row(ui, pal, "Menu « Extensions »", "Dans la barre de titre : les commandes internes des extensions (machine, .c2d, FAO, dessin, 3D, projet), avec leurs paramètres en JSON. Pour les essais et les scripts ; inutile au quotidien.", |ui| {
+            widgets::switch(ui, pal, &mut d.extensions_menu, "Menu « Extensions »");
+        });
         widgets::option_row(ui, pal, "Thème", "Sombre par défaut. Appliqué avec « Appliquer ».", |ui| {
             egui::ComboBox::from_id_salt("theme").width(180.0).selected_text(if d.theme == ThemeChoice::Dark { "Sombre" } else { "Clair" }).show_ui(ui, |ui| {
                 ui.selectable_value(&mut d.theme, ThemeChoice::Dark, "Sombre");

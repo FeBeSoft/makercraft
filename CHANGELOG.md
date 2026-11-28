@@ -42,6 +42,12 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
 - Barre de titre : numéro de version après MakerCraft, bouton « Mettre à jour » à gauche de
   Machine. La vérification se fait au clic (GitHub, via curl), ou au démarrage si l'option « Vérifier les mises à jour au démarrage » est cochée (non par défaut) ; la fenêtre propose
   Valider (page de téléchargement), Passer cette version, Annuler.
+- Fermeture ou ouverture d'un autre projet avec des modifications non enregistrées : fenêtre
+  « Enregistrer les modifications ? » (Enregistrer, Ne pas enregistrer, Annuler).
+- Barre de titre : Aide tout à droite ; menu « Extensions » caché par défaut (Options > Général >
+  Interface).
+- Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
+  rétablissent, chevrons étroits aux extrémités du ruban.
 
 ### Amont
 - SolidCraft v0.41.0 -> v0.51.2 (extension `cao`) : import STEP plus robuste, import IGES,

@@ -82,6 +82,8 @@ pub struct Prefs {
     pub skipped_version: String,
     /// Vérifier les mises à jour au démarrage (accord de l'utilisateur : non par défaut).
     pub check_updates: bool,
+    /// Menu « Extensions » dans la barre de titre (outil de test des commandes, caché par défaut).
+    pub extensions_menu: bool,
 }
 
 impl Default for Prefs {
@@ -102,6 +104,7 @@ impl Default for Prefs {
             origin_3d: true,
             skipped_version: String::new(),
             check_updates: false,
+            extensions_menu: false,
         }
     }
 }

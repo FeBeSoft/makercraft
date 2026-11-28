@@ -43,11 +43,22 @@ pub struct App {
     options: Options,
     /// Fenêtre « Mettre à jour ».
     updater: crate::update::Updater,
+    /// Projet modifié : action en attente de la réponse « Enregistrer ? ».
+    confirm: Option<Pending>,
+    /// Fermeture accordée (après enregistrement ou « Ne pas enregistrer »).
+    closing_ok: bool,
     command: Option<CommandDialog>,
     textures_tried: bool,
     status: String,
     /// Images déjà affichées (les premières sont redemandées : la fenêtre apparaît après elles).
     frames: u32,
+}
+
+/// Ce qui attend la réponse à « Enregistrer les modifications ? ».
+enum Pending {
+    Quit,
+    Open(PathBuf),
+    OpenDialog,
 }
 
 enum Action {
@@ -85,6 +96,8 @@ impl App {
             machines,
             options: Options::default(),
             updater: crate::update::Updater::default(),
+            confirm: None,
+            closing_ok: false,
             command: None,
             textures_tried: false,
             status: "Prêt".to_owned(),
@@ -174,10 +187,89 @@ impl App {
         }
     }
 
+    /// Le projet CNC a des modifications non enregistrées que `p` ferait perdre.
+    fn would_lose(&self, p: &Pending) -> bool {
+        let cnc_file = |path: &Path| {
+            let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+            !matches!(ext.as_str(), "nc" | "gcode" | "ngc" | "tap")
+        };
+        self.cnc.dirty()
+            && match p {
+                Pending::Quit => true,
+                Pending::Open(path) => cnc_file(path),
+                Pending::OpenDialog => self.atelier.family() == Family::Cnc,
+            }
+    }
+
+    /// Fait l'action, sans plus rien demander.
+    fn proceed(&mut self, p: Pending, ctx: &egui::Context) {
+        match p {
+            Pending::Quit => {
+                self.closing_ok = true;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+            Pending::Open(path) => self.open(&path),
+            Pending::OpenDialog => self.open_dialog(),
+        }
+    }
+
+    /// Demande d'abord s'il faut enregistrer, si l'action ferait perdre des modifications.
+    fn guarded(&mut self, p: Pending, ctx: &egui::Context) {
+        if self.would_lose(&p) {
+            self.confirm = Some(p);
+        } else {
+            self.proceed(p, ctx);
+        }
+    }
+
+    /// Fenêtre « Enregistrer les modifications ? ».
+    fn confirm_window(&mut self, ctx: &egui::Context, pal: &Palette) {
+        if self.confirm.is_none() {
+            return;
+        }
+        let name = self.cnc.path.as_ref().and_then(|p| p.file_name()).map_or_else(|| "Sans titre.mkc".to_owned(), |n| n.to_string_lossy().into_owned());
+        let mut choice = None;
+        egui::Modal::new(egui::Id::unique("enregistrer-avant")).show(ctx, |ui| {
+            ui.set_width(380.0);
+            ui.label(RichText::new("Enregistrer les modifications ?").font(theme::bold(15.0)));
+            ui.add_space(4.0);
+            ui.label(RichText::new(format!("Le projet « {name} » a été modifié depuis le dernier enregistrement.")).color(pal.weak));
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                if ui.button("Enregistrer").clicked() {
+                    choice = Some(0);
+                }
+                if ui.button("Ne pas enregistrer").clicked() {
+                    choice = Some(1);
+                }
+                if ui.button("Annuler").clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
+                    choice = Some(2);
+                }
+            });
+        });
+        match choice {
+            Some(0) => {
+                self.ribbon_command("cnc.enregistrer");
+                if let Some(p) = self.confirm.take()
+                    && !self.cnc.dirty()
+                {
+                    self.proceed(p, ctx);
+                }
+            }
+            Some(1) => {
+                if let Some(p) = self.confirm.take() {
+                    self.proceed(p, ctx);
+                }
+            }
+            Some(_) => self.confirm = None,
+            None => {}
+        }
+    }
+
     fn run(&mut self, a: Action, ctx: &egui::Context) {
         match a {
-            Action::OpenDialog => self.open_dialog(),
-            Action::Open(p) => self.open(&p),
+            Action::OpenDialog => self.guarded(Pending::OpenDialog, ctx),
+            Action::Open(p) => self.guarded(Pending::Open(p), ctx),
             Action::Atelier(at) => self.set_atelier(at),
             Action::Options(page) => self.options.show_page(&self.prefs, page),
             Action::Command(spec) => self.command = Some(CommandDialog::new(&spec)),
@@ -189,7 +281,7 @@ impl App {
                     self.machines_requests(req);
                 }
             }
-            Action::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+            Action::Quit => self.guarded(Pending::Quit, ctx),
         }
     }
 }
@@ -243,6 +335,12 @@ impl eframe::App for App {
             self.body(&mut b, pal);
         });
 
+        // fermeture de la fenêtre (croix, Alt+F4) avec un projet modifié : demander d'abord
+        if ctx.input(|i| i.viewport().close_requested()) && !self.closing_ok && self.would_lose(&Pending::Quit) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.confirm = Some(Pending::Quit);
+        }
+        self.confirm_window(&ctx, pal);
         if self.updater.ui(&ctx, pal, &mut self.prefs) {
             self.save_prefs();
         }
@@ -355,8 +453,10 @@ impl App {
         if ur.on_hover_text(tip).clicked() {
             self.updater.start();
         }
-        rr.add_space(10.0);
-        self.extensions_menu(&mut rr, actions);
+        if self.prefs.extensions_menu {
+            rr.add_space(10.0);
+            self.extensions_menu(&mut rr, actions);
+        }
     }
 
     /// Ruban : grand sélecteur d'ateliers à gauche, onglets et groupes de l'atelier actif.
