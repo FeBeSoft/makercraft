@@ -118,6 +118,10 @@ v0.51.2; CadCraft stays on v0.20.1 (no newer stable release).*
 - Mises à jour : seule une version plus récente est proposée (une version plus ancienne
   publiée sur GitHub était annoncée comme nouvelle).
 
+### Problèmes connus
+- Réseau circulaire : à sa création, Propriétés n'affiche pas encore ses paramètres.
+- Quelques invites de CadCraft encore en anglais ; panneau Propriétés qui déborde un peu à droite.
+
 ## v0.1.0 bêta 20261121 - 21/11/2026
 
 Première version test publique, pour Windows 10 / 11 (64 bits). Notes complètes :
