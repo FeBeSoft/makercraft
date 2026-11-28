@@ -1,7 +1,8 @@
-//! « Mettre à jour » : à la demande seulement (bouton de la barre d'accès rapide), MakerCraft
-//! demande à GitHub la dernière version publiée et l'affiche dans une fenêtre : Valider ouvre
-//! la page de téléchargement, « Passer cette version » ne la signale plus, Annuler revient.
-//! Aucune connexion automatique : la requête part de `curl`, fourni par Windows 10 et 11.
+//! « Mettre à jour » : au clic sur le bouton de la barre d'accès rapide, MakerCraft demande à
+//! GitHub la dernière version publiée et l'affiche dans une fenêtre : Valider ouvre la page de
+//! téléchargement, « Passer cette version » ne la signale plus, Annuler revient. Au démarrage,
+//! seulement si l'utilisateur a coché l'option (non par défaut) : vérification silencieuse, le
+//! bouton passe en orange. La requête part de `curl`, fourni par Windows 10 et 11.
 
 use std::sync::mpsc::{Receiver, channel};
 
@@ -82,6 +83,12 @@ fn fetch(repo: &str) -> Result<Release, String> {
 }
 
 impl Updater {
+    /// Vérification silencieuse (option « au démarrage ») : pas de fenêtre.
+    pub fn check_quietly(&mut self) {
+        self.start();
+        self.open = false;
+    }
+
     /// Lance la vérification et ouvre la fenêtre.
     pub fn start(&mut self) {
         self.open = true;
@@ -110,6 +117,9 @@ impl Updater {
             && let Ok(r) = rx.try_recv()
         {
             self.state = State::Done(r);
+        }
+        if matches!(self.state, State::Running(_)) {
+            ctx.request_repaint_after(std::time::Duration::from_millis(500));
         }
         if !self.open {
             return false;

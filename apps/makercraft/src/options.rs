@@ -158,6 +158,7 @@ impl Options {
                         self.draft.theme = d.theme;
                         self.draft.units = d.units;
                         self.draft.remember_atelier = d.remember_atelier;
+                        self.draft.check_updates = d.check_updates;
                         self.draft.cadcraft_commands = d.cadcraft_commands;
                         self.draft.origin_2d = d.origin_2d;
                         self.draft.origin_3d = d.origin_3d;
@@ -283,6 +284,9 @@ impl Options {
                     let d = &mut self.draft;
                     widgets::option_row(ui, pal, "Rouvrir le dernier atelier", "Sinon MakerCraft démarre dans l'atelier CNC - DAO / CAO.", |ui| {
                         widgets::switch(ui, pal, &mut d.remember_atelier, "Rouvrir le dernier atelier");
+                    });
+                    widgets::option_row(ui, pal, "Vérifier les mises à jour au démarrage", "Demande à GitHub la dernière version publiée ; le bouton « Mettre à jour » passe en orange s'il y en a une. Seule l'adresse IP de l'ordinateur est transmise à GitHub. Non coché : aucune connexion, sauf clic sur « Mettre à jour ».", |ui| {
+                        widgets::switch(ui, pal, &mut d.check_updates, "Vérifier les mises à jour au démarrage");
                     });
                 }
                 (Page::Files, 0) => self.files(ui, pal),

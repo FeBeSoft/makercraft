@@ -123,7 +123,7 @@ Chaque retour compte, même court : une capture et deux lignes suffisent. Les id
 2. Lancez `makercraft.exe`. L'exécutable n'est pas encore signé : Windows SmartScreen peut afficher un avertissement ; cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
 3. Pour une 3018 en USB, installez le pilote CH340 si Windows ne reconnaît pas le port.
 
-Rien n'est installé ailleurs : les réglages sont dans `%APPDATA%\FeBe\MakerCraft`. MakerCraft ne fait **aucune connexion réseau** de lui-même : seul le bouton « Mettre à jour », quand on clique dessus, demande à GitHub la dernière version publiée.
+Rien n'est installé ailleurs : les réglages sont dans `%APPDATA%\FeBe\MakerCraft`. MakerCraft ne fait **aucune connexion réseau** de lui-même : seul le bouton « Mettre à jour », quand on clique dessus, demande à GitHub la dernière version publiée (et au démarrage si l'option, non cochée par défaut, est activée).
 
 ## English summary
 

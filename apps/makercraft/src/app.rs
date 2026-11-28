@@ -90,6 +90,9 @@ impl App {
             status: "Prêt".to_owned(),
             frames: 0,
         };
+        if app.prefs.check_updates {
+            app.updater.check_quietly();
+        }
         if let Some(e) = &app.host_error {
             app.status = format!("Extensions : {e}");
         }

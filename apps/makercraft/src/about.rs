@@ -88,7 +88,7 @@ pub fn main_library() -> String {
 }
 
 /// Ce que fait MakerCraft en particulier, affiché après la déclaration commune.
-pub const RGPD_MAKERCRAFT: &str = "MakerCraft en particulier : il ne fait aucune connexion réseau de lui-même. Il dialogue avec les machines (CNC, laser) uniquement par les ports USB ou série de votre ordinateur. Dessins, projets, banque d'outils, réglages et fichiers récents sont enregistrés sur votre ordinateur et n'en sortent que si vous les envoyez vous-même. Seul le bouton « Mettre à jour » interroge GitHub, et seulement quand vous cliquez dessus : la requête demande la dernière version publiée et n'envoie aucune donnée personnelle. Il n'y a pas de vérification automatique.";
+pub const RGPD_MAKERCRAFT: &str = "MakerCraft en particulier : il ne fait aucune connexion réseau de lui-même. Il dialogue avec les machines (CNC, laser) uniquement par les ports USB ou série de votre ordinateur. Dessins, projets, banque d'outils, réglages et fichiers récents sont enregistrés sur votre ordinateur et n'en sortent que si vous les envoyez vous-même. La vérification des mises à jour interroge GitHub (GitHub Inc., États-Unis) : quand vous cliquez sur « Mettre à jour », et au démarrage seulement si vous avez coché l'option « Vérifier les mises à jour au démarrage » (Options > Général > Démarrage, non cochée par défaut ; vous pouvez la décocher à tout moment). La requête demande la dernière version publiée ; seule l'adresse IP de votre ordinateur est transmise à GitHub, comme pour toute visite d'un site, et MakerCraft n'envoie aucune autre donnée.";
 
 /// Texte complet de l'onglet « RGPD ».
 pub fn rgpd() -> String {

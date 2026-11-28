@@ -80,6 +80,8 @@ pub struct Prefs {
     pub origin_3d: bool,
     /// Version que l'utilisateur a choisi de passer (« Mettre à jour »).
     pub skipped_version: String,
+    /// Vérifier les mises à jour au démarrage (accord de l'utilisateur : non par défaut).
+    pub check_updates: bool,
 }
 
 impl Default for Prefs {
@@ -99,6 +101,7 @@ impl Default for Prefs {
             origin_2d: true,
             origin_3d: true,
             skipped_version: String::new(),
+            check_updates: false,
         }
     }
 }

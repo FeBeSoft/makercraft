@@ -40,7 +40,7 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
 - Options > Général > Dessin : commandes de CadCraft dans la ligne de commande, origine dans
   la vue 2D, origine dans la vue 3D.
 - Barre de titre : numéro de version après MakerCraft, bouton « Mettre à jour » à gauche de
-  Machine. La vérification se fait seulement au clic (GitHub, via curl) ; la fenêtre propose
+  Machine. La vérification se fait au clic (GitHub, via curl), ou au démarrage si l'option « Vérifier les mises à jour au démarrage » est cochée (non par défaut) ; la fenêtre propose
   Valider (page de téléchargement), Passer cette version, Annuler.
 
 ### Amont
