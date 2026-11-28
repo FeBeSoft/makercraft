@@ -137,8 +137,11 @@ fn tone_color(pal: &Palette, t: Tone) -> Color32 {
 }
 
 impl Ribbon {
-    /// Rangée d'onglets dans `r` ; `accent` est la couleur de l'atelier actif.
-    pub fn tabs_ui(&mut self, ui: &mut Ui, r: Rect, pal: &Palette, tabs: &[Tab], accent: Color32) {
+    /// Rangée d'onglets dans `r` ; `accent` est la couleur de l'atelier actif. `dot` : pastille
+    /// cliquable après le titre d'un onglet (rang, couleur, info-bulle) ; renvoie vrai si on l'a
+    /// cliquée.
+    pub fn tabs_ui(&mut self, ui: &mut Ui, r: Rect, pal: &Palette, tabs: &[Tab], accent: Color32, dot: Option<(usize, Color32, &str)>) -> bool {
+        let mut dot_clicked = false;
         if self.tab >= tabs.len() {
             self.tab = 0;
         }
@@ -146,7 +149,9 @@ impl Ribbon {
         let font = theme::regular(13.5);
         let mut x = r.left() + 6.0;
         for (i, t) in tabs.iter().enumerate() {
-            let w = p.layout_no_wrap(t.label.to_owned(), font.clone(), pal.text).size().x + 26.0;
+            let this_dot = dot.filter(|(k, _, _)| *k == i);
+            let extra = if this_dot.is_some() { 16.0 } else { 0.0 };
+            let w = p.layout_no_wrap(t.label.to_owned(), font.clone(), pal.text).size().x + 26.0 + extra;
             let tr = Rect::from_min_size(pos2(x, r.top()), vec2(w, r.height()));
             let resp = ui.interact(tr, ui.scope_id().with(("onglet-ruban", i)), Sense::click());
             resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Tab, true, i == self.tab, t.label));
@@ -154,7 +159,16 @@ impl Ribbon {
             if resp.hovered() && !active {
                 p.rect_filled(tr.shrink2(vec2(2.0, 4.0)), CornerRadius::same(6), pal.hover);
             }
-            p.text(tr.center(), Align2::CENTER_CENTER, t.label, if active { theme::bold(13.5) } else { font.clone() }, if active { pal.text } else { pal.weak });
+            let label_c = pos2(tr.center().x - extra / 2.0, tr.center().y);
+            let lr = p.text(label_c, Align2::CENTER_CENTER, t.label, if active { theme::bold(13.5) } else { font.clone() }, if active { pal.text } else { pal.weak });
+            if let Some((_, col, tip)) = this_dot {
+                let c = pos2(lr.right() + 9.0, tr.center().y);
+                let dr = Rect::from_center_size(c, vec2(14.0, 14.0));
+                let d = ui.interact(dr, ui.scope_id().with(("pastille-onglet", i)), Sense::click()).on_hover_text(tip).on_hover_cursor(egui::CursorIcon::PointingHand);
+                d.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tip));
+                p.circle_filled(c, if d.hovered() { 5.0 } else { 4.0 }, col);
+                dot_clicked |= d.clicked();
+            }
             if active && !self.collapsed {
                 p.rect_filled(Rect::from_min_max(pos2(tr.left() + 8.0, tr.bottom() - 3.0), pos2(tr.right() - 8.0, tr.bottom())), CornerRadius::same(2), accent);
             }
@@ -183,6 +197,7 @@ impl Ribbon {
         if resp.clicked() {
             self.collapsed = !self.collapsed;
         }
+        dot_clicked
     }
 
     /// Corps du ruban (groupes de l'onglet actif) dans `r`. Renvoie la commande cliquée.

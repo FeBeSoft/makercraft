@@ -427,21 +427,7 @@ impl App {
         if g.clicked() {
             actions.push(Action::Options(Page::General));
         }
-        rr.add_space(8.0);
-        let connected = self.machines.connected();
-        let label = format!("Machine : {}", self.machines.state_label());
-        let font = theme::regular(13.0);
-        let tw = p.layout_no_wrap(label.clone(), font.clone(), pal.text).size().x;
-        let (pill, pr) = rr.allocate_exact_size(vec2(tw + 34.0, 28.0), Sense::click());
-        pr.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &label));
-        p.rect_filled(pill, CornerRadius::same(255), if pr.hovered() { pal.hover } else { pal.card });
-        p.rect_stroke(pill, CornerRadius::same(255), Stroke::new(1.0, pal.card_line), egui::StrokeKind::Inside);
-        p.circle_filled(pos2(pill.left() + 15.0, pill.center().y), 4.0, if connected { pal.orange } else { pal.dim });
-        p.text(pos2(pill.left() + 26.0, pill.center().y), Align2::LEFT_CENTER, label, font, if connected { pal.text } else { pal.weak });
-        if pr.clicked() {
-            actions.push(Action::Atelier(Atelier::Machines));
-        }
-        // à gauche de Machine : vérification des mises à jour, à la demande
+        // à gauche d'Options : vérification des mises à jour, à la demande
         rr.add_space(8.0);
         let newer = self.updater.newer(&self.prefs).map(|r| if r.name.is_empty() { r.tag.clone() } else { r.name.clone() });
         let ulabel = "Mettre à jour";
@@ -482,7 +468,13 @@ impl App {
             self.ribbon.tab = self.cnc.step.index();
         }
         let tr = Rect::from_min_max(pos2(r.left() + SWITCH_W + 6.0, r.top()), pos2(r.right() - 6.0, r.top() + ribbon::TAB_ROW_H));
-        self.ribbon.tabs_ui(ui, tr, pal, &tabs, self.atelier.family().accent(pal));
+        // atelier CNC : pastille de l'état de la machine après « Machine » (vert : connectée,
+        // rouge : déconnectée) ; un clic mène à l'atelier Machines
+        let tip = format!("Machine : {} ; cliquer pour ouvrir l'atelier Machines", self.machines.state_label());
+        let dot = (self.atelier == Atelier::Cnc).then(|| (cnc::Step::Machine.index(), if self.machines.connected() { pal.ok } else { pal.bad }, tip.as_str()));
+        if self.ribbon.tabs_ui(ui, tr, pal, &tabs, self.atelier.family().accent(pal), dot) {
+            actions.push(Action::Atelier(Atelier::Machines));
+        }
         if self.atelier == Atelier::Cnc {
             self.cnc.step = cnc::Step::from_index(self.ribbon.tab);
         }
@@ -627,18 +619,16 @@ impl App {
         p.circle_filled(pos2(r.left() + 18.0, r.center().y), 4.0, accent);
         let a = p.text(pos2(r.left() + 30.0, r.center().y), Align2::LEFT_CENTER, self.atelier.title(), theme::bold(12.5), pal.text);
         let mut x = a.right() + 18.0;
-        if self.atelier == Atelier::Cnc
-            && let Some(n) = self.cnc.file_name()
-        {
-            let t = p.text(pos2(x, r.center().y), Align2::LEFT_CENTER, n, theme::mono(12.0), pal.weak);
-            x = t.right() + 18.0;
-        }
         if self.atelier == Atelier::Machines {
             let t = p.text(pos2(x, r.center().y), Align2::LEFT_CENTER, self.machines.status_summary(), f.clone(), pal.weak);
             x = t.right() + 18.0;
         }
         let right = p.text(pos2(r.right() - 16.0, r.center().y), Align2::RIGHT_CENTER, format!("Unités : {}", self.prefs.units.label()), f.clone(), pal.weak);
-        let ver = p.text(pos2(right.left() - 22.0, r.center().y), Align2::RIGHT_CENTER, format!("MakerCraft {}", crate::about::version_label()), f.clone(), pal.dim);
+        // état de la machine avant les unités (le fichier et la version sont dans le titre)
+        let connected = self.machines.connected();
+        let ver = p.text(pos2(right.left() - 22.0, r.center().y), Align2::RIGHT_CENTER, format!("Machine : {}", self.machines.state_label()), f.clone(), if connected { pal.text } else { pal.weak });
+        p.circle_filled(pos2(ver.left() - 9.0, r.center().y), 4.0, if connected { pal.ok } else { pal.bad });
+        let ver = ver.expand2(vec2(14.0, 0.0));
         let max = ver.left() - 30.0 - x;
         if max > 40.0 {
             let mut job = egui::text::LayoutJob::simple_singleline(self.status.clone(), f, pal.text);
