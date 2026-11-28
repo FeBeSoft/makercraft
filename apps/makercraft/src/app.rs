@@ -47,6 +47,8 @@ pub struct App {
     confirm: Option<Pending>,
     /// Fermeture accordée (après enregistrement ou « Ne pas enregistrer »).
     closing_ok: bool,
+    /// Titre de la fenêtre Windows déjà envoyé.
+    title: String,
     command: Option<CommandDialog>,
     textures_tried: bool,
     status: String,
@@ -98,6 +100,7 @@ impl App {
             updater: crate::update::Updater::default(),
             confirm: None,
             closing_ok: false,
+            title: String::new(),
             command: None,
             textures_tried: false,
             status: "Prêt".to_owned(),
@@ -341,6 +344,15 @@ impl eframe::App for App {
             self.confirm = Some(Pending::Quit);
         }
         self.confirm_window(&ctx, pal);
+        // barre de titre de Windows (et barre des tâches) : fichier, puis logiciel et version
+        let title = match self.cnc.file_name().filter(|_| self.atelier.family() == Family::Cnc) {
+            Some(f) => format!("{f} - MakerCraft {}", crate::about::version_label()),
+            None => format!("MakerCraft {}", crate::about::version_label()),
+        };
+        if title != self.title {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
+            self.title = title;
+        }
         if self.updater.ui(&ctx, pal, &mut self.prefs) {
             self.save_prefs();
         }
@@ -377,15 +389,9 @@ impl App {
         let p = ui.painter().clone();
         p.rect_filled(r, CornerRadius::ZERO, pal.bar);
         p.hline(r.x_range(), r.bottom() - 0.5, Stroke::new(1.0, pal.bar_line));
-        let logo = Rect::from_min_size(pos2(r.left() + 12.0, r.center().y - 11.0), vec2(22.0, 22.0));
-        if let Some(t) = &self.logo {
-            p.image(t.id(), logo, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
-        }
-        let name = p.text(pos2(logo.right() + 8.0, r.center().y), Align2::LEFT_CENTER, "MakerCraft", theme::bold(14.5), pal.text);
-        let name = name.union(p.text(pos2(name.right() + 6.0, r.center().y + 1.0), Align2::LEFT_CENTER, crate::about::version_label(), theme::regular(12.0), pal.weak));
-        p.vline(name.right() + 12.0, (r.top() + 11.0)..=(r.bottom() - 11.0), Stroke::new(1.0, pal.bar_line));
+        // nom, version et fichier sont dans la barre de titre de Windows : ici, les menus seulement
         // à gauche
-        let left = Rect::from_min_max(pos2(name.right() + 18.0, r.top() + 5.0), pos2(r.center().x + 120.0, r.bottom() - 5.0));
+        let left = Rect::from_min_max(pos2(r.left() + 10.0, r.top() + 5.0), pos2(r.center().x + 120.0, r.bottom() - 5.0));
         let mut m = ui.new_child(UiBuilder::new().max_rect(left).layout(egui::Layout::left_to_right(egui::Align::Center)));
         menu_style(&mut m, pal);
         self.file_menu(&mut m, pal, actions);

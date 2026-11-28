@@ -53,9 +53,14 @@ fn repo_path(url: &str) -> Option<String> {
     (p.split('/').count() == 2 && !p.is_empty()).then(|| p.to_owned())
 }
 
-/// Lit la réponse JSON de l'API GitHub (`releases/latest`).
+/// Lit la réponse JSON de l'API GitHub : la liste des versions (la plus récente d'abord,
+/// préversions comprises) ou une seule version.
 pub fn parse_release(text: &str) -> Result<Release, String> {
     let v: Value = serde_json::from_str(text).map_err(|e| format!("réponse de GitHub illisible : {e}"))?;
+    let v = match v {
+        Value::Array(list) => list.into_iter().find(|r| !r.get("draft").and_then(Value::as_bool).unwrap_or(false)).ok_or_else(|| "aucune version publiée".to_owned())?,
+        other => other,
+    };
     let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or_default().to_owned();
     let tag = s("tag_name");
     if tag.is_empty() {
@@ -66,7 +71,8 @@ pub fn parse_release(text: &str) -> Result<Release, String> {
 }
 
 fn fetch(repo: &str) -> Result<Release, String> {
-    let url = format!("https://api.github.com/repos/{repo}/releases/latest");
+    // pas `releases/latest` : il ignore les préversions (bêta), et MakerCraft n'a que des bêtas
+    let url = format!("https://api.github.com/repos/{repo}/releases?per_page=5");
     let mut cmd = std::process::Command::new("curl");
     cmd.args(["-s", "-L", "--max-time", "15", "-H", "Accept: application/vnd.github+json", "-H", "User-Agent: MakerCraft", &url]);
     #[cfg(windows)]
@@ -209,6 +215,8 @@ mod tests {
         assert_eq!(r.tag, "v0.1.1-beta.20261205");
         assert_eq!(r.date, "2026-12-05");
         assert!(parse_release(r#"{"message":"Not Found"}"#).is_err());
+        let list = parse_release(r#"[{"tag_name":"v0.2.0-beta.1","draft":true},{"tag_name":"v0.1.0-beta.20261121","prerelease":true}]"#);
+        assert_eq!(list.map(|r| r.tag).ok().as_deref(), Some("v0.1.0-beta.20261121"));
     }
 
     #[test]

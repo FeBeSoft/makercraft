@@ -44,7 +44,7 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
   Valider (page de téléchargement), Passer cette version, Annuler.
 - Fermeture ou ouverture d'un autre projet avec des modifications non enregistrées : fenêtre
   « Enregistrer les modifications ? » (Enregistrer, Ne pas enregistrer, Annuler).
-- Barre de titre : Aide tout à droite ; menu « Extensions » caché par défaut (Options > Général >
+- Barre de titre de Windows : nom du fichier, puis MakerCraft et sa version (aussi dans la barre des tâches) ; logo et nom retirés de la barre d'accès rapide. Aide tout à droite ; menu « Extensions » caché par défaut (Options > Général >
   Interface).
 - Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
   rétablissent, chevrons étroits aux extrémités du ruban.
