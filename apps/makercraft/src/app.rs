@@ -333,7 +333,9 @@ impl eframe::App for App {
             let body = Rect::from_min_max(pos2(full.left() + 18.0, rib.bottom() + 16.0), pos2(full.right() - 18.0, status.top() - 14.0));
             self.quick_bar(ui, quick, pal, &mut actions);
             self.ribbon_area(ui, rib, pal, &mut actions);
-            self.status_bar(ui, status, pal);
+            if self.status_bar(ui, status, pal) {
+                actions.push(Action::Atelier(Atelier::Machines));
+            }
             let mut b = ui.new_child(UiBuilder::new().max_rect(body));
             self.body(&mut b, pal);
         });
@@ -610,7 +612,8 @@ impl App {
         });
     }
 
-    fn status_bar(&self, ui: &mut Ui, r: Rect, pal: &Palette) {
+    /// Barre d'état ; renvoie vrai si on a cliqué sur l'état de la machine.
+    fn status_bar(&self, ui: &mut Ui, r: Rect, pal: &Palette) -> bool {
         let p = ui.painter();
         p.rect_filled(r, CornerRadius::ZERO, pal.bar);
         p.hline(r.x_range(), r.top() + 0.5, Stroke::new(1.0, pal.bar_line));
@@ -629,6 +632,10 @@ impl App {
         let ver = p.text(pos2(right.left() - 22.0, r.center().y), Align2::RIGHT_CENTER, format!("Machine : {}", self.machines.state_label()), f.clone(), if connected { pal.text } else { pal.weak });
         p.circle_filled(pos2(ver.left() - 9.0, r.center().y), 4.0, if connected { pal.ok } else { pal.bad });
         let ver = ver.expand2(vec2(14.0, 0.0));
+        let zone = Rect::from_min_max(pos2(ver.left() - 6.0, r.top()), pos2(ver.right() - 8.0, r.bottom()));
+        let m = ui.interact(zone, ui.scope_id().with("etat-machine"), Sense::click()).on_hover_text("Ouvrir l'atelier Machines").on_hover_cursor(egui::CursorIcon::PointingHand);
+        m.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "État de la machine"));
+        let go = m.clicked();
         let max = ver.left() - 30.0 - x;
         if max > 40.0 {
             let mut job = egui::text::LayoutJob::simple_singleline(self.status.clone(), f, pal.text);
@@ -637,6 +644,7 @@ impl App {
             let g = p.layout_job(job);
             p.galley(pos2(x, r.center().y - g.size().y / 2.0), g, pal.text);
         }
+        go
     }
 
     fn body(&mut self, ui: &mut Ui, pal: &Palette) {
