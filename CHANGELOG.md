@@ -107,6 +107,13 @@ dimension box, right column with Properties / 3D / Comments tabs, contour tree w
 and lock, context menus, drawing options); on-demand update check; SolidCraft upgraded to
 v0.51.2; CadCraft stays on v0.20.1 (no newer stable release).*
 
+### Corrigé
+- Dessin : les commandes du ruban lancées sur une sélection (réseau circulaire, déplacer,
+  tourner, miroir...) repartaient sans objet et redemandaient la sélection.
+- Dessin : dégagements dogbone et T-bone. Le tracé suit désormais l'encoche que laisse la fraise
+  qui touche le coin (sur la bissectrice, ou dans la paroi du segment qui part pour le T-bone),
+  au lieu d'une boucle extérieure rattachée au coin par un seul point.
+
 ## v0.1.0 bêta 20261121 - 21/11/2026
 
 Première version test publique, pour Windows 10 / 11 (64 bits). Notes complètes :

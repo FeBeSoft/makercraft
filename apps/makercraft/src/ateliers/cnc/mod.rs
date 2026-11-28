@@ -388,7 +388,12 @@ impl Cnc {
             }
             return;
         }
+        // sans commande en cours, cancel() vide la sélection : on la remet, pour que la commande
+        // (réseau, déplacer, tourner...) parte des objets déjà choisis
         self.sketch.session.cancel();
+        if !sel.is_empty() {
+            self.sketch.session.set_selection(sel);
+        }
         if let Err(e) = self.sketch.session.cmdline(name) {
             req.push(Request::Status(e.to_string()));
         }

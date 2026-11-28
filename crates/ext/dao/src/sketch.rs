@@ -239,8 +239,9 @@ impl Sketch {
 
     /// Dégagements d'angle (dogbone ou T-bone) de rayon `r` aux coins saillants des polylignes
     /// fermées `hs` (coins que la fraise ne peut pas atteindre dans une poche ou un trou) : une
-    /// boucle circulaire de diamètre 2r au coin, selon la bissectrice (dogbone) ou dans le
-    /// prolongement du segment qui arrive (T-bone). Renvoie le nombre de coins traités.
+    /// encoche en arc de cercle, celle que laisse une fraise de rayon `r` qui touche le coin,
+    /// centrée sur la bissectrice (dogbone) ou contre le segment qui arrive (T-bone, l'encoche
+    /// entre dans la paroi du segment qui part). Renvoie le nombre de coins traités.
     pub fn relieve_corners(&mut self, hs: &[doc::Handle], r: f64, tbone: bool) -> Result<usize, String> {
         if !(r > 0.0 && r.is_finite()) {
             return Err("rayon de fraise positif attendu".into());
@@ -408,25 +409,47 @@ pub fn relief_vertices(v: &[cgeom::PolyVertex], r: f64, tbone: bool) -> (Vec<cge
         let l = x.hypot(y);
         if l > 1e-12 { (x / l, y / l) } else { (0.0, 0.0) }
     };
-    let mut out = Vec::with_capacity(n * 3);
+    // angle orienté de u vers w (radians, -pi..pi)
+    let angle = |u: (f64, f64), w: (f64, f64)| (u.0 * w.1 - u.1 * w.0).atan2(u.0 * w.0 + u.1 * w.1);
+    let mut out = Vec::with_capacity(n * 2);
     let mut count = 0;
     for i in 0..n {
         let (pp, p, pn) = (v[(i + n - 1) % n].p, v[i].p, v[(i + 1) % n].p);
+        let (l1, l2) = ((p.x - pp.x).hypot(p.y - pp.y), (pn.x - p.x).hypot(pn.y - p.y));
         let e1 = unit(p.x - pp.x, p.y - pp.y);
         let e2 = unit(pn.x - p.x, pn.y - p.y);
         let z = e1.0 * e2.1 - e1.1 * e2.0;
         let vertex = |q: cgeom::Vec2, bulge: f64| cgeom::PolyVertex { p: q, bulge, start_width: 0.0, end_width: 0.0 };
         // coin saillant (tourne du côté de l'intérieur), pas un alignement
-        if s * z > 1e-9 {
-            let b = if tbone { e1 } else { unit(e1.0 - e2.0, e1.1 - e2.1) };
-            let q = cgeom::Vec2::new(p.x + 2.0 * r * b.0, p.y + 2.0 * r * b.1);
-            out.push(vertex(p, s));
-            out.push(vertex(q, s));
+        if s * z <= 1e-9 {
             out.push(vertex(p, 0.0));
-            count += 1;
-        } else {
-            out.push(vertex(p, 0.0));
+            continue;
         }
+        // Centre c du cercle de la fraise qui touche le coin : à r du coin, côté intérieur,
+        // sur la bissectrice (dogbone) ou sur la normale intérieure du segment qui arrive
+        // (T-bone, le dégagement entre alors dans la paroi du segment qui part). Le tracé suit
+        // le segment qui arrive jusqu'au cercle (a), contourne le cercle par l'extérieur, en
+        // passant par m, et reprend sur le segment qui part (b).
+        let out_dir = unit(e1.0 - e2.0, e1.1 - e2.1);
+        let n_in = (-s * e1.1, s * e1.0);
+        let d = if tbone { (-n_in.0, -n_in.1) } else { out_dir }; // c = p - r d
+        let c = (p.x - r * d.0, p.y - r * d.1);
+        let ta = 2.0 * r * (d.0 * e1.0 + d.1 * e1.1);
+        let tb = -2.0 * r * (d.0 * e2.0 + d.1 * e2.1);
+        if ta < -1e-9 || tb < 1e-9 || ta > 0.5 * l1 + 1e-9 || tb > 0.5 * l2 + 1e-9 {
+            out.push(vertex(p, 0.0));
+            continue;
+        }
+        let a = (p.x - ta * e1.0, p.y - ta * e1.1);
+        let b = (p.x + tb * e2.0, p.y + tb * e2.1);
+        // point le plus à l'extérieur de l'arc : le coin (dogbone) ou le fond du dégagement
+        // dans la paroi du segment qui part (T-bone)
+        let m = if tbone { (c.0 + r * s * e2.1, c.1 - r * s * e2.0) } else { (p.x, p.y) };
+        let rel = |q: (f64, f64)| (q.0 - c.0, q.1 - c.1);
+        let theta = angle(rel(a), rel(m)) + angle(rel(m), rel(b));
+        out.push(vertex(cgeom::Vec2::new(a.0, a.1), (theta / 4.0).tan()));
+        out.push(vertex(cgeom::Vec2::new(b.0, b.1), 0.0));
+        count += 1;
     }
     (out, count)
 }
@@ -551,15 +574,26 @@ mod tests {
             .iter()
             .map(|&(x, y)| PolyVertex { p: Vec2::new(x, y), bulge: 0.0, start_width: 0.0, end_width: 0.0 })
             .collect();
+        let near = |q: Vec2, x: f64, y: f64| (q.x - x).abs() < 1e-9 && (q.y - y).abs() < 1e-9;
+        let k = 1.5 * 2f64.sqrt();
         let (v, n) = super::relief_vertices(&sq, 1.5, false);
         assert_eq!(n, 4);
-        assert_eq!(v.len(), 12);
-        // coin (10, 0) : boucle vers l'extérieur, selon la bissectrice (diamètre 3 mm)
-        let q = v[4].p;
-        assert!((q.x - (10.0 + 3.0 / 2f64.sqrt())).abs() < 1e-9 && (q.y + 3.0 / 2f64.sqrt()).abs() < 1e-9);
-        // T-bone : dans le prolongement du segment qui arrive (selon +X au coin (10, 0))
-        let (t, _) = super::relief_vertices(&sq, 1.5, true);
-        assert!((t[4].p.x - 13.0).abs() < 1e-9 && t[4].p.y.abs() < 1e-9);
+        assert_eq!(v.len(), 8);
+        // coin (10, 0) : le tracé quitte le bas à 1,5 x racine(2) du coin, passe par le coin
+        // en demi-cercle (fraise de rayon 1,5 centrée à l'intérieur) et reprend sur le côté droit
+        assert!(near(v[2].p, 10.0 - k, 0.0) && (v[2].bulge - 1.0).abs() < 1e-9);
+        assert!(near(v[3].p, 10.0, k) && v[3].bulge == 0.0);
+        // T-bone au coin (10, 0) : fraise centrée en (10, 1,5), tangente au bas, le dégagement
+        // entre de 1,5 mm dans la paroi droite (x = 11,5) et reprend en (10, 3)
+        let (t, n) = super::relief_vertices(&sq, 1.5, true);
+        assert_eq!(n, 4);
+        assert!(near(t[2].p, 10.0, 0.0) && (t[2].bulge - 1.0).abs() < 1e-9);
+        assert!(near(t[3].p, 10.0, 3.0));
+        // carré parcouru dans l'autre sens : mêmes points, arcs dans l'autre sens
+        let rev: Vec<PolyVertex> = sq.iter().rev().cloned().collect();
+        let (w, n) = super::relief_vertices(&rev, 1.5, false);
+        assert_eq!(n, 4);
+        assert!(w.iter().all(|x| x.bulge == 0.0 || (x.bulge + 1.0).abs() < 1e-9));
     }
 
     #[test]
