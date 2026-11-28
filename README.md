@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/FeBeSoft/makercraft/releases/tag/v0.1.0-beta.20261121"><img src="https://img.shields.io/badge/version-0.1.0%20b%C3%AAta%2020261121-orange" alt="Version 0.1.0 bêta 20261121"></a>
+  <a href="https://github.com/FeBeSoft/makercraft/releases/tag/v0.1.1-beta.20261128"><img src="https://img.shields.io/badge/version-0.1.1%20b%C3%AAta%2020261128-orange" alt="Version 0.1.1 bêta 20261128"></a>
   <img src="https://img.shields.io/badge/Windows-10%20%2F%2011%2064%20bits-blue" alt="Windows 10 / 11 64 bits">
   <img src="https://img.shields.io/badge/Rust-egui-blue" alt="Rust / egui">
   <img src="https://img.shields.io/badge/licence-GPL--3.0-green" alt="GPL-3.0">
@@ -20,9 +20,9 @@
   <img src="images/cnc-parcours.png" alt="MakerCraft - atelier CNC, parcours d'usinage" width="900">
 </p>
 
-## Version test / Test release : v0.1.0 bêta 20261121
+## Version test / Test release : v0.1.1 bêta 20261128
 
-**[Télécharger la version test](https://github.com/FeBeSoft/makercraft/releases/tag/v0.1.0-beta.20261121)** (Windows 10 / 11, 64 bits).
+**[Télécharger la version test](https://github.com/FeBeSoft/makercraft/releases/tag/v0.1.1-beta.20261128)** (Windows 10 / 11, 64 bits). Nouveautés : [notes de version](docs/versions/v0.1.1-beta.20261128.md) ; historique complet : [CHANGELOG](CHANGELOG.md).
 
 C'est une **préversion** : tout n'est pas fini, et elle sert surtout à recueillir vos avis. Essayez-la d'abord **avec l'émulateur intégré**, sans machine réelle. Ne l'utilisez pas encore pour un travail qui compte.
 
@@ -42,7 +42,7 @@ Six étapes, dans l'ordre de fabrication, une par onglet du ruban :
 
 - **Machine** : la machine de la banque (Genmitsu 3018-PRO pour l'instant), ses courses.
 - **Brut** : dimensions, matière, zéro pièce, zones de bridage interdites à l'outil.
-- **Dessin** : le moteur de dessin de CadCraft (ligne, polyligne, rectangle, cercle, arc, modifications, accroches, annuler) et l'import DXF / DWG. Un calque = un contour à usiner.
+- **Dessin** : le moteur de dessin de CadCraft, avec un ruban à groupes et des variantes au clic droit (cercles, arcs, ellipses, polygone, étoile, oblong, points de perçage...), une sélection à poignées façon Carbide Create (déplacer, mettre à l'échelle, tourner), la boîte des cotes façon Galaad (Entrée), les Propriétés, des réseaux qui restent liés à leur forme d'origine, l'édition des nœuds, les dégagements dogbone et T-bone, les aides au tracé (accroches, grille, ortho, polaire, calculs comme `W/2+5`), les lignes de construction et les cotes. Import DXF / DWG. Un calque = un contour à usiner, dans un arbre avec visibilité, verrou et commentaires.
 - **Parcours** : contour extérieur ou intérieur, sur le trait, poche, perçage, gravure. L'outil se choisit dans chaque parcours, et la banque d'outils propose les vitesses.
 - **Simulation** : contrôle des passages dans les brides, de la profondeur et de la durée.
 - **Usinage** : écriture du G-code Grbl, avec le rappel de l'outil et de la pince ER11 à chaque changement d'outil, et envoi direct vers l'atelier Machines.
