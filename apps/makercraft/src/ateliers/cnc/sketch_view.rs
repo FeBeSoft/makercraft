@@ -51,6 +51,8 @@ pub struct Outcome {
     pub status: Option<String>,
     /// Ouvrir la boîte des cotes de la sélection (Entrée).
     pub open_dims: bool,
+    /// Commande demandée par un menu, à lancer par l'atelier (mêmes règles que le ruban).
+    pub command: Option<&'static str>,
 }
 
 #[derive(Default)]
@@ -617,7 +619,7 @@ fn context_menu(ui: &mut Ui, sketch: &mut Sketch, list: &render::DisplayList, ou
         ("Décomposer", "explode"),
     ] {
         if ui.button(label).clicked() {
-            run_cmd(sketch, cmd, out);
+            out.command = Some(cmd);
         }
     }
     ui.separator();

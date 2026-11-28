@@ -135,6 +135,27 @@ impl Sketch {
         Ok(())
     }
 
+    /// Un des objets `hs` est-il un réseau associatif ?
+    pub fn has_array(&self, hs: &[doc::Handle]) -> bool {
+        self.drawing().is_some_and(|d| d.model.iter().any(|e| hs.contains(&e.handle) && d.array_params(e).is_some()))
+    }
+
+    /// Avant une commande de réseau : réseaux toujours associatifs (le lien avec la forme
+    /// d'origine reste, le réseau reste modifiable) et posés sur le contour de la forme choisie.
+    pub fn prepare_array(&mut self) {
+        let sel = self.session.selection();
+        if let Some(l) = sel.first().and_then(|h| self.layer_of(*h))
+            && l != self.current_layer()
+        {
+            self.set_current_layer(&l);
+        }
+        if self.drawing().is_some_and(|d| d.header.i64("ARRAYASSOCIATIVITY", 1) != 1)
+            && let Ok(d) = self.session.doc_mut()
+        {
+            d.header.set_i64("ARRAYASSOCIATIVITY", 1);
+        }
+    }
+
     /// Rayon de l'objet `h` s'il s'agit d'un cercle ou d'un arc.
     pub fn radius_of(&self, h: doc::Handle) -> Option<f64> {
         let e = self.drawing()?.model.iter().find(|e| e.handle == h)?;

@@ -114,6 +114,8 @@ pub struct Cnc {
     pub(crate) solo: Option<Vec<(String, bool)>>,
     /// Marquer l'origine dans la vue 3D (Options).
     pub origin_3d: bool,
+    /// Décomposer un réseau : confirmation demandée (le lien avec la forme d'origine se perd).
+    explode_confirm: bool,
 }
 
 impl Default for Cnc {
@@ -144,6 +146,7 @@ impl Default for Cnc {
             expanded: std::collections::BTreeSet::new(),
             solo: None,
             origin_3d: true,
+            explode_confirm: false,
         }
     }
 }
@@ -301,6 +304,14 @@ impl Cnc {
     /// Lance une commande de dessin de CadCraft (la commande en cours est annulée).
     fn draw_command(&mut self, name: &str, req: &mut Vec<Request>) {
         self.step = Step::Dessin;
+        let sel = self.sketch.session.selection();
+        if name == "explode" && !self.explode_confirm && self.sketch.has_array(&sel) {
+            self.explode_confirm = true;
+            return;
+        }
+        if name.starts_with("array") {
+            self.sketch.prepare_array();
+        }
         self.sketch.session.cancel();
         if let Err(e) = self.sketch.session.cmdline(name) {
             req.push(Request::Status(e.to_string()));
@@ -666,6 +677,10 @@ impl Cnc {
             if out.open_dims {
                 self.dims_open = true;
             }
+            if let Some(c) = out.command {
+                self.draw_command(c, req);
+            }
+            self.explode_window(ui, req);
             // objets des contours cachés ou verrouillés : hors sélection
             let sel = self.sketch.session.selection();
             let ok = self.sketch.editable(&sel);
@@ -718,6 +733,38 @@ impl Cnc {
         let mut tui = ui.new_child(UiBuilder::new().max_rect(tabs).layout(egui::Layout::left_to_right(egui::Align::Center)));
         for t in props::SideTab::ALL {
             tui.selectable_value(&mut self.side_tab, t, t.label());
+        }
+    }
+
+    /// Confirmation avant de décomposer un réseau.
+    fn explode_window(&mut self, ui: &mut Ui, req: &mut Vec<Request>) {
+        if !self.explode_confirm {
+            return;
+        }
+        let mut choice = None;
+        egui::Modal::new(egui::Id::unique("decomposer-reseau")).show(ui.ctx(), |ui| {
+            ui.set_width(380.0);
+            ui.label(egui::RichText::new("Décomposer le réseau ?").strong().size(15.0));
+            ui.add_space(4.0);
+            ui.label("Ses exemplaires deviennent des objets séparés : le réseau ne sera plus modifiable, et la forme d'origine ne le pilotera plus.");
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui.button("Décomposer").clicked() {
+                    choice = Some(true);
+                }
+                if ui.button("Annuler").clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                    choice = Some(false);
+                }
+            });
+        });
+        match choice {
+            Some(true) => {
+                // explode_confirm reste vrai le temps de relancer la commande sans redemander
+                self.draw_command("explode", req);
+                self.explode_confirm = false;
+            }
+            Some(false) => self.explode_confirm = false,
+            None => {}
         }
     }
 
