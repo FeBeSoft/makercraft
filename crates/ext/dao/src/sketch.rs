@@ -135,6 +135,15 @@ impl Sketch {
         Ok(())
     }
 
+    /// Pose une polyligne fermée (forme de `crate::shapes`) sur le contour courant, par la
+    /// commande `pline` de CadCraft (annulable) ; renvoie son identifiant.
+    pub fn add_closed_polyline(&mut self, v: &[crate::shapes::Vertex]) -> Result<Option<doc::Handle>, String> {
+        let vs: Vec<makercraft_ext_api::Value> = v.iter().map(|p| makercraft_ext_api::json!({ "p": [p.x, p.y], "bulge": p.bulge })).collect();
+        let before: Vec<doc::Handle> = self.drawing().map(|d| d.model.handles()).unwrap_or_default();
+        self.session.execute("pline", &makercraft_ext_api::json!({ "vertices": vs, "closed": true })).map_err(|e| e.to_string())?;
+        Ok(self.drawing().and_then(|d| d.model.handles().into_iter().find(|h| !before.contains(h))))
+    }
+
     /// Paramètres du réseau associatif `h` (None si ce n'en est pas un).
     pub fn array_of(&self, h: doc::Handle) -> Option<doc::ArrayParams> {
         let d = self.drawing()?;
@@ -330,6 +339,26 @@ pub fn flatten_bulges(v: &[cgeom::PolyVertex], closed: bool, tol: f64) -> Vec<cg
 
 #[cfg(test)]
 mod tests {
+    /// Étoile et oblong posés par `pline` : tracés fermés du contour courant.
+    #[test]
+    fn star_and_oblong_are_closed_contours() {
+        let mut sk = Sketch::new();
+        let layer = sk.current_layer();
+        let Ok(star) = crate::shapes::star(5, 25.0, 10.0, (50.0, 50.0), 0.0) else { panic!("étoile") };
+        let Ok(oblong) = crate::shapes::oblong(60.0, 20.0, true, (0.0, 0.0), 0.0) else { panic!("oblong") };
+        for v in [star, oblong] {
+            match sk.add_closed_polyline(&v) {
+                Ok(Some(_)) => {}
+                other => panic!("pose : {other:?}"),
+            }
+        }
+        let c = sk.contours(&layer, 0.01);
+        assert_eq!(c.len(), 2);
+        assert!(c.iter().all(|p| p.closed));
+        // l'oblong a ses demi-cercles : bien plus que 4 points
+        assert!(c.iter().any(|p| p.points.len() > 20));
+    }
+
     /// Le lien du réseau (forme d'origine + paramètres) survit à l'enregistrement DXF du .mkc,
     /// et le réseau reste modifiable après relecture.
     #[test]

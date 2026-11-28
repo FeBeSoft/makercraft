@@ -153,6 +153,18 @@ pub enum Icon {
     EllipseAxis,
     EllipseArc,
     ArrayPolar,
+    /// Point (perçage) et points multiples.
+    Point,
+    PointMulti,
+    /// Retourner (miroir sur place) horizontalement, verticalement.
+    FlipH,
+    FlipV,
+    /// Caler une forme par deux paires de points (source vers cible).
+    AlignPts,
+    /// Étirer une partie d'un tracé (fenêtre de capture).
+    Stretch,
+    /// Remplir le brut sans déformer.
+    FillStock,
     #[expect(dead_code, reason = "réseau le long d'un tracé : en attente d'un réseau associatif dans CadCraft")]
     ArrayPath,
 }
@@ -731,6 +743,42 @@ pub fn paint(p: &Painter, r: Rect, icon: Icon, c: Color32) {
             for (x, y) in [(0.12, 0.72), (0.42, 0.48), (0.82, 0.32)] {
                 p.rect_stroke(Rect::from_center_size(at(r, x, y), vec2(r.width() * 0.2, r.width() * 0.2)), CornerRadius::same(1), s, StrokeKind::Middle);
             }
+        }
+        Icon::Point => {
+            line(p, r, &[(0.2, 0.5), (0.8, 0.5)], Stroke::new(w * 0.6, c));
+            line(p, r, &[(0.5, 0.2), (0.5, 0.8)], Stroke::new(w * 0.6, c));
+            p.circle_filled(r.center(), w * 1.6, c);
+        }
+        Icon::PointMulti => {
+            for (x, y) in [(0.22, 0.3), (0.72, 0.24), (0.5, 0.74), (0.85, 0.7)] {
+                p.circle_filled(at(r, x, y), w * 1.4, c);
+            }
+        }
+        Icon::FlipH | Icon::FlipV => {
+            let tri_l: [(f32, f32); 4] = [(0.42, 0.18), (0.42, 0.82), (0.08, 0.82), (0.42, 0.18)];
+            let tri_r: [(f32, f32); 4] = [(0.58, 0.18), (0.58, 0.82), (0.92, 0.82), (0.58, 0.18)];
+            let f = |q: (f32, f32)| if icon == Icon::FlipH { q } else { (q.1, q.0) };
+            line(p, r, &tri_l.map(f), s);
+            let pts: Vec<Pos2> = tri_r.iter().map(|q| { let (x, y) = f(*q); at(r, x, y) }).collect();
+            p.extend(Shape::dashed_line(&pts, s, w * 2.0, w * 1.5));
+            let axis = if icon == Icon::FlipH { [(0.5, 0.04), (0.5, 0.96)] } else { [(0.04, 0.5), (0.96, 0.5)] };
+            line(p, r, &axis, Stroke::new(w * 0.6, c));
+        }
+        Icon::AlignPts => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.06, 0.5), at(r, 0.4, 0.9)), CornerRadius::ZERO, Stroke::new(w * 0.7, c), StrokeKind::Middle);
+            line(p, r, &[(0.52, 0.52), (0.94, 0.1), (0.94, 0.52), (0.52, 0.52)], s);
+            p.circle_filled(at(r, 0.06, 0.9), w * 1.3, c);
+            p.circle_filled(at(r, 0.52, 0.52), w * 1.3, c);
+        }
+        Icon::Stretch => {
+            line(p, r, &[(0.08, 0.7), (0.08, 0.3), (0.62, 0.3), (0.92, 0.5), (0.62, 0.7), (0.08, 0.7)], s);
+            p.extend(Shape::dashed_line(&[at(r, 0.5, 0.14), at(r, 0.98, 0.14), at(r, 0.98, 0.86), at(r, 0.5, 0.86), at(r, 0.5, 0.14)], Stroke::new(w * 0.6, c), w * 2.0, w * 1.5));
+        }
+        Icon::FillStock => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.06, 0.14), at(r, 0.94, 0.86)), CornerRadius::ZERO, Stroke::new(w * 0.7, c), StrokeKind::Middle);
+            p.circle_stroke(r.center(), r.height() * 0.3, s);
+            line(p, r, &[(0.24, 0.5), (0.06, 0.5)], s);
+            line(p, r, &[(0.76, 0.5), (0.94, 0.5)], s);
         }
         Icon::Link => {
             let k = CornerRadius::same((r.width() * 0.16) as u8);

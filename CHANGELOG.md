@@ -54,7 +54,12 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
   demande confirmation. Réseau rectangulaire créé d'un clic (2 x 2) puis réglé dans Propriétés :
   colonnes, rangées, pas ; réseau circulaire : nombre, angle, rotation des copies ; « Modifier la
   forme d'origine » puis « Terminer » met à jour tous les exemplaires. Le réseau le long d'un
-  tracé n'est pas proposé : CadCraft 0.20.1 n'en fait que des copies sans lien.
+  tracé n'est pas proposé : CadCraft 0.20.1 n'en fait que des copies sans lien. Un réseau choisi seul
+  ne montre que ses paramètres.
+- Dessin : Étoile (branches, rayons, rotation) et Oblong (longueur hors tout ou entraxe,
+  largeur), posés en polylignes fermées ; Point et Points multiples (repères de perçage) ;
+  Miroir avec variantes Retourner horizontalement / verticalement (sur place) ; Caler (deux
+  paires de points), Étirer, Remplir le brut (mise à l'échelle sans déformer, centrée).
 - Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
   rétablissent, chevrons étroits aux extrémités du ruban.
 

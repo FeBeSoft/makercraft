@@ -95,6 +95,17 @@ pub fn editor(ui: &mut Ui, pal: &Palette, st: &mut PropsState, sketch: &mut Sket
         ui.label(RichText::new("Aucune sélection. Cliquer un objet, ou glisser un rectangle dans la vue (vers la droite : objets entièrement dedans ; vers la gauche : objets touchés).").size(12.5).color(pal.weak));
         return msg;
     };
+    // un réseau choisi seul : ses paramètres seulement ; la forme se modifie par « Modifier la
+    // forme d'origine »
+    if let [one] = sel
+        && let Some(a) = sketch.array_of(*one)
+    {
+        if let Some(e) = array_fields(ui, pal, st, sketch, *one, &a) {
+            msg = Some(e);
+        }
+        ui.label(RichText::new("Entrée ou sortie du champ : appliqué à tous les exemplaires (annulable).").size(12.0).color(pal.weak));
+        return msg;
+    }
     let mut layers: Vec<String> = sel.iter().filter_map(|h| sketch.layer_of(*h)).collect();
     layers.sort();
     layers.dedup();
@@ -153,19 +164,12 @@ pub fn editor(ui: &mut Ui, pal: &Palette, st: &mut PropsState, sketch: &mut Sket
     {
         msg = Some(e);
     }
-    if let [one] = sel
-        && let Some(a) = sketch.array_of(*one)
-        && let Some(e) = array_fields(ui, pal, st, sketch, *one, &a)
-    {
-        msg = Some(e);
-    }
     ui.label(RichText::new("Entrée ou sortie du champ : appliqué (annulable).").size(12.0).color(pal.weak));
     msg
 }
 
 /// Paramètres d'un réseau associatif, modifiables : tous les exemplaires suivent (arrayedit).
 fn array_fields(ui: &mut Ui, pal: &Palette, st: &mut PropsState, sketch: &mut Sketch, h: doc::Handle, a: &doc::ArrayParams) -> Option<String> {
-    ui.separator();
     let mut edit = serde_json::Map::new();
     match &a.kind {
         doc::ArrayKind::Rect(r) => {

@@ -9,6 +9,7 @@
 //! Entités lues : LINE, LWPOLYLINE (avec arrondis « bulge »), POLYLINE/VERTEX, CIRCLE, ARC,
 //! POINT. Les autres (textes, cotes, splines, blocs) sont comptées et signalées, pas dessinées.
 
+pub mod shapes;
 pub mod sketch;
 pub use sketch::{LayerInfo, Sketch};
 

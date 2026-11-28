@@ -116,6 +116,24 @@ pub struct Cnc {
     pub origin_3d: bool,
     /// Décomposer un réseau : confirmation demandée (le lien avec la forme d'origine se perd).
     explode_confirm: bool,
+    /// Boîte Étoile / Oblong ouverte.
+    shape: Option<ShapeDialog>,
+}
+
+/// Boîte des formes paramétrées (étoile, oblong).
+#[derive(Debug, Clone, Copy)]
+struct ShapeDialog {
+    star: bool,
+    branches: u32,
+    outer: f64,
+    inner: f64,
+    length: f64,
+    width: f64,
+    /// Longueur hors tout (sinon entraxe des demi-cercles).
+    overall: bool,
+    rot: f64,
+    cx: f64,
+    cy: f64,
 }
 
 impl Default for Cnc {
@@ -147,6 +165,7 @@ impl Default for Cnc {
             solo: None,
             origin_3d: true,
             explode_confirm: false,
+            shape: None,
         }
     }
 }
@@ -430,9 +449,13 @@ impl Cnc {
                                 Variant::new("cnc.cmd.ellipse.arc", "Arc d'ellipse", "Arc d'ellipse", Icon::EllipseArc),
                             ]),
                             draw("cnc.cmd.polygon", "Polygone", Icon::Polygon).more(),
+                            draw("cnc.cmd.point", "Point", Icon::Point).more().tip("Point : repère de perçage").variants(vec![
+                                Variant::new("cnc.cmd.point", "Un point", "Point", Icon::Point),
+                                Variant::new("cnc.cmd.point.multiple", "Plusieurs points (Entrée termine)", "Points", Icon::PointMulti),
+                            ]),
                             draw("cnc.cmd.spline", "Spline", Icon::Spline).more(),
-                            draw("cnc.etoile", "Étoile", Icon::Star).more().enabled(false).tip("À venir"),
-                            draw("cnc.oblong", "Oblong", Icon::Oblong).more().enabled(false).tip("À venir"),
+                            draw("cnc.etoile", "Étoile", Icon::Star).more().tip("Étoile : branches, rayons, rotation"),
+                            draw("cnc.oblong", "Oblong", Icon::Oblong).more().tip("Oblong (rainure, boutonnière) : longueur, largeur"),
                         ],
                     },
                     Group {
@@ -441,7 +464,11 @@ impl Cnc {
                             modify("cnc.cmd.move", "Déplacer", Icon::Move),
                             modify("cnc.cmd.copy", "Copier", Icon::Copy),
                             modify("cnc.cmd.rotate", "Rotation", Icon::Rotate),
-                            modify("cnc.cmd.mirror", "Miroir", Icon::Mirror),
+                            modify("cnc.cmd.mirror", "Miroir", Icon::Mirror).variants(vec![
+                                Variant::new("cnc.cmd.mirror", "Par deux points (copie ou non)", "Miroir", Icon::Mirror),
+                                Variant::new("cnc.retourner_h", "Retourner horizontalement (sur place)", "Retourner H", Icon::FlipH),
+                                Variant::new("cnc.retourner_v", "Retourner verticalement (sur place)", "Retourner V", Icon::FlipV),
+                            ]),
                             modify("cnc.cmd.offset", "Décaler", Icon::Offset),
                             modify("cnc.cmd.fillet", "Raccord", Icon::Fillet),
                             modify("cnc.cmd.scale", "Échelle", Icon::Scale).more(),
@@ -451,12 +478,15 @@ impl Cnc {
                             modify("cnc.cmd.join", "Joindre", Icon::Join).more(),
                             modify("cnc.cmd.explode", "Décomposer", Icon::Explode).more(),
                             modify("cnc.cmd.chamfer", "Chanfrein", Icon::Chamfer).more(),
-                            // le long d'un tracé : pas encore associatif dans CadCraft 0.20.1 (copies sans lien),
-            // donc pas proposé tant que le lien avec la forme d'origine ne peut pas être gardé
-            modify("cnc.cmd.arrayrect", "Réseau", Icon::Array).more().variants(vec![
-                Variant::new("cnc.cmd.arrayrect", "Rectangulaire", "Réseau", Icon::Array),
-                Variant::new("cnc.cmd.arraypolar", "Circulaire", "Réseau circ.", Icon::ArrayPolar),
-            ]),
+                            // le long d'un tracé : pas encore associatif dans CadCraft 0.20.1 (copies sans
+                            // lien), donc pas proposé tant que le lien avec la forme d'origine ne tient pas
+                            modify("cnc.cmd.arrayrect", "Réseau", Icon::Array).more().variants(vec![
+                                Variant::new("cnc.cmd.arrayrect", "Rectangulaire", "Réseau", Icon::Array),
+                                Variant::new("cnc.cmd.arraypolar", "Circulaire", "Réseau circ.", Icon::ArrayPolar),
+                            ]),
+                            modify("cnc.cmd.align", "Caler", Icon::AlignPts).more().tip("Caler la sélection : point source puis point cible (deux paires pour tourner, mise à l'échelle au choix)"),
+                            modify("cnc.cmd.stretch", "Étirer", Icon::Stretch).more().tip("Étirer : fenêtre de capture (de droite à gauche), puis déplacement"),
+                            modify("cnc.remplir_brut", "Remplir le brut", Icon::FillStock).more().tip("Mettre la sélection à l'échelle du brut, sans déformer, et la centrer"),
                             modify("cnc.cmd.erase", "Effacer", Icon::Trash).more(),
                         ],
                     },
@@ -599,6 +629,14 @@ impl Cnc {
                     self.selected_path = None;
                 }
             }
+            "cnc.retourner_h" | "cnc.retourner_v" => self.flip(id == "cnc.retourner_h", req),
+            "cnc.remplir_brut" => self.fill_stock(req),
+            "cnc.etoile" | "cnc.oblong" => {
+                self.step = Step::Dessin;
+                let s = self.stock_rect();
+                let (cx, cy) = ((s[0] + s[2]) / 2.0, (s[1] + s[3]) / 2.0);
+                self.shape = Some(ShapeDialog { star: id == "cnc.etoile", branches: 5, outer: 25.0, inner: 10.0, length: 60.0, width: 20.0, overall: true, rot: 0.0, cx, cy });
+            }
             "cnc.rapides" => self.show_rapids = !self.show_rapids,
             "cnc.gcode" => panels::write_gcode(self, req, false),
             "cnc.envoyer" => panels::write_gcode(self, req, true),
@@ -702,6 +740,7 @@ impl Cnc {
                 self.draw_command(c, req);
             }
             self.explode_window(ui, req);
+            self.shape_window(ui, req);
             // objets des contours cachés ou verrouillés : hors sélection
             let sel = self.sketch.session.selection();
             let ok = self.sketch.editable(&sel);
@@ -754,6 +793,115 @@ impl Cnc {
         let mut tui = ui.new_child(UiBuilder::new().max_rect(tabs).layout(egui::Layout::left_to_right(egui::Align::Center)));
         for t in props::SideTab::ALL {
             tui.selectable_value(&mut self.side_tab, t, t.label());
+        }
+    }
+
+    /// Objets choisis modifiables et leur boîte (None et message s'il n'y en a pas).
+    fn selection_box(&mut self, req: &mut Vec<Request>) -> Option<(Vec<makercraft_dao::sketch::doc::Handle>, [f64; 4])> {
+        self.step = Step::Dessin;
+        let sel = self.sketch.editable(&self.sketch.session.selection());
+        match self.view2d.bbox_of(&self.sketch, &sel) {
+            Some(b) if !sel.is_empty() => Some((sel, b)),
+            _ => {
+                req.push(Request::Status("Choisir d'abord les objets (clic ou rectangle dans la vue)".into()));
+                None
+            }
+        }
+    }
+
+    /// Retourne la sélection sur place (miroir par son axe vertical ou horizontal, sans copie).
+    fn flip(&mut self, horizontal: bool, req: &mut Vec<Request>) {
+        let Some((sel, b)) = self.selection_box(req) else { return };
+        let (cx, cy) = ((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0);
+        let (p1, p2) = if horizontal { ([cx, b[1]], [cx, b[3]]) } else { ([b[0], cy], [b[2], cy]) };
+        let hs: Vec<String> = sel.iter().map(|h| h.hex()).collect();
+        if let Err(e) = self.sketch.session.execute("mirror", &serde_json::json!({ "handles": hs, "p1": p1, "p2": p2, "erase": true })) {
+            req.push(Request::Status(e.to_string()));
+        }
+    }
+
+    /// Met la sélection à l'échelle du brut sans la déformer, puis la centre dessus.
+    fn fill_stock(&mut self, req: &mut Vec<Request>) {
+        let Some((sel, b)) = self.selection_box(req) else { return };
+        let s = self.stock_rect();
+        let (w, h) = (b[2] - b[0], b[3] - b[1]);
+        let k = [(w, s[2] - s[0]), (h, s[3] - s[1])].iter().filter(|(a, _)| *a > 1e-9).map(|(a, t)| t / a).fold(f64::INFINITY, f64::min);
+        if !k.is_finite() || k <= 0.0 {
+            req.push(Request::Status("Sélection sans largeur ni hauteur".into()));
+            return;
+        }
+        let c = cg((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0);
+        let target = cg((s[0] + s[2]) / 2.0, (s[1] + s[3]) / 2.0);
+        let r = select_frame::Xform::Scale { base: c, factor: k }
+            .execute(&mut self.sketch, &sel)
+            .and_then(|()| select_frame::Xform::Move(cg(target.x - c.x, target.y - c.y)).execute(&mut self.sketch, &sel));
+        match r {
+            Ok(()) => req.push(Request::Status(format!("Sélection mise à l'échelle du brut (x {k:.3}) et centrée"))),
+            Err(e) => req.push(Request::Status(e)),
+        }
+    }
+
+    /// Boîte Étoile / Oblong : valeurs, centre (milieu du brut par défaut), puis Placer.
+    fn shape_window(&mut self, ui: &mut Ui, req: &mut Vec<Request>) {
+        let Some(mut d) = self.shape else { return };
+        let mut open = true;
+        let mut place = false;
+        let mut cancel = false;
+        let title = if d.star { "Étoile" } else { "Oblong" };
+        egui::Window::new(title).collapsible(false).resizable(false).open(&mut open).show(ui.ctx(), |ui| {
+            let row = |ui: &mut Ui, label: &str, v: &mut f64, min: f64, suffix: &str| {
+                ui.horizontal(|ui| {
+                    ui.add_sized(vec2(140.0, 20.0), egui::Label::new(label));
+                    ui.add(egui::DragValue::new(v).range(min..=1e5).speed(0.1).max_decimals(3).suffix(suffix));
+                });
+            };
+            if d.star {
+                ui.horizontal(|ui| {
+                    ui.add_sized(vec2(140.0, 20.0), egui::Label::new("Branches"));
+                    ui.add(egui::DragValue::new(&mut d.branches).range(3..=64));
+                });
+                row(ui, "Rayon extérieur", &mut d.outer, 0.01, " mm");
+                row(ui, "Rayon intérieur", &mut d.inner, 0.01, " mm");
+            } else {
+                ui.horizontal(|ui| {
+                    ui.add_sized(vec2(140.0, 20.0), egui::Label::new("Longueur"));
+                    ui.radio_value(&mut d.overall, true, "hors tout");
+                    ui.radio_value(&mut d.overall, false, "entraxe");
+                });
+                row(ui, "Longueur", &mut d.length, 0.01, " mm");
+                row(ui, "Largeur", &mut d.width, 0.01, " mm");
+            }
+            row(ui, "Rotation", &mut d.rot, -360.0, "°");
+            row(ui, "Centre X", &mut d.cx, -1e5, " mm");
+            row(ui, "Centre Y", &mut d.cy, -1e5, " mm");
+            ui.label(egui::RichText::new("Posée sur le contour courant ; elle se déplace ensuite avec le cadre de sélection ou dans Propriétés.").size(12.0).weak());
+            ui.horizontal(|ui| {
+                if ui.button("Placer").clicked() {
+                    place = true;
+                }
+                if ui.button("Annuler").clicked() {
+                    cancel = true;
+                }
+            });
+        });
+        self.shape = Some(d);
+        if place {
+            let v = if d.star {
+                makercraft_dao::shapes::star(d.branches, d.outer, d.inner, (d.cx, d.cy), d.rot)
+            } else {
+                makercraft_dao::shapes::oblong(d.length, d.width, d.overall, (d.cx, d.cy), d.rot)
+            };
+            match v.and_then(|v| self.sketch.add_closed_polyline(&v)) {
+                Ok(h) => {
+                    self.sketch.session.set_selection(h.into_iter().collect());
+                    self.side_tab = props::SideTab::Props;
+                    open = false;
+                }
+                Err(e) => req.push(Request::Status(e)),
+            }
+        }
+        if !open || cancel || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            self.shape = None;
         }
     }
 
