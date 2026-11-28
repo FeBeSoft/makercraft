@@ -62,6 +62,10 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
   paires de points), Étirer, Remplir le brut (mise à l'échelle sans déformer, centrée).
 - Contours : renommer sur place (double-clic, F2 ou clic droit ; parcours et commentaires suivent),
   sélectionner ses objets, supprimer un contour et ses objets après confirmation (annulable).
+- Contours : couleurs jamais répétées (14 couleurs distinctes, puis teintes réparties).
+- Dessin : barre des aides au tracé en bas à gauche de la vue : Accroches (F3, types au clic
+  droit), Grille magnétique (F9, pas au clic droit), Ortho (F8), Polaire (F10, pas d'angle au clic
+  droit).
 - Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
   rétablissent, chevrons étroits aux extrémités du ruban.
 

@@ -197,15 +197,13 @@ impl Sketch {
 
     /// Ajoute un calque s'il n'existe pas ; renvoie vrai s'il a été créé.
     pub fn add_layer(&mut self, name: &str) -> bool {
-        // couleurs bien distinctes pour les contours : bleu, rouge, vert, magenta, cyan, jaune...
-        const ACI: [u8; 8] = [5, 1, 3, 6, 4, 2, 30, 150];
         match self.session.doc_mut() {
             Ok(d) => {
                 let created = d.ensure_layer(name);
                 if created {
-                    let n = d.layers.len();
+                    let used: Vec<cadcraft_color::Color> = d.layers.iter().map(|l| l.color).collect();
                     if let Some(l) = d.layers.last_mut() {
-                        l.color = cadcraft_color::Color::Index(ACI[n % ACI.len()]);
+                        l.color = new_layer_color(&used);
                     }
                 }
                 created
@@ -271,6 +269,41 @@ fn close_path(layer: &str, mut pts: Vec<Vec2>) -> Path2 {
         pts.pop();
     }
     Path2 { layer: layer.to_owned(), points: pts, closed }
+}
+
+/// Couleur d'un nouveau contour, jamais déjà prise : d'abord des couleurs bien distinctes de la
+/// palette AutoCAD (bleu, rouge, vert, magenta, cyan, jaune, orange...), puis des teintes
+/// réparties par l'angle d'or, en couleurs vraies.
+pub fn new_layer_color(used: &[cadcraft_color::Color]) -> cadcraft_color::Color {
+    const ACI: [u8; 14] = [5, 1, 3, 6, 4, 2, 30, 150, 210, 90, 170, 40, 230, 120];
+    if let Some(i) = ACI.iter().find(|i| !used.contains(&cadcraft_color::Color::Index(**i))) {
+        return cadcraft_color::Color::Index(*i);
+    }
+    let mut k = used.len() as f64;
+    loop {
+        let h = (k * 137.508) % 360.0;
+        let c = hsv(h, 0.65, 0.95);
+        if !used.contains(&c) {
+            return c;
+        }
+        k += 1.0;
+    }
+}
+
+fn hsv(h: f64, s: f64, v: f64) -> cadcraft_color::Color {
+    let c = v * s;
+    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+    let m = v - c;
+    let (r, g, b) = match (h / 60.0) as u32 {
+        0 => (c, x, 0.0),
+        1 => (x, c, 0.0),
+        2 => (0.0, c, x),
+        3 => (0.0, x, c),
+        4 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+    let u = |f: f64| ((f + m) * 255.0).round().clamp(0.0, 255.0) as u8;
+    cadcraft_color::Color::True(cadcraft_color::Rgb(u(r), u(g), u(b)))
 }
 
 /// Échelle non uniforme d'un objet (`m` : la même transformation en matrice).
@@ -344,6 +377,16 @@ pub fn flatten_bulges(v: &[cgeom::PolyVertex], closed: bool, tol: f64) -> Vec<cg
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn layer_colors_never_repeat() {
+        let mut used = Vec::new();
+        for _ in 0..60 {
+            let c = super::new_layer_color(&used);
+            assert!(!used.contains(&c));
+            used.push(c);
+        }
+    }
+
     /// Étoile et oblong posés par `pline` : tracés fermés du contour courant.
     #[test]
     fn star_and_oblong_are_closed_contours() {

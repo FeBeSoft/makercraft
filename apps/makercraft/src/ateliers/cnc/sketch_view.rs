@@ -43,6 +43,61 @@ impl Xf {
 
 }
 
+/// Aides au tracé (barre en bas à gauche de la vue, F3 / F8 / F9 / F10).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Aids {
+    /// Accroches coupées (F3).
+    pub osnap_off: bool,
+    /// Types d'accroches (masque AutoCAD) ; 0 : celles par défaut.
+    pub osmode: u32,
+    /// Ortho (F8) : horizontal ou vertical depuis le point précédent.
+    pub ortho: bool,
+    /// Grille magnétique (F9) et son pas (0 : 5 mm).
+    pub grid_snap: bool,
+    pub grid_step: f64,
+    /// Polaire (F10) et son pas d'angle (0 : 15°).
+    pub polar: bool,
+    pub polar_step: f64,
+}
+
+/// Types d'accroches proposés : (bit AutoCAD, libellé).
+const SNAP_KINDS: [(u32, &str); 8] = [(1, "Extrémité"), (2, "Milieu"), (4, "Centre"), (16, "Quadrant"), (32, "Intersection"), (128, "Perpendiculaire"), (256, "Tangente"), (512, "Proche")];
+
+impl Aids {
+    pub fn osmode(&self) -> u32 {
+        if self.osmode == 0 { OSMODE } else { self.osmode }
+    }
+
+    fn grid(&self) -> f64 {
+        if self.grid_step > 0.0 { self.grid_step } else { 5.0 }
+    }
+
+    fn polar_deg(&self) -> f64 {
+        if self.polar_step > 0.0 { self.polar_step } else { 15.0 }
+    }
+
+    /// Point `w` contraint par la grille, puis par ortho ou polaire depuis `base`.
+    pub fn constrain(&self, w: WVec, base: Option<WVec>) -> WVec {
+        let mut p = w;
+        if self.grid_snap {
+            let g = self.grid();
+            p = WVec::new((p.x / g).round() * g, (p.y / g).round() * g);
+        }
+        if let Some(b) = base {
+            let d = p - b;
+            if self.ortho {
+                p = if d.x.abs() >= d.y.abs() { WVec::new(p.x, b.y) } else { WVec::new(b.x, p.y) };
+            } else if self.polar {
+                let len = (d.x * d.x + d.y * d.y).sqrt();
+                let step = self.polar_deg().to_radians();
+                let a = (d.y.atan2(d.x) / step).round() * step;
+                p = b + WVec::new(len * a.cos(), len * a.sin());
+            }
+        }
+        p
+    }
+}
+
 /// Ce que la vue rapporte à l'atelier.
 #[derive(Default)]
 pub struct Outcome {
@@ -68,6 +123,8 @@ pub struct SketchView {
     pub editable: bool,
     /// Ne pas marquer l'origine (zéro pièce) dans la vue.
     pub hide_origin: bool,
+    /// Aides au tracé : accroches, grille, ortho, polaire.
+    pub aids: Aids,
     /// Proportions déliées (Propriétés) : les poignées étirent sur un axe ; Ctrl inverse.
     pub free_scale: bool,
     /// Commandes de CadCraft refusées dans la ligne de commande (Options) : seules les valeurs
@@ -162,7 +219,9 @@ impl SketchView {
                 && let Ok(d) = s.doc()
             {
                 let base = s.current_prompt().and_then(|p| p.base);
-                self.snap = snap::osnap(d, &doc::Space::Model, w, APERTURE_PX / xf.scale, OSMODE, base, false);
+                if !self.aids.osnap_off {
+                    self.snap = snap::osnap(d, &doc::Space::Model, w, APERTURE_PX / xf.scale, self.aids.osmode(), base, false);
+                }
             }
             if self.drag.is_none()
                 && let Some(b) = frame
@@ -226,7 +285,8 @@ impl SketchView {
                 } else if let Some(hit) = self.snap {
                     s.input_snapped(hit)
                 } else {
-                    s.input(Input::Point(w))
+                    let base = s.current_prompt().and_then(|p| p.base);
+                    s.input(Input::Point(self.aids.constrain(w, base)))
                 }
             } else {
                 // hors commande : un clic choisit l'objet sous le curseur (et lui seul), dans le
@@ -298,7 +358,8 @@ impl SketchView {
             && let Some(c) = self.cursor
             && let Ok(d) = s.doc()
         {
-            let preview = s.preview(self.snap.as_ref().map_or(c, |h| h.point));
+            let base = s.current_prompt().and_then(|p| p.base);
+            let preview = s.preview(self.snap.as_ref().map_or_else(|| self.aids.constrain(c, base), |h| h.point));
             if !preview.is_empty() {
                 let opts = render::Options { tolerance: tol, ..render::Options::default() };
                 let pl = render::build_entities(d, preview.iter(), &opts);
@@ -316,6 +377,11 @@ impl SketchView {
         }
         p.rect_stroke(canvas, CornerRadius::same(10), Stroke::new(1.0, pal.card_line), StrokeKind::Inside);
 
+        // ----------------------------------------------------------------- aides au tracé
+        if editable {
+            self.aids_bar(ui, canvas, pal);
+        }
+
         // ----------------------------------------------------------------- menus
         if editable {
             resp.context_menu(|ui| context_menu(ui, sketch, &list, &mut out));
@@ -330,6 +396,101 @@ impl SketchView {
         let after = sketch.session.state().map_or(0, |st| Arc::as_ptr(&st.doc) as usize);
         out.changed = before != after;
         out
+    }
+
+    /// Barre des aides au tracé, en bas à gauche de la vue ; clic : marche / arrêt, clic droit :
+    /// réglages. F3 accroches, F8 ortho, F9 grille, F10 polaire.
+    fn aids_bar(&mut self, ui: &mut Ui, canvas: Rect, pal: &Palette) {
+        let a = &mut self.aids;
+        if !ui.ctx().egui_wants_keyboard_input() {
+            ui.input(|i| {
+                if i.key_pressed(Key::F3) {
+                    a.osnap_off = !a.osnap_off;
+                }
+                if i.key_pressed(Key::F8) {
+                    a.ortho = !a.ortho;
+                    a.polar &= !a.ortho;
+                }
+                if i.key_pressed(Key::F9) {
+                    a.grid_snap = !a.grid_snap;
+                }
+                if i.key_pressed(Key::F10) {
+                    a.polar = !a.polar;
+                    a.ortho &= !a.polar;
+                }
+            });
+        }
+        let labels = [
+            ("Accroches", !a.osnap_off, "F3 : accroches aux objets ; clic droit : types d'accroches"),
+            ("Grille", a.grid_snap, "F9 : points sur la grille ; clic droit : pas"),
+            ("Ortho", a.ortho, "F8 : traits horizontaux ou verticaux"),
+            ("Polaire", a.polar, "F10 : angles par pas ; clic droit : pas d'angle"),
+        ];
+        let font = theme::regular(11.5);
+        let mut x = canvas.left() + 10.0;
+        let y = canvas.bottom() - 30.0;
+        for (k, (label, on, tip)) in labels.iter().enumerate() {
+            let text = match k {
+                1 => format!("{label} {} mm", fmt_num(a.grid())),
+                3 => format!("{label} {}°", fmt_num(a.polar_deg())),
+                _ => (*label).to_owned(),
+            };
+            let w = ui.painter().layout_no_wrap(text.clone(), font.clone(), pal.text).size().x + 16.0;
+            let r = Rect::from_min_size(pos2(x, y), vec2(w, 22.0));
+            let resp = ui.interact(r, ui.scope_id().with(("aide-trace", k)), Sense::click()).on_hover_text(*tip);
+            resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, true, *on, *label));
+            let p = ui.painter();
+            p.rect_filled(r, CornerRadius::same(5), if *on { theme::mix(pal.card, pal.blue, 0.25) } else { pal.card });
+            p.rect_stroke(r, CornerRadius::same(5), Stroke::new(1.0, if *on { pal.blue } else { pal.card_line }), StrokeKind::Inside);
+            p.text(r.center(), Align2::CENTER_CENTER, text, font.clone(), if *on { pal.text } else { pal.weak });
+            if resp.clicked() {
+                match k {
+                    0 => a.osnap_off = !a.osnap_off,
+                    1 => a.grid_snap = !a.grid_snap,
+                    2 => {
+                        a.ortho = !a.ortho;
+                        a.polar &= !a.ortho;
+                    }
+                    _ => {
+                        a.polar = !a.polar;
+                        a.ortho &= !a.polar;
+                    }
+                }
+            }
+            resp.context_menu(|ui| match k {
+                0 => {
+                    let mut m = a.osmode();
+                    for (bit, name) in SNAP_KINDS {
+                        let mut on = m & bit != 0;
+                        if ui.checkbox(&mut on, name).changed() {
+                            m = if on { m | bit } else { m & !bit };
+                            a.osmode = m.max(1);
+                        }
+                    }
+                }
+                1 => {
+                    for g in [0.5, 1.0, 2.0, 2.5, 5.0, 10.0] {
+                        if ui.radio(a.grid() == g, format!("{} mm", fmt_num(g))).clicked() {
+                            a.grid_step = g;
+                            a.grid_snap = true;
+                        }
+                    }
+                }
+                3 => {
+                    for g in [5.0, 10.0, 15.0, 30.0, 45.0, 90.0] {
+                        if ui.radio(a.polar_deg() == g, format!("{}°", fmt_num(g))).clicked() {
+                            a.polar_step = g;
+                            a.polar = true;
+                            a.ortho = false;
+                        }
+                    }
+                }
+                _ => {
+                    ui.label("Pas de réglage");
+                }
+            });
+            x = r.right() + 4.0;
+        }
     }
 
     /// Boîte englobante des objets `hs` (mm), d'après le dernier affichage.
@@ -642,6 +803,12 @@ fn run_cmd(sketch: &mut Sketch, cmd: &str, out: &mut Outcome) {
 
 fn status<T, E: std::fmt::Display>(r: Result<T, E>) -> Option<String> {
     r.err().map(|e| e.to_string())
+}
+
+/// Nombre sans zéros inutiles (2,5 ; 10).
+fn fmt_num(v: f64) -> String {
+    let s = format!("{v:.2}");
+    s.trim_end_matches('0').trim_end_matches('.').replace('.', ",")
 }
 
 fn snap_label(name: &str) -> &str {
