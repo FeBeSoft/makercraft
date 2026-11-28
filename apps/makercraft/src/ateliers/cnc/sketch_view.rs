@@ -227,7 +227,24 @@ impl SketchView {
                     s.input(Input::Point(w))
                 }
             } else {
-                s.idle_click(w, shift)
+                // hors commande : un clic choisit l'objet sous le curseur (et lui seul), dans le
+                // vide il vide la sélection ; Maj ajoute ou retire l'objet (Carbide Create, Galaad)
+                match s.pick_object(&doc::Space::Model, w, APERTURE_PX / xf.scale) {
+                    Ok(hit) => {
+                        let mut sel = if shift { s.selection() } else { Vec::new() };
+                        if let Some(h) = hit {
+                            match sel.iter().position(|x| *x == h) {
+                                Some(i) => {
+                                    sel.remove(i);
+                                }
+                                None => sel.push(h),
+                            }
+                        }
+                        s.set_selection(sel);
+                        Ok(())
+                    }
+                    Err(e) => Err(e),
+                }
             };
             if let Err(e) = r {
                 out.status = Some(e.to_string());

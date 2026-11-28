@@ -302,6 +302,9 @@ impl App {
         let right = Rect::from_min_max(pos2(r.center().x + 130.0, r.top() + 5.0), pos2(r.right() - 12.0, r.bottom() - 5.0));
         let mut rr = ui.new_child(UiBuilder::new().max_rect(right).layout(egui::Layout::right_to_left(egui::Align::Center)));
         menu_style(&mut rr, pal);
+        // tout à droite : Aide, puis Options à sa gauche
+        self.help_menu(&mut rr, actions);
+        rr.add_space(6.0);
         let (gear, g) = rr.allocate_exact_size(vec2(100.0, 30.0), Sense::click());
         g.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, "Options"));
         p.rect_filled(gear, CornerRadius::same(8), if g.hovered() { pal.hover } else { pal.bar });
@@ -344,7 +347,6 @@ impl App {
             self.updater.start();
         }
         rr.add_space(10.0);
-        self.help_menu(&mut rr, actions);
         self.extensions_menu(&mut rr, actions);
     }
 
