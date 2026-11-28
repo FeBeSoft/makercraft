@@ -452,7 +452,16 @@ impl Cnc {
                     view_clone(&view),
                 ],
                 Step::Dessin => vec![
-                    Group { label: "Fichier", items: vec![Item::large("cnc.importer", "Importer", Icon::Open).tone(Tone::Design).tip("Remplacer le dessin par un DXF ou un DWG")] },
+                    Group {
+                        label: "Fichier",
+                        items: vec![Item::large("cnc.importer", "Importer", Icon::Open).tone(Tone::Design).tip("Importer un dessin : choisir le format").menu().variants(vec![
+                            Variant::new("cnc.importer", "DXF ou DWG (AutoCAD, CadCraft...)", "Importer", Icon::Open),
+                            Variant::new("cnc.importer_c2d", "Carbide Create (.c2d)", "c2d", Icon::Open).off(),
+                            Variant::new("cnc.importer_gal", "Galaad (.gal)", "gal", Icon::Open).off(),
+                            Variant::new("cnc.importer_svg", "SVG (Inkscape...)", "svg", Icon::Open).off(),
+                            Variant::new("cnc.importer_step", "Pièce 3D, vue de dessus (STEP)", "step", Icon::Open).off(),
+                        ])],
+                    },
                     Group {
                         label: "Dessiner",
                         items: vec![
@@ -1229,6 +1238,7 @@ fn clone_item(i: &Item) -> Item {
         selected: i.selected,
         width: i.width,
         variants: i.variants.clone(),
+        menu: i.menu,
     }
 }
 

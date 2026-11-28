@@ -84,6 +84,8 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
 - Dessin : Historique de construction dans la colonne de droite (clic sur une étape : revenir
   juste après ; caché à la prochaine action) ; points de construction (contour Construction) ;
   croix bleue au point qui sera pris par la grille, l'ortho ou le polaire.
+- Dessin : Importer ouvre au clic la liste des formats (DXF / DWG ; c2d, gal, SVG, STEP grisés,
+  à venir).
 - Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
   rétablissent, chevrons étroits aux extrémités du ruban.
 

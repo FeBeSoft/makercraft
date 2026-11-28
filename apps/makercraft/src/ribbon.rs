@@ -42,11 +42,19 @@ pub struct Variant {
     pub short: &'static str,
     /// Icône propre à la variante.
     pub icon: Icon,
+    /// Disponible (sinon grisée, « à venir »).
+    pub enabled: bool,
 }
 
 impl Variant {
     pub const fn new(id: &'static str, label: &'static str, short: &'static str, icon: Icon) -> Self {
-        Self { id, label, short, icon }
+        Self { id, label, short, icon, enabled: true }
+    }
+
+    /// Variante pas encore disponible : affichée grisée.
+    pub const fn off(mut self) -> Self {
+        self.enabled = false;
+        self
     }
 }
 
@@ -71,11 +79,13 @@ pub struct Item {
     pub more: bool,
     /// Variantes (clic droit) ; la dernière utilisée est affichée et lancée par un clic.
     pub variants: Vec<Variant>,
+    /// Un clic (gauche ou droit) ouvre la liste des variantes au lieu de lancer la commande.
+    pub menu: bool,
 }
 
 impl Item {
     pub fn large(id: &'static str, label: &'static str, icon: Icon) -> Self {
-        Self { id, label, icon, large: true, enabled: true, checked: None, tone: Tone::Plain, tip: String::new(), choices: Vec::new(), selected: 0, width: 0.0, more: false, variants: Vec::new() }
+        Self { id, label, icon, large: true, enabled: true, checked: None, tone: Tone::Plain, tip: String::new(), choices: Vec::new(), selected: 0, width: 0.0, more: false, variants: Vec::new(), menu: false }
     }
 
     /// Liste déroulante dans une colonne de petits boutons.
@@ -85,6 +95,12 @@ impl Item {
 
     pub fn small(id: &'static str, label: &'static str, icon: Icon) -> Self {
         Self { large: false, ..Self::large(id, label, icon) }
+    }
+
+    /// Le bouton ouvre ses variantes au clic gauche comme au clic droit (menu).
+    pub fn menu(mut self) -> Self {
+        self.menu = true;
+        self
     }
 
     /// Variantes au clic droit ; la première est celle par défaut.
@@ -278,10 +294,10 @@ impl Ribbon {
                     let w = large_width(&p, it.label);
                     let br = Rect::from_min_size(pos2(x, top), vec2(w, GROUP_H - 8.0));
                     let (c, menu) = button(&child, &p, pal, br, it, true, self.shown(it));
-                    if c {
+                    if c && !it.menu {
                         clicked = Some(self.shown(it).0);
                     }
-                    if menu {
+                    if menu || (c && it.menu) {
                         self.flyout = Some((it.id, br.left_bottom() + vec2(0.0, 2.0), ui.ctx().cumulative_pass_nr()));
                     }
                     x = br.right() + 2.0;
@@ -432,13 +448,15 @@ impl Ribbon {
                     ui.set_min_width(200.0);
                     ui.label(egui::RichText::new(it.label).size(11.0).color(pal.dim));
                     for v in &it.variants {
-                        let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width().max(200.0), 26.0), Sense::click());
-                        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, it.enabled, v.label));
+                        let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width().max(200.0), 26.0), if v.enabled { Sense::click() } else { Sense::hover() });
+                        let resp = if v.enabled { resp } else { resp.on_hover_text("À venir") };
+                        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, it.enabled && v.enabled, v.label));
                         if v.id == cur || resp.hovered() {
                             ui.painter().rect_filled(r, CornerRadius::same(5), if resp.hovered() { pal.hover } else { theme::mix(pal.bar, pal.blue, 0.2) });
                         }
-                        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.left() + 14.0, r.center().y), vec2(18.0, 18.0)), v.icon, tone_color(pal, it.tone));
-                        ui.painter().text(pos2(r.left() + 30.0, r.center().y), Align2::LEFT_CENTER, v.label, theme::regular(12.5), pal.text);
+                        let (ic, tc) = if v.enabled { (tone_color(pal, it.tone), pal.text) } else { (theme::alpha(pal.dim, 0.7), pal.dim) };
+                        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.left() + 14.0, r.center().y), vec2(18.0, 18.0)), v.icon, ic);
+                        ui.painter().text(pos2(r.left() + 30.0, r.center().y), Align2::LEFT_CENTER, v.label, theme::regular(12.5), tc);
                         if v.id == cur {
                             ui.painter().text(pos2(r.right() - 8.0, r.center().y), Align2::RIGHT_CENTER, "dernière", theme::regular(10.5), pal.dim);
                         }
@@ -449,8 +467,10 @@ impl Ribbon {
                 });
             });
             if let Some(v) = pick {
-                self.chosen.insert(id.to_owned(), v.to_owned());
-                self.chosen_changed = true;
+                if !it.menu {
+                    self.chosen.insert(id.to_owned(), v.to_owned());
+                    self.chosen_changed = true;
+                }
                 self.flyout = None;
                 self.open = None;
                 clicked = Some(v);
@@ -551,7 +571,7 @@ fn button(ui: &Ui, p: &egui::Painter, pal: &Palette, r: Rect, it: &Item, large: 
         icons::paint(p, Rect::from_center_size(pos2(r.left() + 14.0, r.center().y), vec2(16.0, 16.0)), icon, icon_c);
         p.text(pos2(r.left() + 28.0, r.center().y), Align2::LEFT_CENTER, label, theme::regular(12.5), text_c);
     }
-    let has_variants = !it.variants.is_empty();
+    let has_variants = !it.variants.is_empty() && !it.menu;
     if has_variants {
         // petit coin en bas à droite : variantes au clic droit
         let c = if large { pos2(r.right() - 4.0, r.top() + 38.0) } else { pos2(r.right() - 3.0, r.bottom() - 3.0) };
@@ -562,7 +582,7 @@ fn button(ui: &Ui, p: &egui::Painter, pal: &Palette, r: Rect, it: &Item, large: 
         (true, false) => resp,
         (false, false) => resp.on_hover_text(&it.tip),
     };
-    (it.enabled && resp.clicked(), it.enabled && has_variants && resp.secondary_clicked())
+    (it.enabled && resp.clicked(), it.enabled && !it.variants.is_empty() && resp.secondary_clicked())
 }
 
 #[cfg(test)]
