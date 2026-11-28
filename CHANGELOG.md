@@ -66,6 +66,8 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
 - Dessin : barre des aides au tracé en bas à gauche de la vue : Accroches (F3, types au clic
   droit), Grille magnétique (F9, pas au clic droit), Ortho (F8), Polaire (F10, pas d'angle au clic
   droit).
+- Dessin : édition des nœuds par double-clic sur un objet : ses poignées (sommets, milieux,
+  centre) se glissent, avec accroches et aides au tracé ; Échap ou clic dans le vide pour finir.
 - Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
   rétablissent, chevrons étroits aux extrémités du ruban.
 

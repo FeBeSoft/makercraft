@@ -125,6 +125,9 @@ pub struct SketchView {
     pub hide_origin: bool,
     /// Aides au tracé : accroches, grille, ortho, polaire.
     pub aids: Aids,
+    /// Édition des nœuds (double-clic sur un objet) : l'objet, et la poignée glissée.
+    nodes: Option<doc::Handle>,
+    node_drag: Option<usize>,
     /// Proportions déliées (Propriétés) : les poignées étirent sur un axe ; Ctrl inverse.
     pub free_scale: bool,
     /// Commandes de CadCraft refusées dans la ligne de commande (Options) : seules les valeurs
@@ -201,7 +204,14 @@ impl SketchView {
         let list = self.list(sketch, tol);
         let running = sketch.session.running.is_some();
         // cadre de sélection : objets choisis, modifiables, hors commande
-        let frame_sel = if editable && !running { sketch.editable(&sketch.session.selection()) } else { Vec::new() };
+        // l'objet en édition des nœuds doit rester modifiable et choisi
+        if let Some(h) = self.nodes
+            && (running || sketch.editable(&[h]).is_empty() || sketch.session.selection() != [h])
+        {
+            self.nodes = None;
+            self.node_drag = None;
+        }
+        let frame_sel = if editable && !running && self.nodes.is_none() { sketch.editable(&sketch.session.selection()) } else { Vec::new() };
         let frame = if frame_sel.is_empty() { None } else { select_frame::bbox(&list, &frame_sel) };
         let (shift, ctrl, pointer) = ui.input(|i| (i.modifiers.shift, i.modifiers.command, i.pointer.interact_pos()));
         let free = self.free_scale != ctrl;
@@ -215,7 +225,7 @@ impl SketchView {
             s.cursor = w;
             self.cursor = Some(w);
             self.snap = None;
-            if editable && running && !s.picking_objects()
+            if editable && ((running && !s.picking_objects()) || self.node_drag.is_some())
                 && let Ok(d) = s.doc()
             {
                 let base = s.current_prompt().and_then(|p| p.base);
@@ -240,9 +250,16 @@ impl SketchView {
         if editable && !running && resp.drag_started_by(egui::PointerButton::Primary)
             && let Some(o) = ui.input(|i| i.pointer.press_origin())
         {
-            match frame.and_then(|b| select_frame::hit(&xf, b, o).map(|g| (b, g))) {
+            let node = self.nodes.and_then(|h| s.grips_of(h).ok()).and_then(|g| g.iter().position(|q| xf.to_screen(*q).distance(o) <= 8.0));
+            if node.is_some() {
+                self.node_drag = node;
+            } else if self.nodes.is_some() {
+                self.window = Some(o);
+            } else {
+                match frame.and_then(|b| select_frame::hit(&xf, b, o).map(|g| (b, g))) {
                 Some((bbox, grip)) => self.drag = Some(select_frame::Drag { grip, start: xf.to_world(o), bbox }),
                 None => self.window = Some(o),
+                }
             }
         }
         let pan = resp.dragged_by(egui::PointerButton::Middle) || (resp.dragged_by(egui::PointerButton::Primary) && !editable);
@@ -255,7 +272,13 @@ impl SketchView {
         }
         let active = self.drag.zip(pointer).map(|(d, p)| d.xform(xf.to_world(p), shift, free));
         if resp.drag_stopped() {
-            if let (Some(x), Some(_)) = (active, self.drag.take()) {
+            if let (Some(i), Some(h), Some(p)) = (self.node_drag.take(), self.nodes, pointer) {
+                // sommet déplacé : accroche, sinon aides au tracé (grille...)
+                let w = self.snap.as_ref().map_or_else(|| self.aids.constrain(xf.to_world(p), None), |hit| hit.point);
+                if let Err(e) = sketch.session.grip_edit(h, i, w, makercraft_dao::sketch::engine::grips::GripMode::Stretch) {
+                    out.status = Some(e.to_string());
+                }
+            } else if let (Some(x), Some(_)) = (active, self.drag.take()) {
                 if let Err(e) = x.execute(sketch, &frame_sel) {
                     out.status = Some(e);
                 }
@@ -312,6 +335,17 @@ impl SketchView {
                 out.status = Some(e.to_string());
             }
         }
+        // double-clic sur un objet : édition de ses nœuds (sommets, milieux, centre)
+        if editable && !running && resp.double_clicked()
+            && let Some(hp) = resp.interact_pointer_pos()
+            && let Ok(Some(h)) = sketch.session.pick_object(&doc::Space::Model, xf.to_world(hp), APERTURE_PX / xf.scale)
+            && !sketch.editable(&[h]).is_empty()
+        {
+            self.nodes = Some(h);
+            sketch.session.set_selection(vec![h]);
+            out.status = Some("Édition des nœuds : glisser un sommet ; Échap ou clic dans le vide pour finir".into());
+        }
+        let s = &mut sketch.session;
         // bouton du milieu : menu des vues (le glissement, lui, déplace la vue)
         if resp.clicked_by(egui::PointerButton::Middle) {
             self.zoom_menu = resp.interact_pointer_pos().map(|p| (p, ui.ctx().cumulative_pass_nr()));
@@ -320,7 +354,7 @@ impl SketchView {
         // ----------------------------------------------------------------- clavier
         if editable && (resp.hovered() || typing) {
             // Échap : d'abord le geste en cours, sinon la commande et la sélection
-            if ui.input(|i| i.key_pressed(Key::Escape)) && self.drag.take().is_none() && self.window.take().is_none() {
+            if ui.input(|i| i.key_pressed(Key::Escape)) && self.drag.take().is_none() && self.window.take().is_none() && self.nodes.take().is_none() {
                 s.cancel();
                 s.set_selection(Vec::new());
                 self.cmdline.clear();
@@ -351,6 +385,22 @@ impl SketchView {
         }
         if let (Some(a), Some(b)) = (self.window, pointer) {
             select_frame::paint_window(&p, a, b, pal.blue);
+        }
+        if let Some(h) = self.nodes
+            && let Ok(g) = sketch.session.grips_of(h)
+        {
+            for (k, q) in g.iter().enumerate() {
+                let c = xf.to_screen(*q);
+                let hot = pointer.is_some_and(|m| m.distance(c) <= 8.0) || self.node_drag == Some(k);
+                p.rect(Rect::from_center_size(c, vec2(9.0, 9.0)), CornerRadius::same(1), if hot { pal.orange } else { pal.canvas }, Stroke::new(1.5, pal.orange), StrokeKind::Middle);
+            }
+            if let (Some(k), Some(m)) = (self.node_drag, pointer)
+                && let Some(q) = g.get(k)
+            {
+                let to = self.snap.as_ref().map_or(m, |hit| xf.to_screen(hit.point));
+                p.extend(egui::Shape::dashed_line(&[xf.to_screen(*q), to], Stroke::new(1.2, pal.orange), 5.0, 4.0));
+                p.rect_stroke(Rect::from_center_size(to, vec2(9.0, 9.0)), CornerRadius::same(1), Stroke::new(1.5, pal.orange), StrokeKind::Middle);
+            }
         }
         let s = &mut sketch.session;
         if editable
