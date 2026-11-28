@@ -22,6 +22,8 @@ pub struct LayerInfo {
     pub name: String,
     pub rgb: [u8; 3],
     pub visible: bool,
+    /// Calque verrouillé : ses objets ne se modifient pas.
+    pub locked: bool,
     /// Nombre d'objets sur le calque.
     pub objects: usize,
 }
@@ -92,10 +94,33 @@ impl Sketch {
                     name: l.name.clone(),
                     rgb: [c.0, c.1, c.2],
                     visible: l.on && !l.frozen,
+                    locked: l.locked,
                     objects: d.model.iter().filter(|e| e.common.layer == l.name).count(),
                 }
             })
             .collect()
+    }
+
+    /// Les objets de `hs` modifiables : ni sur un calque verrouillé, ni sur un calque caché.
+    pub fn editable(&self, hs: &[doc::Handle]) -> Vec<doc::Handle> {
+        let Some(d) = self.drawing() else { return Vec::new() };
+        let ok = |name: &str| d.layers.iter().find(|l| l.name == name).is_none_or(|l| l.on && !l.frozen && !l.locked);
+        d.model.iter().filter(|e| hs.contains(&e.handle) && ok(&e.common.layer)).map(|e| e.handle).collect()
+    }
+
+    /// Calque de l'objet `h`.
+    pub fn layer_of(&self, h: doc::Handle) -> Option<String> {
+        self.drawing()?.model.iter().find(|e| e.handle == h).map(|e| e.common.layer.clone())
+    }
+
+    /// Rayon de l'objet `h` s'il s'agit d'un cercle ou d'un arc.
+    pub fn radius_of(&self, h: doc::Handle) -> Option<f64> {
+        let e = self.drawing()?.model.iter().find(|e| e.handle == h)?;
+        match &e.kind {
+            doc::EntityKind::Circle(c) => Some(c.radius),
+            doc::EntityKind::Arc(a) => Some(a.radius),
+            _ => None,
+        }
     }
 
     pub fn current_layer(&self) -> String {

@@ -15,8 +15,8 @@ pub const STAGE: &str = "bêta 20261121";
 pub fn version_label() -> String {
     format!("v{} {STAGE}", env!("CARGO_PKG_VERSION"))
 }
-/// Dépôt GitHub du logiciel : vide tant qu'il n'est pas publié.
-pub const GITHUB_REPO: &str = "";
+/// Dépôt GitHub du logiciel (publié le 21/11/2026).
+pub const GITHUB_REPO: &str = "https://github.com/FeBeSoft/makercraft";
 pub const GITHUB_ACCOUNT: &str = "https://github.com/FeBeSoft";
 
 pub const TAGLINE: &str = "Ateliers CNC, Laser, PCB et Machines pour le fablab et l'enseignement de la Technologie";
@@ -88,7 +88,7 @@ pub fn main_library() -> String {
 }
 
 /// Ce que fait MakerCraft en particulier, affiché après la déclaration commune.
-pub const RGPD_MAKERCRAFT: &str = "MakerCraft en particulier : il ne fait aucune connexion réseau. Il dialogue avec les machines (CNC, laser) uniquement par les ports USB ou série de votre ordinateur. Dessins, projets, banque d'outils, réglages et fichiers récents sont enregistrés sur votre ordinateur et n'en sortent que si vous les envoyez vous-même. Il n'y a pas de vérification automatique des mises à jour pour l'instant ; si elle est ajoutée, elle suivra la règle ci-dessus et pourra être désactivée.";
+pub const RGPD_MAKERCRAFT: &str = "MakerCraft en particulier : il ne fait aucune connexion réseau de lui-même. Il dialogue avec les machines (CNC, laser) uniquement par les ports USB ou série de votre ordinateur. Dessins, projets, banque d'outils, réglages et fichiers récents sont enregistrés sur votre ordinateur et n'en sortent que si vous les envoyez vous-même. Seul le bouton « Mettre à jour » interroge GitHub, et seulement quand vous cliquez dessus : la requête demande la dernière version publiée et n'envoie aucune donnée personnelle. Il n'y a pas de vérification automatique.";
 
 /// Texte complet de l'onglet « RGPD ».
 pub fn rgpd() -> String {

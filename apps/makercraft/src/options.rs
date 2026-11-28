@@ -34,7 +34,7 @@ pub enum Page {
 impl Page {
     fn tabs(self) -> &'static [&'static str] {
         match self {
-            Self::General => &["Interface", "Démarrage"],
+            Self::General => &["Interface", "Dessin", "Démarrage"],
             Self::Files => &["Dossiers", "Récents"],
             Self::Extension(_) => &["Commandes"],
             Self::About => &["Le logiciel", "L'Auteur", "Droits d'auteur", "RGPD", "Sources", "Mises à jour", "Contact"],
@@ -158,6 +158,9 @@ impl Options {
                         self.draft.theme = d.theme;
                         self.draft.units = d.units;
                         self.draft.remember_atelier = d.remember_atelier;
+                        self.draft.cadcraft_commands = d.cadcraft_commands;
+                        self.draft.origin_2d = d.origin_2d;
+                        self.draft.origin_3d = d.origin_3d;
                     }
                     fui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if widgets::button(ui, pal, None, "Appliquer", Kind::Primary, true).clicked() {
@@ -264,6 +267,18 @@ impl Options {
             ui.set_width(ui.available_width() - 6.0);
             match (self.page, self.tab) {
                 (Page::General, 0) => self.general_interface(ui, pal),
+                (Page::General, 1) => {
+                    let d = &mut self.draft;
+                    widgets::option_row(ui, pal, "Commandes de CadCraft", "Taper les commandes (ligne, cercle, décaler...) dans la ligne de commande du dessin. Sinon elle ne sert qu'aux valeurs demandées par les commandes du ruban.", |ui| {
+                        widgets::switch(ui, pal, &mut d.cadcraft_commands, "Commandes de CadCraft");
+                    });
+                    widgets::option_row(ui, pal, "Origine dans la vue 2D", "Axes X (rouge) et Y (vert) au zéro pièce.", |ui| {
+                        widgets::switch(ui, pal, &mut d.origin_2d, "Origine dans la vue 2D");
+                    });
+                    widgets::option_row(ui, pal, "Origine dans la vue 3D", "Axes X, Y et Z au zéro pièce.", |ui| {
+                        widgets::switch(ui, pal, &mut d.origin_3d, "Origine dans la vue 3D");
+                    });
+                }
                 (Page::General, _) => {
                     let d = &mut self.draft;
                     widgets::option_row(ui, pal, "Rouvrir le dernier atelier", "Sinon MakerCraft démarre dans l'atelier CNC - DAO / CAO.", |ui| {

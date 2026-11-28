@@ -41,6 +41,8 @@ pub struct App {
     cnc: cnc::Cnc,
     machines: machines::Machines,
     options: Options,
+    /// Fenêtre « Mettre à jour ».
+    updater: crate::update::Updater,
     command: Option<CommandDialog>,
     textures_tried: bool,
     status: String,
@@ -82,6 +84,7 @@ impl App {
             cnc: cnc::Cnc::default(),
             machines,
             options: Options::default(),
+            updater: crate::update::Updater::default(),
             command: None,
             textures_tried: false,
             status: "Prêt".to_owned(),
@@ -228,6 +231,9 @@ impl eframe::App for App {
             self.body(&mut b, pal);
         });
 
+        if self.updater.ui(&ctx, pal, &mut self.prefs) {
+            self.save_prefs();
+        }
         if self.options.open {
             match self.options.ui(&ctx, pal, &self.host, self.logo.as_ref()) {
                 options::Outcome::Apply(p) => {
@@ -266,6 +272,7 @@ impl App {
             p.image(t.id(), logo, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
         }
         let name = p.text(pos2(logo.right() + 8.0, r.center().y), Align2::LEFT_CENTER, "MakerCraft", theme::bold(14.5), pal.text);
+        let name = name.union(p.text(pos2(name.right() + 6.0, r.center().y + 1.0), Align2::LEFT_CENTER, crate::about::version_label(), theme::regular(12.0), pal.weak));
         p.vline(name.right() + 12.0, (r.top() + 11.0)..=(r.bottom() - 11.0), Stroke::new(1.0, pal.bar_line));
         // à gauche
         let left = Rect::from_min_max(pos2(name.right() + 18.0, r.top() + 5.0), pos2(r.center().x + 120.0, r.bottom() - 5.0));
@@ -314,6 +321,24 @@ impl App {
         p.text(pos2(pill.left() + 26.0, pill.center().y), Align2::LEFT_CENTER, label, font, if connected { pal.text } else { pal.weak });
         if pr.clicked() {
             actions.push(Action::Atelier(Atelier::Machines));
+        }
+        // à gauche de Machine : vérification des mises à jour, à la demande
+        rr.add_space(8.0);
+        let newer = self.updater.newer(&self.prefs).map(|r| if r.name.is_empty() { r.tag.clone() } else { r.name.clone() });
+        let ulabel = "Mettre à jour";
+        let uw = p.layout_no_wrap(ulabel.to_owned(), theme::regular(13.0), pal.text).size().x;
+        let (ub, ur) = rr.allocate_exact_size(vec2(uw + 38.0, 28.0), Sense::click());
+        ur.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, ulabel));
+        p.rect_filled(ub, CornerRadius::same(8), if ur.hovered() { pal.hover } else { pal.bar });
+        p.rect_stroke(ub, CornerRadius::same(8), Stroke::new(1.0, if newer.is_some() { pal.orange } else { pal.line2 }), egui::StrokeKind::Inside);
+        icons::paint(&p, Rect::from_min_size(pos2(ub.left() + 10.0, ub.center().y - 8.0), vec2(16.0, 16.0)), Icon::Down, if newer.is_some() { pal.orange } else { pal.weak });
+        p.text(pos2(ub.left() + 30.0, ub.center().y), Align2::LEFT_CENTER, ulabel, theme::regular(13.0), pal.text);
+        let tip = match &newer {
+            Some(n) => format!("Nouvelle version disponible : {n}. Cliquer pour voir les détails."),
+            None => "Vérifier sur GitHub s'il existe une nouvelle version (connexion seulement à la demande)".to_owned(),
+        };
+        if ur.on_hover_text(tip).clicked() {
+            self.updater.start();
         }
         rr.add_space(10.0);
         self.help_menu(&mut rr, actions);
@@ -509,6 +534,7 @@ impl App {
         match self.atelier {
             Atelier::Cnc => {
                 let mut req = Vec::new();
+                self.cnc.apply_prefs(&self.prefs);
                 self.cnc.ui(ui, pal, units, &mut req);
                 self.cnc_requests(req);
             }

@@ -21,13 +21,35 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
   décomposer, chanfrein, réseau (Étoile, Oblong, Grouper, Booléens, Aligner, Répartir grisés).
 - Dessin : invites de CadCraft en français (catalogue fr de CadCraft 0.20.1) et noms de
   commandes français dans la ligne de commande.
+- Dessin : sélection façon Carbide Create. Rectangle glissé (vers la droite : objets
+  entièrement dedans ; vers la gauche : objets touchés), cadre orange à huit poignées et poignée
+  de rotation : glisser déplace, met à l'échelle (proportions gardées) et tourne ; Maj : depuis
+  le centre, rotation par pas de 15°. Entrée ouvre la boîte des cotes, à la manière de Galaad.
+- Dessin : colonne de droite à un panneau à la fois, onglets en bas : Propriétés (X, Y,
+  largeur, hauteur, rayon, rotation, point de référence 3 x 3), 3D, Commentaires (par contour,
+  enregistrés dans le `.mkc`).
+- Dessin : arbre des contours avec œil (visibilité) et cadenas (verrouillage : plus de
+  modification) par contour, barre d'outils (contour courant seul, masquer les autres, tout
+  afficher, tout déverrouiller, déplier / replier, nouveau contour), tracés de chaque contour,
+  icône « lien » quand des parcours utilisent le contour.
+- Dessin : clic droit, menu de la commande en cours ou de la sélection ; clic molette, menu des
+  vues (tout voir, cadrer la sélection, zoom).
+- Options > Général > Dessin : commandes de CadCraft dans la ligne de commande, origine dans
+  la vue 2D, origine dans la vue 3D.
+- Barre de titre : numéro de version après MakerCraft, bouton « Mettre à jour » à gauche de
+  Machine. La vérification se fait seulement au clic (GitHub, via curl) ; la fenêtre propose
+  Valider (page de téléchargement), Passer cette version, Annuler.
 
 ### Amont
 - SolidCraft v0.41.0 -> v0.51.2 (extension `cao`) : import STEP plus robuste, import IGES,
   mises en plan, assemblages, tôlerie. Aucun changement de notre code, sauf le numéro de version.
 - CadCraft reste en v0.20.1 : pas de nouvelle release stable depuis le 11/11/2026.
 
-*English: SolidCraft upgraded to v0.51.2; CadCraft stays on v0.20.1 (no newer stable release).*
+*English: drawing step reworked (grouped ribbon with fold-out groups, French prompts, new
+commands, Carbide-style selection frame with move / scale / rotate grips, Galaad-style
+dimension box, right column with Properties / 3D / Comments tabs, contour tree with visibility
+and lock, context menus, drawing options); on-demand update check; SolidCraft upgraded to
+v0.51.2; CadCraft stays on v0.20.1 (no newer stable release).*
 
 ## v0.1.0 bêta 20261121 - 21/11/2026
 

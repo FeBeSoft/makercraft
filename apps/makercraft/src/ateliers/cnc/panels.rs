@@ -1,6 +1,7 @@
 //! Panneau de gauche de l'atelier CNC : les réglages de l'étape en cours.
 
 use eframe::egui::{self, DragValue, RichText, Sense, Ui, vec2};
+use makercraft_dao::LayerInfo;
 use makercraft_mkc::{PathKind, PathTool, XyOrigin, ZOrigin};
 
 use super::{Cnc, Request, Step, toolpaths};
@@ -156,31 +157,154 @@ fn stock(c: &mut Cnc, ui: &mut Ui, pal: &Palette) {
 // ---------------------------------------------------------------------- 3 Dessin
 
 fn drawing(c: &mut Cnc, ui: &mut Ui, pal: &Palette, req: &mut Vec<Request>) {
-    let layers = c.sketch.layers();
+    let layers: Vec<LayerInfo> = c.sketch.layers().into_iter().filter(|l| l.name != "Defpoints" && (l.name != "0" || l.objects > 0)).collect();
     let current = c.sketch.current_layer();
-    widgets::card(ui, pal, Some("Contours (un calque = un contour)"), |ui| {
-        for l in layers.iter().filter(|l| l.name != "Defpoints" && (l.name != "0" || l.objects > 0)) {
-            let paths = c.sketch.contours(&l.name, 0.05);
-            let closed = paths.iter().filter(|p| p.closed).count();
-            ui.horizontal(|ui| {
-                let (r, _) = ui.allocate_exact_size(vec2(12.0, 12.0), Sense::hover());
-                ui.painter().rect_filled(r, egui::CornerRadius::same(3), egui::Color32::from_rgb(l.rgb[0], l.rgb[1], l.rgb[2]));
-                let cur = l.name == current;
-                if ui.radio(cur, RichText::new(&l.name).strong()).on_hover_text("Calque courant : ce qu'on dessine va dessus").clicked() {
-                    c.sketch.set_current_layer(&l.name);
+    let mut msg = None;
+
+    // barre d'outils de l'arbre
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 2.0;
+        let solo = c.solo.is_some();
+        if tool(ui, pal, Icon::Solo, "Contour courant seul (cliquer de nouveau pour rétablir)", solo) {
+            match c.solo.take() {
+                Some(saved) => {
+                    for (name, on) in saved {
+                        keep(&mut msg, set_layer(c, &name, "on", on));
+                    }
                 }
-                let info = if paths.is_empty() { "vide".to_owned() } else { format!("{} tracé(s), {closed} fermé(s)", paths.len()) };
-                ui.label(RichText::new(info).size(12.0).color(pal.weak));
-            });
+                None => {
+                    c.solo = Some(layers.iter().map(|l| (l.name.clone(), l.visible)).collect());
+                    for l in &layers {
+                        keep(&mut msg, set_layer(c, &l.name, "on", l.name == current));
+                    }
+                }
+            }
         }
-        if widgets::button(ui, pal, Some(Icon::Layers), "Nouveau contour", Kind::Plain, true).clicked() {
+        if tool(ui, pal, Icon::EyeOff, "Masquer les autres contours", false) {
+            c.solo = None;
+            for l in layers.iter().filter(|l| l.name != current) {
+                keep(&mut msg, set_layer(c, &l.name, "on", false));
+            }
+        }
+        if tool(ui, pal, Icon::Eye, "Tout afficher", false) {
+            c.solo = None;
+            for l in &layers {
+                keep(&mut msg, set_layer(c, &l.name, "on", true));
+            }
+        }
+        if tool(ui, pal, Icon::Unlock, "Tout déverrouiller", false) {
+            for l in layers.iter().filter(|l| l.locked) {
+                keep(&mut msg, set_layer(c, &l.name, "locked", false));
+            }
+        }
+        let all_open = !layers.is_empty() && layers.iter().all(|l| c.expanded.contains(&l.name));
+        if tool(ui, pal, if all_open { Icon::Collapse } else { Icon::Expand }, if all_open { "Tout replier" } else { "Tout déplier" }, false) {
+            if all_open {
+                c.expanded.clear();
+            } else {
+                c.expanded.extend(layers.iter().map(|l| l.name.clone()));
+            }
+        }
+        if tool(ui, pal, Icon::New, "Nouveau contour", false) {
             c.command("cnc.contour_nouveau", req);
         }
     });
-    widgets::card(ui, pal, Some("Dessiner"), |ui| {
-        ui.label(RichText::new("Les commandes du ruban (ou tapées : ligne, cercle, rect...) demandent leurs points : clic dans la vue, ou valeurs dans la ligne de commande (x,y ; @dx,dy ; longueur). Entrée ou clic droit valide, Échap annule, Suppr efface la sélection.").size(12.5).color(pal.weak));
-        ui.label(RichText::new("Accroches : extrémité, milieu, centre, quadrant, intersection.").size(12.5).color(pal.weak));
+
+    // arbre des contours : un calque = un contour
+    widgets::card(ui, pal, Some("Contours"), |ui| {
+        if layers.is_empty() {
+            ui.label(RichText::new("Aucun contour.").color(pal.weak));
+        }
+        for l in &layers {
+            let paths = c.sketch.contours(&l.name, 0.05);
+            let open = c.expanded.contains(&l.name);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 4.0;
+                if tool(ui, pal, if open { Icon::Collapse } else { Icon::Expand }, if open { "Replier" } else { "Déplier" }, false) {
+                    if open {
+                        c.expanded.remove(&l.name);
+                    } else {
+                        c.expanded.insert(l.name.clone());
+                    }
+                }
+                let (r, _) = ui.allocate_exact_size(vec2(12.0, 12.0), Sense::hover());
+                ui.painter().rect_filled(r, egui::CornerRadius::same(3), egui::Color32::from_rgb(l.rgb[0], l.rgb[1], l.rgb[2]));
+                let cur = l.name == current;
+                let name = RichText::new(&l.name).strong().color(if l.visible { ui.visuals().text_color() } else { pal.dim });
+                if ui.radio(cur, name).on_hover_text("Contour courant : ce qu'on dessine va dessus").clicked() {
+                    c.sketch.set_current_layer(&l.name);
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if tool(ui, pal, if l.locked { Icon::Lock } else { Icon::Unlock }, if l.locked { "Verrouillé : cliquer pour déverrouiller" } else { "Verrouiller (plus de modification possible)" }, l.locked) {
+                        keep(&mut msg, set_layer(c, &l.name, "locked", !l.locked));
+                    }
+                    if tool(ui, pal, if l.visible { Icon::Eye } else { Icon::EyeOff }, if l.visible { "Visible : cliquer pour masquer" } else { "Masqué : cliquer pour afficher" }, !l.visible) {
+                        c.solo = None;
+                        keep(&mut msg, set_layer(c, &l.name, "on", !l.visible));
+                    }
+                    let used: Vec<&str> = c.project.toolpaths.iter().filter(|t| t.layers.contains(&l.name)).map(|t| t.name.as_str()).collect();
+                    if !used.is_empty() {
+                        let (r, resp) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
+                        crate::icons::paint(ui.painter(), r, Icon::Link, pal.orange);
+                        resp.on_hover_text(format!("Utilisé par : {}", used.join(", ")));
+                    }
+                    if c.project.comments.contains_key(&l.name) {
+                        let (r, resp) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
+                        crate::icons::paint(ui.painter(), r, Icon::Comment, pal.weak);
+                        resp.on_hover_text("Ce contour a un commentaire (panneau de droite, onglet Commentaires)");
+                    }
+                });
+            });
+            if open {
+                ui.indent(("contour", &l.name), |ui| {
+                    if paths.is_empty() {
+                        ui.label(RichText::new("vide").size(12.0).color(pal.weak));
+                    }
+                    for (i, p) in paths.iter().enumerate() {
+                        let kind = if p.closed { "fermé" } else { "ouvert" };
+                        ui.label(RichText::new(format!("Tracé {} : {kind}, {} points", i + 1, p.points.len())).size(12.0).color(if p.closed { pal.weak } else { pal.warn }));
+                    }
+                    ui.label(RichText::new(format!("{} objet(s)", l.objects)).size(12.0).color(pal.dim));
+                });
+            }
+        }
     });
+    if let Some(m) = msg {
+        req.push(Request::Status(m));
+    }
+    widgets::card(ui, pal, Some("Dessiner"), |ui| {
+        ui.label(RichText::new("Les commandes du ruban (ou tapées : ligne, cercle, rect...) demandent leurs points : clic dans la vue, ou valeurs dans la ligne de commande (x,y ; @dx,dy ; longueur). Clic droit : menu de la commande ou de la sélection ; clic molette : menu des vues.").size(12.5).color(pal.weak));
+        ui.label(RichText::new("Sélection : clic, ou rectangle glissé. Le cadre orange déplace, met à l'échelle et tourne (Maj : depuis le centre, pas de 15°) ; Entrée ouvre les cotes.").size(12.5).color(pal.weak));
+    });
+}
+
+/// Garde le premier message d'erreur.
+fn keep(msg: &mut Option<String>, e: Option<String>) {
+    if msg.is_none() {
+        *msg = e;
+    }
+}
+
+/// Change une propriété (`on`, `locked`) du calque `name` ; renvoie l'erreur éventuelle.
+fn set_layer(c: &mut Cnc, name: &str, key: &str, value: bool) -> Option<String> {
+    let mut m = serde_json::Map::new();
+    m.insert("name".into(), name.into());
+    m.insert(key.into(), value.into());
+    let r = c.sketch.session.execute("layer.set", &serde_json::Value::Object(m));
+    // les objets cachés ou verrouillés quittent la sélection
+    let sel = c.sketch.editable(&c.sketch.session.selection());
+    c.sketch.session.set_selection(sel);
+    r.err().map(|e| e.to_string())
+}
+
+/// Petit bouton icône de l'arbre des contours ; `on` : état actif (surligné).
+fn tool(ui: &mut Ui, pal: &Palette, icon: Icon, tip: &str, on: bool) -> bool {
+    let (r, resp) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::click());
+    if resp.hovered() {
+        ui.painter().rect_filled(r, egui::CornerRadius::same(5), pal.hover);
+    }
+    crate::icons::paint(ui.painter(), r.shrink(4.0), icon, if on { pal.blue } else { ui.visuals().text_color() });
+    resp.on_hover_text(tip).clicked()
 }
 
 // ---------------------------------------------------------------------- 4 Parcours

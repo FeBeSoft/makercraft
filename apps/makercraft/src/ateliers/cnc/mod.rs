@@ -7,6 +7,8 @@
 //! et données MakerCraft (machine, brut, brides, parcours).
 
 mod panels;
+mod props;
+mod select_frame;
 pub mod sketch_view;
 pub mod toolpaths;
 pub mod view3d;
@@ -101,6 +103,17 @@ pub struct Cnc {
     tooldb: Option<Result<ToolDb, String>>,
     job_cache: Option<((Project, usize), Job)>,
     pub(crate) written: Option<Result<PathBuf, String>>,
+    /// Panneau de droite de l'étape Dessin : onglet affiché et champs des propriétés.
+    side_tab: props::SideTab,
+    props: props::PropsState,
+    /// Boîte des cotes de la sélection (Entrée) ouverte.
+    dims_open: bool,
+    /// Contours dépliés dans l'arbre.
+    pub(crate) expanded: std::collections::BTreeSet<String>,
+    /// « Courant seul » actif : visibilité des contours à rétablir.
+    pub(crate) solo: Option<Vec<(String, bool)>>,
+    /// Marquer l'origine dans la vue 3D (Options).
+    pub origin_3d: bool,
 }
 
 impl Default for Cnc {
@@ -125,6 +138,12 @@ impl Default for Cnc {
             tooldb: None,
             job_cache: None,
             written: None,
+            side_tab: props::SideTab::Props,
+            props: props::PropsState::default(),
+            dims_open: false,
+            expanded: std::collections::BTreeSet::new(),
+            solo: None,
+            origin_3d: true,
         }
     }
 }
@@ -528,6 +547,13 @@ impl Cnc {
         }
     }
 
+    /// Réglages du dessin choisis dans les Options.
+    pub fn apply_prefs(&mut self, p: &Prefs) {
+        self.view2d.hide_origin = !p.origin_2d;
+        self.view2d.no_commands = !p.cadcraft_commands;
+        self.origin_3d = p.origin_3d;
+    }
+
     // ------------------------------------------------------------------ fenêtre
 
     pub fn ui(&mut self, ui: &mut Ui, pal: &Palette, units: Units, req: &mut Vec<Request>) {
@@ -535,7 +561,11 @@ impl Cnc {
         ui.allocate_rect(full, Sense::hover());
         let panel = Rect::from_min_size(full.min, vec2(PANEL_W.min(full.width() * 0.3), full.height()));
         let work = Rect::from_min_max(pos2(panel.right() + 14.0, full.top()), full.max);
-        let split_x = work.left() + work.width() * self.split;
+        let dessin = self.step == Step::Dessin;
+        // étape Dessin : colonne de droite à onglets (Propriétés, 3D, Commentaires) ;
+        // ailleurs : 2D et 3D côte à côte, séparation déplaçable
+        let side_w = PANEL_W.min(work.width() * 0.4);
+        let split_x = if dessin { work.right() - side_w - 7.0 } else { work.left() + work.width() * self.split };
         let r2d = Rect::from_min_max(work.min, pos2(split_x - 5.0, work.bottom()));
         let r3d = Rect::from_min_max(pos2(split_x + 5.0, work.top()), work.max);
 
@@ -548,12 +578,14 @@ impl Cnc {
         });
 
         // séparation 2D | 3D
-        let sep = Rect::from_center_size(pos2(split_x, work.center().y), vec2(10.0, work.height()));
-        let sresp = ui.interact(sep, ui.scope_id().with("separation-2d-3d"), Sense::drag()).on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
-        if sresp.dragged() {
-            self.split = ((split_x + sresp.drag_delta().x - work.left()) / work.width()).clamp(0.25, 0.8);
+        if !dessin {
+            let sep = Rect::from_center_size(pos2(split_x, work.center().y), vec2(10.0, work.height()));
+            let sresp = ui.interact(sep, ui.scope_id().with("separation-2d-3d"), Sense::drag()).on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+            if sresp.dragged() {
+                self.split = ((split_x + sresp.drag_delta().x - work.left()) / work.width()).clamp(0.25, 0.8);
+            }
+            ui.painter().rect_filled(Rect::from_center_size(sep.center(), vec2(3.0, 40.0)), CornerRadius::same(2), if sresp.hovered() { pal.blue } else { pal.line2 });
         }
-        ui.painter().rect_filled(Rect::from_center_size(sep.center(), vec2(3.0, 40.0)), CornerRadius::same(2), if sresp.hovered() { pal.blue } else { pal.line2 });
 
         // 2D
         if self.view2d.needs_frame() {
@@ -602,6 +634,20 @@ impl Cnc {
         if let Some(s) = out.status {
             req.push(Request::Status(s));
         }
+        if dessin {
+            if out.open_dims {
+                self.dims_open = true;
+            }
+            // objets des contours cachés ou verrouillés : hors sélection
+            let sel = self.sketch.session.selection();
+            let ok = self.sketch.editable(&sel);
+            if ok.len() != sel.len() {
+                self.sketch.session.set_selection(ok);
+            }
+            self.side_panel(ui, r3d, pal, req);
+            self.dims_window(ui, r2d, pal, req);
+            return;
+        }
 
         // 3D
         let scene = self.scene3d(pal);
@@ -613,6 +659,66 @@ impl Cnc {
             Step::Simulation => "trajectoires (enlèvement de matière : à venir)",
         };
         self.view3d.show(ui, r3d, pal, &scene, caption);
+    }
+
+    /// Colonne de droite de l'étape Dessin : un panneau à la fois, onglets en bas.
+    fn side_panel(&mut self, ui: &mut Ui, r: Rect, pal: &Palette, req: &mut Vec<Request>) {
+        const TABS_H: f32 = 30.0;
+        let body = Rect::from_min_max(r.min, pos2(r.right(), r.bottom() - TABS_H - 6.0));
+        let tabs = Rect::from_min_max(pos2(r.left(), r.bottom() - TABS_H), r.max);
+        if self.side_tab == props::SideTab::View3d {
+            let scene = self.scene3d(pal);
+            self.view3d.show(ui, body, pal, &scene, "contours posés sur le brut");
+        } else {
+            let mut cui = ui.new_child(UiBuilder::new().max_rect(body));
+            ScrollArea::vertical().id_salt(("cnc-droite", self.side_tab.label())).auto_shrink([false, false]).show(&mut cui, |ui| {
+                ui.set_max_width(body.width() - 12.0);
+                if self.side_tab == props::SideTab::Props {
+                    crate::widgets::card(ui, pal, Some("Propriétés"), |ui| {
+                        let sel = self.sketch.editable(&self.sketch.session.selection());
+                        let b = self.view2d.bbox_of(&self.sketch, &sel);
+                        if let Some(m) = props::editor(ui, pal, &mut self.props, &mut self.sketch, &sel, b) {
+                            req.push(Request::Status(m));
+                        }
+                    });
+                } else {
+                    let layer = self.sketch.session.selection().first().and_then(|h| self.sketch.layer_of(*h)).unwrap_or_else(|| self.sketch.current_layer());
+                    crate::widgets::card(ui, pal, Some("Commentaires"), |ui| props::comments(ui, pal, &mut self.project.comments, &layer));
+                }
+            });
+        }
+        let mut tui = ui.new_child(UiBuilder::new().max_rect(tabs).layout(egui::Layout::left_to_right(egui::Align::Center)));
+        for t in props::SideTab::ALL {
+            tui.selectable_value(&mut self.side_tab, t, t.label());
+        }
+    }
+
+    /// Boîte des cotes de la sélection, ouverte par Entrée (à la manière de Galaad).
+    fn dims_window(&mut self, ui: &mut Ui, r2d: Rect, pal: &Palette, req: &mut Vec<Request>) {
+        if !self.dims_open {
+            return;
+        }
+        let sel = self.sketch.editable(&self.sketch.session.selection());
+        let b = self.view2d.bbox_of(&self.sketch, &sel);
+        let mut open = true;
+        let mut close = false;
+        egui::Window::new("Cotes de la sélection")
+            .collapsible(false)
+            .resizable(false)
+            .default_pos(r2d.center() - vec2(150.0, 120.0))
+            .open(&mut open)
+            .show(ui.ctx(), |ui| {
+                ui.set_width(300.0);
+                if let Some(m) = props::editor(ui, pal, &mut self.props, &mut self.sketch, &sel, b) {
+                    req.push(Request::Status(m));
+                }
+                if ui.button("Fermer (Échap)").clicked() {
+                    close = true;
+                }
+            });
+        if !open || close || sel.is_empty() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            self.dims_open = false;
+        }
     }
 
     /// Trajets en usinage (avance) de tous les parcours actifs, en polylignes 3D.
@@ -665,6 +771,13 @@ impl Cnc {
                     }
                     sc.lines.push(Line3 { points: pts, rgb: if rapid { rapid_c } else { feed_c }, width: if rapid { 1.0 } else { 1.6 }, on_top: false });
                 }
+            }
+        }
+        if self.origin_3d {
+            // zéro pièce : X rouge, Y vert, Z bleu
+            let k = (s[0].max(s[1]) * 0.12).clamp(5.0, 40.0);
+            for (end, c) in [([k, 0.0, 0.0], pal.red), ([0.0, k, 0.0], pal.green), ([0.0, 0.0, k], pal.blue)] {
+                sc.lines.push(Line3 { points: vec![[0.0, 0.0, 0.0], end], rgb: rgb(c), width: 2.0, on_top: true });
             }
         }
         sc

@@ -6,10 +6,11 @@
 use std::sync::Arc;
 
 use eframe::egui::{self, Align2, Color32, CornerRadius, Key, Painter, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Ui, UiBuilder, pos2, vec2};
-use makercraft_dao::sketch::engine::{Input, View, snap};
+use makercraft_dao::sketch::engine::{Input, Session, View, snap};
 use makercraft_dao::sketch::{cgeom, doc, render};
 use makercraft_dao::Sketch;
 
+use super::select_frame;
 use crate::theme::{self, Palette};
 
 /// Accroches actives : extrémité, milieu, centre, intersection, quadrant.
@@ -48,6 +49,8 @@ pub struct Outcome {
     /// Le dessin a changé.
     pub changed: bool,
     pub status: Option<String>,
+    /// Ouvrir la boîte des cotes de la sélection (Entrée).
+    pub open_dims: bool,
 }
 
 #[derive(Default)]
@@ -61,6 +64,20 @@ pub struct SketchView {
     framed: bool,
     /// Le dessin se modifie (étape Dessin) ; sinon on ne fait que regarder.
     pub editable: bool,
+    /// Ne pas marquer l'origine (zéro pièce) dans la vue.
+    pub hide_origin: bool,
+    /// Commandes de CadCraft refusées dans la ligne de commande (Options) : seules les valeurs
+    /// demandées par une commande en cours y passent.
+    pub no_commands: bool,
+    /// Geste en cours sur le cadre de sélection.
+    drag: Option<select_frame::Drag>,
+    /// Coin de départ (écran) d'un rectangle de sélection.
+    window: Option<Pos2>,
+    /// Menu des vues : position et passe d'ouverture.
+    zoom_menu: Option<(Pos2, u64)>,
+    /// Finesse et transformation du dernier affichage.
+    tol: f64,
+    xf: Option<Xf>,
 }
 
 impl SketchView {
@@ -98,7 +115,7 @@ impl SketchView {
         l
     }
 
-    /// Affiche la vue dans `rect`. `overlay` dessine par-dessous le dessin (brut, brides) et
+    /// Affiche la vue dans `rect`. `under` dessine par-dessous le dessin (brut, brides) et
     /// `over` par-dessus (trajectoires).
     pub fn show(
         &mut self,
@@ -113,14 +130,24 @@ impl SketchView {
         let editable = self.editable;
         let canvas = Rect::from_min_max(rect.min, pos2(rect.right(), rect.bottom() - if editable { CMDLINE_H + 6.0 } else { 0.0 }));
         let resp = ui.interact(canvas, ui.scope_id().with("dessin-2d"), Sense::click_and_drag());
-        let s = &mut sketch.session;
-        s.viewport_px = (f64::from(canvas.width()), f64::from(canvas.height()));
-        let view = s.state().map(|st| st.view()).unwrap_or_default();
+        sketch.session.viewport_px = (f64::from(canvas.width()), f64::from(canvas.height()));
+        let view = sketch.session.state().map(|st| st.view()).unwrap_or_default();
         let xf = Xf { rect: canvas, center: view.center, scale: f64::from(canvas.height()) / view.height.max(1e-9) };
-        let before = s.state().map_or(0, |st| Arc::as_ptr(&st.doc) as usize);
+        self.xf = Some(xf);
+        let before = sketch.session.state().map_or(0, |st| Arc::as_ptr(&st.doc) as usize);
+        let tol = 0.5 / xf.scale;
+        self.tol = tol;
+        let list = self.list(sketch, tol);
+        let running = sketch.session.running.is_some();
+        // cadre de sélection : objets choisis, modifiables, hors commande
+        let frame_sel = if editable && !running { sketch.editable(&sketch.session.selection()) } else { Vec::new() };
+        let frame = if frame_sel.is_empty() { None } else { select_frame::bbox(&list, &frame_sel) };
+        let (shift, pointer) = ui.input(|i| (i.modifiers.shift, i.pointer.interact_pos()));
+        let cmd_id = ui.scope_id().with("ligne-de-commande");
+        let typing = ui.memory(|m| m.has_focus(cmd_id));
 
         // ----------------------------------------------------------------- souris
-        let running = s.running.is_some();
+        let s = &mut sketch.session;
         if let Some(hp) = resp.hover_pos() {
             let w = xf.to_world(hp);
             s.cursor = w;
@@ -132,19 +159,29 @@ impl SketchView {
                 let base = s.current_prompt().and_then(|p| p.base);
                 self.snap = snap::osnap(d, &doc::Space::Model, w, APERTURE_PX / xf.scale, OSMODE, base, false);
             }
+            if self.drag.is_none()
+                && let Some(b) = frame
+                && let Some(g) = select_frame::hit(&xf, b, hp)
+            {
+                ui.ctx().set_cursor_icon(g.cursor());
+            }
             let scroll = ui.input(|i| i.smooth_scroll_delta.y);
             if scroll != 0.0 {
-                let k = (-f64::from(scroll) / 300.0).exp();
-                let v = View { center: w + (view.center - w) * k, height: (view.height * k).clamp(0.01, 1e7), twist: 0.0 };
-                if let Ok(st) = s.state_mut() {
-                    st.set_view_quiet(v);
-                }
+                zoom_at(s, view, w, (-f64::from(scroll) / 300.0).exp());
             }
         } else {
             self.cursor = None;
             self.snap = None;
         }
-        let pan = resp.dragged_by(egui::PointerButton::Middle) || (resp.dragged_by(egui::PointerButton::Primary) && !running);
+        if editable && !running && resp.drag_started_by(egui::PointerButton::Primary)
+            && let Some(o) = ui.input(|i| i.pointer.press_origin())
+        {
+            match frame.and_then(|b| select_frame::hit(&xf, b, o).map(|g| (b, g))) {
+                Some((bbox, grip)) => self.drag = Some(select_frame::Drag { grip, start: xf.to_world(o), bbox }),
+                None => self.window = Some(o),
+            }
+        }
+        let pan = resp.dragged_by(egui::PointerButton::Middle) || (resp.dragged_by(egui::PointerButton::Primary) && !editable);
         if pan {
             let d = resp.drag_delta();
             let v = View { center: view.center - WVec::new(f64::from(d.x), -f64::from(d.y)) / xf.scale, ..view };
@@ -152,11 +189,29 @@ impl SketchView {
                 st.set_view_quiet(v);
             }
         }
+        let active = self.drag.zip(pointer).map(|(d, p)| d.xform(xf.to_world(p), shift));
+        if resp.drag_stopped() {
+            if let (Some(x), Some(_)) = (active, self.drag.take()) {
+                if let Err(e) = x.execute(sketch, &frame_sel) {
+                    out.status = Some(e);
+                }
+            } else if let (Some(a), Some(b)) = (self.window.take(), pointer) {
+                let mut pick = sketch.editable(&select_frame::window_pick(&list, xf.to_world(a), xf.to_world(b)));
+                if shift {
+                    for h in sketch.session.selection() {
+                        if !pick.contains(&h) {
+                            pick.push(h);
+                        }
+                    }
+                }
+                sketch.session.set_selection(pick);
+            }
+        }
+        let s = &mut sketch.session;
         if editable && resp.clicked()
             && let Some(hp) = resp.interact_pointer_pos()
         {
             let w = xf.to_world(hp);
-            let shift = ui.input(|i| i.modifiers.shift);
             let r = if s.running.is_some() {
                 if s.picking_objects() {
                     match s.pick_object(&doc::Space::Model, w, APERTURE_PX / xf.scale) {
@@ -175,15 +230,15 @@ impl SketchView {
                 out.status = Some(e.to_string());
             }
         }
-        if editable && resp.secondary_clicked() && s.running.is_some() {
-            out.status = s.input(Input::Enter).err().map(|e| e.to_string());
+        // bouton du milieu : menu des vues (le glissement, lui, déplace la vue)
+        if resp.clicked_by(egui::PointerButton::Middle) {
+            self.zoom_menu = resp.interact_pointer_pos().map(|p| (p, ui.ctx().cumulative_pass_nr()));
         }
 
         // ----------------------------------------------------------------- clavier
-        let cmd_id = ui.scope_id().with("ligne-de-commande");
-        let typing = ui.memory(|m| m.has_focus(cmd_id));
         if editable && (resp.hovered() || typing) {
-            if ui.input(|i| i.key_pressed(Key::Escape)) {
+            // Échap : d'abord le geste en cours, sinon la commande et la sélection
+            if ui.input(|i| i.key_pressed(Key::Escape)) && self.drag.take().is_none() && self.window.take().is_none() {
                 s.cancel();
                 s.set_selection(Vec::new());
                 self.cmdline.clear();
@@ -194,18 +249,27 @@ impl SketchView {
                     let _ = s.input(Input::Enter);
                 }
             }
+            if !typing && frame.is_some() && ui.input(|i| i.key_pressed(Key::Enter)) {
+                out.open_dims = true;
+            }
         }
 
         // ----------------------------------------------------------------- dessin
         let p = ui.painter_at(canvas);
         p.rect_filled(canvas, CornerRadius::same(10), pal.canvas);
-        grid(&p, &xf, pal);
+        grid(&p, &xf, pal, !self.hide_origin);
         under(&p, &xf);
-        let tol = 0.5 / xf.scale;
         let list = self.list(sketch, tol);
         let sel = sketch.session.selection();
         paint_list(&p, &xf, &list, pal, &sel);
         over(&p, &xf);
+        let frame_sel = if editable && sketch.session.running.is_none() { sketch.editable(&sel) } else { Vec::new() };
+        if let Some(b) = select_frame::bbox(&list, &frame_sel) {
+            select_frame::paint(&p, &xf, b, pal.orange, pal.canvas, &list, &frame_sel, active);
+        }
+        if let (Some(a), Some(b)) = (self.window, pointer) {
+            select_frame::paint_window(&p, a, b, pal.blue);
+        }
         let s = &mut sketch.session;
         if editable
             && s.running.is_some()
@@ -230,6 +294,12 @@ impl SketchView {
         }
         p.rect_stroke(canvas, CornerRadius::same(10), Stroke::new(1.0, pal.card_line), StrokeKind::Inside);
 
+        // ----------------------------------------------------------------- menus
+        if editable {
+            resp.context_menu(|ui| context_menu(ui, sketch, &list, &mut out));
+        }
+        self.zoom_popup(ui, sketch, &list, view);
+
         // ----------------------------------------------------------------- ligne de commande
         if editable {
             let cr = Rect::from_min_max(pos2(rect.left(), canvas.bottom() + 6.0), rect.max);
@@ -238,6 +308,57 @@ impl SketchView {
         let after = sketch.session.state().map_or(0, |st| Arc::as_ptr(&st.doc) as usize);
         out.changed = before != after;
         out
+    }
+
+    /// Boîte englobante des objets `hs` (mm), d'après le dernier affichage.
+    pub fn bbox_of(&mut self, sketch: &Sketch, hs: &[doc::Handle]) -> Option<select_frame::BBox> {
+        let list = self.list(sketch, self.tol.max(1e-6));
+        select_frame::bbox(&list, hs)
+    }
+
+    /// Recadre la vue sur `b` (mm), avec une marge.
+    pub fn zoom_to(&mut self, sketch: &mut Sketch, b: [f64; 4]) {
+        let aspect = self.xf.map_or(1.5, |x| f64::from(x.rect.width() / x.rect.height().max(1.0)));
+        self.frame(sketch, b, aspect);
+    }
+
+    /// Menu des vues ouvert par un clic du bouton du milieu.
+    fn zoom_popup(&mut self, ui: &mut Ui, sketch: &mut Sketch, list: &render::DisplayList, view: View) {
+        let Some((at, opened)) = self.zoom_menu else { return };
+        let mut pick = None;
+        let r = egui::Area::new(ui.scope_id().with("menu-vues")).order(egui::Order::Foreground).fixed_pos(at).show(ui.ctx(), |ui| {
+            egui::Frame::menu(ui.style()).show(ui, |ui| {
+                ui.set_min_width(170.0);
+                for (k, label) in [(0, "Tout voir"), (1, "Cadrer la sélection"), (2, "Cadrer le brut et le dessin"), (3, "Zoom avant"), (4, "Zoom arrière")] {
+                    if ui.button(label).clicked() {
+                        pick = Some(k);
+                    }
+                }
+            });
+        });
+        let center = view.center;
+        match pick {
+            Some(0) => {
+                let b = sketch.bounds();
+                if !b.is_empty() {
+                    self.zoom_to(sketch, [b.min.x, b.min.y, b.max.x, b.max.y]);
+                }
+            }
+            Some(1) => {
+                let sel = sketch.session.selection();
+                if let Some(b) = select_frame::bbox(list, &sel) {
+                    self.zoom_to(sketch, b);
+                }
+            }
+            Some(2) => self.framed = false,
+            Some(3) => zoom_at(&mut sketch.session, view, center, 0.5),
+            Some(4) => zoom_at(&mut sketch.session, view, center, 2.0),
+            _ => {}
+        }
+        let new_click = ui.ctx().cumulative_pass_nr() > opened && r.response.clicked_elsewhere();
+        if pick.is_some() || new_click || ui.input(|i| i.key_pressed(Key::Escape)) {
+            self.zoom_menu = None;
+        }
     }
 
     fn command_line(&mut self, ui: &mut Ui, r: Rect, pal: &Palette, sketch: &mut Sketch, id: egui::Id, out: &mut Outcome) {
@@ -257,7 +378,13 @@ impl SketchView {
         let te = egui::TextEdit::singleline(&mut self.cmdline)
             .id(id)
             .font(theme::mono(13.0))
-            .hint_text(if prompt.is_some() { "valeur, x,y ou @dx,dy, Entrée" } else { "commande (ligne, cercle, rect...)" })
+            .hint_text(if prompt.is_some() {
+                "valeur, x,y ou @dx,dy, Entrée"
+            } else if self.no_commands {
+                "commandes du ruban (commandes tapées : voir Options)"
+            } else {
+                "commande (ligne, cercle, rect...)"
+            })
             .desired_width(c.available_width());
         let resp = c.add(te);
         if let Some(k) = kw_clicked {
@@ -267,11 +394,19 @@ impl SketchView {
             let text = self.cmdline.trim().to_owned();
             self.cmdline.clear();
             let r = if text.is_empty() {
-                if s.running.is_some() { s.input(Input::Enter) } else { Ok(()) }
+                if s.running.is_some() {
+                    s.input(Input::Enter).map_err(|e| e.to_string())
+                } else {
+                    // Entrée sur une ligne vide, hors commande : cotes de la sélection
+                    out.open_dims = !s.selection().is_empty();
+                    Ok(())
+                }
+            } else if s.running.is_none() && self.no_commands {
+                Err("commandes de CadCraft désactivées (Options > Général > Dessin) : utiliser le ruban".to_owned())
             } else {
-                s.cmdline(&command_alias(&text))
+                s.cmdline(&command_alias(&text)).map_err(|e| e.to_string())
             };
-            out.status = r.err().map(|e| e.to_string());
+            out.status = r.err();
             resp.request_focus();
         }
     }
@@ -379,6 +514,105 @@ fn catalogue() -> &'static std::collections::HashMap<&'static str, &'static str>
     })
 }
 
+/// Zoom de `k` (moins de 1 : avant) autour du point `w` (mm).
+fn zoom_at(s: &mut Session, view: View, w: WVec, k: f64) {
+    let v = View { center: w + (view.center - w) * k, height: (view.height * k).clamp(0.01, 1e7), twist: 0.0 };
+    if let Ok(st) = s.state_mut() {
+        st.set_view_quiet(v);
+    }
+}
+
+/// Menu du clic droit : celui de la commande en cours, sinon celui de la sélection, sinon les
+/// tracés.
+fn context_menu(ui: &mut Ui, sketch: &mut Sketch, list: &render::DisplayList, out: &mut Outcome) {
+    ui.set_min_width(190.0);
+    if sketch.session.running.is_some() {
+        let s = &mut sketch.session;
+        if ui.button("Valider (Entrée)").clicked() {
+            out.status = status(s.input(Input::Enter));
+        }
+        let keywords = s.current_prompt().map(|p| p.keywords).unwrap_or_default();
+        if !keywords.is_empty() {
+            ui.separator();
+        }
+        for k in keywords {
+            if ui.button(&k).clicked() {
+                out.status = status(s.input(Input::Keyword(k)));
+            }
+        }
+        ui.separator();
+        if ui.button("Annuler la commande (Échap)").clicked() {
+            s.cancel();
+        }
+        return;
+    }
+    let sel = sketch.editable(&sketch.session.selection());
+
+    if sel.is_empty() {
+        for (label, cmd) in [("Ligne", "line"), ("Polyligne", "pline"), ("Rectangle", "rectang"), ("Cercle", "circle"), ("Arc", "arc")] {
+            if ui.button(label).clicked() {
+                run_cmd(sketch, cmd, out);
+            }
+        }
+        ui.separator();
+        if ui.button("Tout sélectionner").clicked() {
+            let mut all: Vec<doc::Handle> = Vec::new();
+            for p in &list.prims {
+                if !all.contains(&p.handle) {
+                    all.push(p.handle);
+                }
+            }
+            let all = sketch.editable(&all);
+            sketch.session.set_selection(all);
+        }
+        ui.separator();
+        if ui.button("Annuler").clicked() {
+            run_cmd(sketch, "undo", out);
+        }
+        if ui.button("Rétablir").clicked() {
+            run_cmd(sketch, "redo", out);
+        }
+        return;
+    }
+    if ui.button("Cotes de la sélection... (Entrée)").clicked() {
+        out.open_dims = true;
+    }
+    ui.separator();
+    for (label, cmd) in [
+        ("Déplacer", "move"),
+        ("Copier", "copy"),
+        ("Rotation", "rotate"),
+        ("Miroir", "mirror"),
+        ("Échelle", "scale"),
+        ("Décaler", "offset"),
+        ("Décomposer", "explode"),
+    ] {
+        if ui.button(label).clicked() {
+            run_cmd(sketch, cmd, out);
+        }
+    }
+    ui.separator();
+    if ui.button("Supprimer (Suppr)").clicked() {
+        run_cmd(sketch, "erase", out);
+    }
+    if ui.button("Tout désélectionner (Échap)").clicked() {
+        sketch.session.set_selection(Vec::new());
+    }
+}
+
+/// Lance la commande `cmd` (sur la sélection) ; Supprimer s'applique tout de suite.
+fn run_cmd(sketch: &mut Sketch, cmd: &str, out: &mut Outcome) {
+    let s = &mut sketch.session;
+    out.status = status(s.cmdline(cmd));
+    if cmd == "erase" && s.running.is_some() {
+        out.status = status(s.input(Input::Enter));
+    }
+}
+
+fn status<T, E: std::fmt::Display>(r: Result<T, E>) -> Option<String> {
+    r.err().map(|e| e.to_string())
+}
+
 fn snap_label(name: &str) -> &str {
     match name {
         "Endpoint" | "endpoint" => "extrémité",
@@ -390,7 +624,7 @@ fn snap_label(name: &str) -> &str {
     }
 }
 
-fn grid(p: &Painter, xf: &Xf, pal: &Palette) {
+fn grid(p: &Painter, xf: &Xf, pal: &Palette, origin: bool) {
     let r = p.clip_rect();
     // pas de grille : environ 24 px, multiple de 1, 2, 5
     let target = 24.0 / xf.scale;
@@ -415,6 +649,9 @@ fn grid(p: &Painter, xf: &Xf, pal: &Palette) {
         p.hline(r.x_range(), sy, Stroke::new(1.0, if major { pal.grid_major } else { pal.grid_minor }));
         y += step;
         n += 1;
+    }
+    if !origin {
+        return;
     }
     // axes du zéro pièce
     let o = xf.to_screen(WVec::new(0.0, 0.0));

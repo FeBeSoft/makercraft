@@ -209,11 +209,22 @@ pub struct Project {
     pub toolpaths: Vec<Toolpath>,
     /// Hauteur de sécurité au-dessus du brut (mm) ; relevée au-dessus des brides si besoin.
     pub safe_z: f64,
+    /// Commentaires libres, par contour (nom du calque).
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub comments: std::collections::BTreeMap<String, String>,
 }
 
 impl Default for Project {
     fn default() -> Self {
-        Self { format: FORMAT, machine: MachineSetup::default(), stock: Stock::default(), clamps: Vec::new(), toolpaths: Vec::new(), safe_z: 5.0 }
+        Self {
+            format: FORMAT,
+            machine: MachineSetup::default(),
+            stock: Stock::default(),
+            clamps: Vec::new(),
+            toolpaths: Vec::new(),
+            safe_z: 5.0,
+            comments: std::collections::BTreeMap::new(),
+        }
     }
 }
 

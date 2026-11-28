@@ -81,16 +81,24 @@ apps/makercraft/src/
                  déclarés, référence des axes, garde des déplacements, droits maker / prof / élève),
                  cnc/ :
     mod.rs         atelier CNC : étapes Machine > Brut > Dessin > Parcours > Simulation > Usinage
-                   (un onglet de ruban chacune), panneau de l'étape | dessin 2D | vue 3D, projet .mkc
-    panels.rs      panneau de gauche de chaque étape (machine, brut et brides, contours, réglages
-                   des parcours, vérifications et durée, G-code)
+                   (un onglet de ruban chacune), panneau de l'étape | dessin 2D | vue 3D, projet .mkc ;
+                   à l'étape Dessin, colonne de droite à onglets (Propriétés, 3D, Commentaires)
+    panels.rs      panneau de gauche de chaque étape (machine, brut et brides, arbre des contours
+                   avec œil et cadenas, réglages des parcours, vérifications et durée, G-code)
     sketch_view.rs dessin 2D piloté par le moteur de CadCraft : clics et accroches, ligne de
-                   commande (noms français acceptés, invites traduites), zoom, déplacement
+                   commande (noms français acceptés, invites traduites), zoom, déplacement,
+                   rectangle de sélection, menus du clic droit et du clic molette
+    select_frame.rs cadre de sélection : poignées déplacer / échelle / rotation, appliquées par
+                   les commandes move, scale, rotate de CadCraft (annulables)
+    props.rs       Propriétés de la sélection (X, Y, taille, rayon, rotation, point de référence),
+                   aussi dans la boîte des cotes (Entrée) ; commentaires par contour
     view3d.rs      vue 3D en lecture seule : image recalculée seulement quand la scène change,
                    rotation à la souris, zoom
     toolpaths.rs   parcours -> opérations de `ext/cam` (contour, poche, perçage, gravure),
                    lignes 3D, contrôle des zones de bridage
-  prefs.rs       préférences JSON (%APPDATA%\FeBe\MakerCraft\preferences.json), dernier atelier
+  prefs.rs       préférences JSON (%APPDATA%\FeBe\MakerCraft\preferences.json), dernier atelier,
+                 options du dessin, version passée
+  update.rs      « Mettre à jour » : dernière version publiée sur GitHub, à la demande (curl)
   theme.rs       thème sombre par défaut (esprit GravéoCraft) et clair : bleu = design, orange = composants
   icons.rs       icônes vectorielles dessinées au Painter (pas d'emoji)
   widgets.rs     cartes, boutons, onglets, pastilles

@@ -73,6 +73,13 @@ pub struct Prefs {
     pub remember_atelier: bool,
     /// Identifiant du dernier atelier (voir `Atelier::id`).
     pub last_atelier: String,
+    /// Dessin : commandes de CadCraft tapées dans la ligne de commande.
+    pub cadcraft_commands: bool,
+    /// Dessin : marquer l'origine (zéro pièce) dans la vue 2D et dans la vue 3D.
+    pub origin_2d: bool,
+    pub origin_3d: bool,
+    /// Version que l'utilisateur a choisi de passer (« Mettre à jour »).
+    pub skipped_version: String,
 }
 
 impl Default for Prefs {
@@ -88,6 +95,10 @@ impl Default for Prefs {
             baud: 115_200,
             remember_atelier: true,
             last_atelier: String::new(),
+            cadcraft_commands: true,
+            origin_2d: true,
+            origin_3d: true,
+            skipped_version: String::new(),
         }
     }
 }

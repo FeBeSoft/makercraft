@@ -17,6 +17,7 @@ mod ribbon;
 mod switcher;
 mod texte_lie;
 mod theme;
+mod update;
 mod widgets;
 
 use std::path::PathBuf;

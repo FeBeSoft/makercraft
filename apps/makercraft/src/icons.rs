@@ -122,6 +122,17 @@ pub enum Icon {
     Boolean,
     Align,
     Distribute,
+    /// Œil (contour visible), barré (caché).
+    Eye,
+    EyeOff,
+    /// Cadenas fermé (contour verrouillé).
+    Lock,
+    /// Cible (afficher le contour courant seul).
+    Solo,
+    /// Bulle (commentaires).
+    Comment,
+    /// Maillons de chaîne (contour lié à des parcours).
+    Link,
 }
 
 /// Point relatif au carré `r` : (0,0) coin haut gauche, (1,1) coin bas droit.
@@ -559,6 +570,34 @@ pub fn paint(p: &Painter, r: Rect, icon: Icon, c: Color32) {
             for x in [0.1, 0.4, 0.7] {
                 p.rect_stroke(Rect::from_min_size(at(r, x, 0.3), vec2(r.width() * 0.2, r.height() * 0.4)), CornerRadius::ZERO, s, StrokeKind::Middle);
             }
+        }
+        Icon::Eye | Icon::EyeOff => {
+            let top: Vec<(f32, f32)> = (0..=12).map(|i| { let t = i as f32 / 12.0; (0.06 + 0.88 * t, 0.5 - 0.32 * (std::f32::consts::PI * t).sin()) }).collect();
+            let bot: Vec<(f32, f32)> = top.iter().map(|(x, y)| (*x, 1.0 - y)).collect();
+            line(p, r, &top, s);
+            line(p, r, &bot, s);
+            p.circle_stroke(r.center(), r.width() * 0.14, s);
+            if icon == Icon::EyeOff {
+                line(p, r, &[(0.12, 0.88), (0.88, 0.12)], s);
+            }
+        }
+        Icon::Lock => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.2, 0.45), at(r, 0.8, 0.9)), CornerRadius::same(1), s, StrokeKind::Middle);
+            line(p, r, &[(0.32, 0.45), (0.32, 0.28), (0.4, 0.14), (0.6, 0.14), (0.68, 0.28), (0.68, 0.45)], s);
+        }
+        Icon::Solo => {
+            p.circle_stroke(r.center(), r.width() * 0.36, s);
+            p.circle_filled(r.center(), r.width() * 0.14, c);
+        }
+        Icon::Comment => {
+            line(p, r, &[(0.1, 0.16), (0.9, 0.16), (0.9, 0.7), (0.46, 0.7), (0.26, 0.9), (0.28, 0.7), (0.1, 0.7), (0.1, 0.16)], s);
+            line(p, r, &[(0.24, 0.36), (0.76, 0.36)], s);
+            line(p, r, &[(0.24, 0.52), (0.62, 0.52)], s);
+        }
+        Icon::Link => {
+            let k = CornerRadius::same((r.width() * 0.16) as u8);
+            p.rect_stroke(Rect::from_min_max(at(r, 0.06, 0.32), at(r, 0.56, 0.68)), k, s, StrokeKind::Middle);
+            p.rect_stroke(Rect::from_min_max(at(r, 0.44, 0.32), at(r, 0.94, 0.68)), k, s, StrokeKind::Middle);
         }
     }
 }
