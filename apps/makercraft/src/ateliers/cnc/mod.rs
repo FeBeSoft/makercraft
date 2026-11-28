@@ -329,7 +329,7 @@ impl Cnc {
             ],
         };
         let draw = |id: &'static str, label: &'static str, icon: Icon| Item::large(id, label, icon).tone(Tone::Design);
-        let modify = |id: &'static str, label: &'static str, icon: Icon| Item::small(id, label, icon);
+        let modify = |id: &'static str, label: &'static str, icon: Icon| Item::large(id, label, icon);
         let mut tabs = Vec::new();
         for step in Step::ALL {
             let groups = match step {
@@ -355,6 +355,11 @@ impl Cnc {
                             draw("cnc.cmd.rectang", "Rectangle", Icon::Rect),
                             draw("cnc.cmd.circle", "Cercle", Icon::Circle),
                             draw("cnc.cmd.arc", "Arc", Icon::Arc),
+                            draw("cnc.cmd.ellipse", "Ellipse", Icon::Ellipse).more(),
+                            draw("cnc.cmd.polygon", "Polygone", Icon::Polygon).more(),
+                            draw("cnc.cmd.spline", "Spline", Icon::Spline).more(),
+                            draw("cnc.etoile", "Étoile", Icon::Star).more().enabled(false).tip("À venir"),
+                            draw("cnc.oblong", "Oblong", Icon::Oblong).more().enabled(false).tip("À venir"),
                         ],
                     },
                     Group {
@@ -362,10 +367,28 @@ impl Cnc {
                         items: vec![
                             modify("cnc.cmd.move", "Déplacer", Icon::Move),
                             modify("cnc.cmd.copy", "Copier", Icon::Copy),
+                            modify("cnc.cmd.rotate", "Rotation", Icon::Rotate),
+                            modify("cnc.cmd.mirror", "Miroir", Icon::Mirror),
                             modify("cnc.cmd.offset", "Décaler", Icon::Offset),
-                            modify("cnc.cmd.trim", "Ajuster", Icon::Trim),
                             modify("cnc.cmd.fillet", "Raccord", Icon::Fillet),
-                            modify("cnc.cmd.erase", "Effacer", Icon::Trash),
+                            modify("cnc.cmd.scale", "Échelle", Icon::Scale).more(),
+                            modify("cnc.cmd.trim", "Ajuster", Icon::Trim).more(),
+                            modify("cnc.cmd.break", "Couper", Icon::Break).more(),
+                            modify("cnc.cmd.extend", "Prolonger", Icon::Extend).more(),
+                            modify("cnc.cmd.join", "Joindre", Icon::Join).more(),
+                            modify("cnc.cmd.explode", "Décomposer", Icon::Explode).more(),
+                            modify("cnc.cmd.chamfer", "Chanfrein", Icon::Chamfer).more(),
+                            modify("cnc.cmd.arrayrect", "Réseau", Icon::Array).more(),
+                            modify("cnc.cmd.erase", "Effacer", Icon::Trash).more(),
+                        ],
+                    },
+                    Group {
+                        label: "Organiser",
+                        items: vec![
+                            modify("cnc.grouper", "Grouper", Icon::Group).enabled(false).tip("À venir"),
+                            modify("cnc.booleens", "Booléens", Icon::Boolean).enabled(false).tip("À venir"),
+                            modify("cnc.aligner", "Aligner", Icon::Align).more().enabled(false).tip("À venir"),
+                            modify("cnc.repartir", "Répartir", Icon::Distribute).more().enabled(false).tip("À venir"),
                         ],
                     },
                     Group {
@@ -667,6 +690,7 @@ fn clone_item(i: &Item) -> Item {
         icon: i.icon,
         large: i.large,
         enabled: i.enabled,
+        more: i.more,
         checked: i.checked,
         tone: i.tone,
         tip: i.tip.clone(),

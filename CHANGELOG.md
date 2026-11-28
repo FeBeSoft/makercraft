@@ -15,6 +15,12 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
 - Spécification du format de projet `.mkc` version 2 (`docs/reference/format-mkc.md`) :
   archive zip à parties avec manifeste, versions par partie et empreintes, façon `.docx`.
   Pas encore codée.
+- Dessin : ruban à groupes façon SolidCraft. La flèche à droite du titre d'un groupe déplie ses
+  autres fonctions en mini-ruban ; flèches de défilement aux extrémités quand le ruban déborde.
+  Nouvelles commandes : ellipse, polygone, spline, échelle, couper, prolonger, joindre,
+  décomposer, chanfrein, réseau (Étoile, Oblong, Grouper, Booléens, Aligner, Répartir grisés).
+- Dessin : invites de CadCraft en français (catalogue fr de CadCraft 0.20.1) et noms de
+  commandes français dans la ligne de commande.
 
 ### Amont
 - SolidCraft v0.41.0 -> v0.51.2 (extension `cao`) : import STEP plus robuste, import IGES,

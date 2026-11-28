@@ -294,6 +294,15 @@ fn command_alias(t: &str) -> String {
         "decaler" | "décaler" | "dec" => "offset",
         "ajuster" | "aj" => "trim",
         "raccord" | "rac" => "fillet",
+        "ellipse" | "el" => "ellipse",
+        "polygone" | "pol" => "polygon",
+        "echelle" | "échelle" | "ech" => "scale",
+        "couper" | "cou" => "break",
+        "prolonger" | "pro" => "extend",
+        "joindre" | "jo" => "join",
+        "decomposer" | "décomposer" | "dcp" => "explode",
+        "chanfrein" | "cha" => "chamfer",
+        "reseau" | "réseau" | "res" => "arrayrect",
         "annuler" | "u" => "undo",
         "retablir" | "rétablir" => "redo",
         _ => return t.to_owned(),
@@ -334,7 +343,40 @@ fn translate(msg: &str) -> String {
         ("Specify offset distance", "Distance de décalage"),
     ];
     let m = msg.trim_end_matches(':').trim();
-    T.iter().find(|(en, _)| m.starts_with(en)).map_or_else(|| m.to_owned(), |(_, fr)| (*fr).to_owned())
+    if let Some((_, fr)) = T.iter().find(|(en, _)| m.starts_with(en)) {
+        return (*fr).to_owned();
+    }
+    let cat = catalogue();
+    if let Some(fr) = cat.get(m).or_else(|| cat.get(format!("{m}:").as_str())) {
+        return fr.trim_end_matches(':').trim().to_owned();
+    }
+    // « Specify ... or [Undo] » : on traduit la partie avant les options
+    for sep in [" or [", " [", " <"] {
+        if let Some((head, tail)) = m.split_once(sep)
+            && let Some(fr) = cat.get(head.trim())
+        {
+            return format!("{}{sep}{tail}", fr.trim_end_matches(':').trim());
+        }
+    }
+    m.to_owned()
+}
+
+/// Catalogue français de CadCraft (`crates/ui-egui/src/i18n/fr.tsv` de CadCraft 0.20.1,
+/// MIT OR Apache-2.0, traductions originales de @pechnikov2026-star), copié dans
+/// `assets/cadcraft-fr.tsv` : anglais -> français, lignes sans contexte seulement.
+fn catalogue() -> &'static std::collections::HashMap<&'static str, &'static str> {
+    static CAT: std::sync::OnceLock<std::collections::HashMap<&'static str, &'static str>> = std::sync::OnceLock::new();
+    CAT.get_or_init(|| {
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/cadcraft-fr.tsv"))
+            .lines()
+            .filter(|l| !l.starts_with('#'))
+            .filter_map(|l| {
+                let mut it = l.split('\t');
+                let (ctx, en, fr) = (it.next()?, it.next()?, it.next()?);
+                (ctx.is_empty() && !fr.is_empty()).then_some((en.trim(), fr))
+            })
+            .collect()
+    })
 }
 
 fn snap_label(name: &str) -> &str {
@@ -442,6 +484,10 @@ mod tests {
     #[test]
     fn french_aliases_and_prompts() {
         assert_eq!(command_alias("Cercle"), "circle");
+        assert_eq!(command_alias("Décomposer"), "explode");
+        // invite reprise du catalogue français de CadCraft
+        assert_eq!(translate("Specify a point:"), "Spécifier un point");
+        assert_eq!(translate("Specify axis endpoint of ellipse"), "Spécifier l'extrémité de l'axe de l'ellipse");
         assert_eq!(command_alias("10,20"), "10,20");
         assert_eq!(translate("Specify next point"), "Point suivant");
         assert_eq!(translate("Something else:"), "Something else");
