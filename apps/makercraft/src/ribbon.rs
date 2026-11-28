@@ -40,11 +40,13 @@ pub struct Variant {
     pub id: &'static str,
     pub label: &'static str,
     pub short: &'static str,
+    /// Icône propre à la variante.
+    pub icon: Icon,
 }
 
 impl Variant {
-    pub const fn new(id: &'static str, label: &'static str, short: &'static str) -> Self {
-        Self { id, label, short }
+    pub const fn new(id: &'static str, label: &'static str, short: &'static str, icon: Icon) -> Self {
+        Self { id, label, short, icon }
     }
 }
 
@@ -406,7 +408,7 @@ impl Ribbon {
                         if v.id == cur || resp.hovered() {
                             ui.painter().rect_filled(r, CornerRadius::same(5), if resp.hovered() { pal.hover } else { theme::mix(pal.bar, pal.blue, 0.2) });
                         }
-                        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.left() + 14.0, r.center().y), vec2(16.0, 16.0)), it.icon, tone_color(pal, it.tone));
+                        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.left() + 14.0, r.center().y), vec2(18.0, 18.0)), v.icon, tone_color(pal, it.tone));
                         ui.painter().text(pos2(r.left() + 30.0, r.center().y), Align2::LEFT_CENTER, v.label, theme::regular(12.5), pal.text);
                         if v.id == cur {
                             ui.painter().text(pos2(r.right() - 8.0, r.center().y), Align2::RIGHT_CENTER, "dernière", theme::regular(10.5), pal.dim);
@@ -432,13 +434,14 @@ impl Ribbon {
         clicked
     }
 
-    /// Ce que montre le bouton `it` : identifiant lancé, libellé (variante choisie s'il en a).
-    fn shown(&self, it: &Item) -> (&'static str, &'static str) {
+    /// Ce que montre le bouton `it` : identifiant lancé, libellé, icône (variante choisie s'il en
+    /// a une).
+    fn shown(&self, it: &Item) -> (&'static str, &'static str, Icon) {
         if it.variants.is_empty() {
-            return (it.id, it.label);
+            return (it.id, it.label, it.icon);
         }
         let v = self.chosen.get(it.id).and_then(|c| it.variants.iter().find(|v| v.id == c)).or(it.variants.first());
-        v.map_or((it.id, it.label), |v| (v.id, v.short))
+        v.map_or((it.id, it.label, it.icon), |v| (v.id, v.short, v.icon))
     }
 }
 
@@ -487,8 +490,8 @@ fn choice(ui: &mut Ui, p: &egui::Painter, pal: &Palette, r: Rect, it: &Item) -> 
 /// Dessine un bouton du ruban ; renvoie vrai s'il a été cliqué.
 /// Bouton du ruban, montrant `shown` (identifiant, libellé) ; renvoie (clic, clic droit sur un
 /// bouton à variantes).
-fn button(ui: &Ui, p: &egui::Painter, pal: &Palette, r: Rect, it: &Item, large: bool, shown: (&'static str, &'static str)) -> (bool, bool) {
-    let label = shown.1;
+fn button(ui: &Ui, p: &egui::Painter, pal: &Palette, r: Rect, it: &Item, large: bool, shown: (&'static str, &'static str, Icon)) -> (bool, bool) {
+    let (label, icon) = (shown.1, shown.2);
     let resp = ui.interact(r, ui.scope_id().with(("ruban", it.id)), if it.enabled { Sense::click() } else { Sense::hover() });
     resp.widget_info(|| match it.checked {
         Some(on) => egui::WidgetInfo::selected(egui::Role::CheckBox, it.enabled, on, label),
@@ -510,13 +513,13 @@ fn button(ui: &Ui, p: &egui::Painter, pal: &Palette, r: Rect, it: &Item, large: 
         (accent, pal.text)
     };
     if large {
-        icons::paint(p, Rect::from_center_size(pos2(r.center().x, r.top() + 24.0), vec2(28.0, 28.0)), it.icon, icon_c);
+        icons::paint(p, Rect::from_center_size(pos2(r.center().x, r.top() + 24.0), vec2(28.0, 28.0)), icon, icon_c);
         let mut job = egui::text::LayoutJob::simple(label.to_owned(), theme::regular(12.5), text_c, r.width() - 6.0);
         job.halign = Align::Center;
         job.wrap.max_rows = 2;
         p.galley(pos2(r.center().x, r.top() + 44.0), p.layout_job(job), text_c);
     } else {
-        icons::paint(p, Rect::from_center_size(pos2(r.left() + 14.0, r.center().y), vec2(16.0, 16.0)), it.icon, icon_c);
+        icons::paint(p, Rect::from_center_size(pos2(r.left() + 14.0, r.center().y), vec2(16.0, 16.0)), icon, icon_c);
         p.text(pos2(r.left() + 28.0, r.center().y), Align2::LEFT_CENTER, label, theme::regular(12.5), text_c);
     }
     let has_variants = !it.variants.is_empty();

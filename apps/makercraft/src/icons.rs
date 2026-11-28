@@ -133,6 +133,27 @@ pub enum Icon {
     Comment,
     /// Maillons de chaîne (contour lié à des parcours).
     Link,
+    // variantes (clic droit sur un bouton du ruban) : points et éléments qui définissent la forme
+    CircleCD,
+    Circle2P,
+    Circle3P,
+    CircleTTR,
+    CircleTTT,
+    Arc3P,
+    ArcSCE,
+    ArcSCA,
+    ArcSCL,
+    ArcSEA,
+    ArcSED,
+    ArcSER,
+    ArcCSE,
+    ArcCSA,
+    ArcCSL,
+    ArcCont,
+    EllipseAxis,
+    EllipseArc,
+    ArrayPolar,
+    ArrayPath,
 }
 
 /// Point relatif au carré `r` : (0,0) coin haut gauche, (1,1) coin bas droit.
@@ -593,6 +614,122 @@ pub fn paint(p: &Painter, r: Rect, icon: Icon, c: Color32) {
             line(p, r, &[(0.1, 0.16), (0.9, 0.16), (0.9, 0.7), (0.46, 0.7), (0.26, 0.9), (0.28, 0.7), (0.1, 0.7), (0.1, 0.16)], s);
             line(p, r, &[(0.24, 0.36), (0.76, 0.36)], s);
             line(p, r, &[(0.24, 0.52), (0.62, 0.52)], s);
+        }
+        Icon::CircleCD | Icon::Circle2P | Icon::Circle3P => {
+            let (o, rad) = (r.center(), r.width() * 0.38);
+            p.circle_stroke(o, rad, s);
+            let dot = |q: Pos2| p.circle_filled(q, w * 1.3, c);
+            match icon {
+                Icon::CircleCD => {
+                    p.line_segment([o - vec2(rad, 0.0), o + vec2(rad, 0.0)], s);
+                    p.circle_filled(o, w * 1.1, c);
+                }
+                Icon::Circle2P => {
+                    dot(o - vec2(rad, 0.0));
+                    dot(o + vec2(rad, 0.0));
+                }
+                _ => {
+                    dot(o - vec2(0.0, rad));
+                    dot(o + vec2(-rad * 0.87, rad * 0.5));
+                    dot(o + vec2(rad * 0.87, rad * 0.5));
+                }
+            }
+        }
+        Icon::CircleTTR => {
+            line(p, r, &[(0.04, 0.92), (0.96, 0.92)], s);
+            line(p, r, &[(0.04, 0.12), (0.62, 0.92)], s);
+            let o = at(r, 0.62, 0.62);
+            p.circle_stroke(o, r.width() * 0.28, s);
+            p.line_segment([o, o + vec2(r.width() * 0.28, 0.0)], Stroke::new(w * 0.7, c));
+        }
+        Icon::CircleTTT => {
+            line(p, r, &[(0.5, 0.04), (0.96, 0.9), (0.04, 0.9), (0.5, 0.04)], s);
+            p.circle_stroke(at(r, 0.5, 0.62), r.width() * 0.25, s);
+        }
+        Icon::Arc3P | Icon::ArcSCE | Icon::ArcSCA | Icon::ArcSCL | Icon::ArcSEA | Icon::ArcSED | Icon::ArcSER | Icon::ArcCSE | Icon::ArcCSA | Icon::ArcCSL => {
+            // demi-cercle supérieur : départ à gauche, fin à droite, centre en bas au milieu
+            let o = at(r, 0.5, 0.72);
+            let rad = r.width() * 0.38;
+            let pts: Vec<Pos2> = (0..=16).map(|i| { let a = std::f32::consts::PI * (1.0 + i as f32 / 16.0); o + vec2(rad * a.cos(), rad * a.sin()) }).collect();
+            p.add(Shape::line(pts, s));
+            let (st, en, mid) = (o - vec2(rad, 0.0), o + vec2(rad, 0.0), o - vec2(0.0, rad));
+            let dot = |q: Pos2| p.circle_filled(q, w * 1.3, c);
+            let thin = Stroke::new(w * 0.7, c);
+            let centre = || {
+                p.line_segment([o - vec2(w * 2.0, 0.0), o + vec2(w * 2.0, 0.0)], thin);
+                p.line_segment([o - vec2(0.0, w * 2.0), o + vec2(0.0, w * 2.0)], thin);
+            };
+            match icon {
+                Icon::Arc3P => {
+                    dot(st);
+                    dot(mid);
+                    dot(en);
+                }
+                Icon::ArcSCE | Icon::ArcCSE => {
+                    dot(st);
+                    dot(en);
+                    centre();
+                }
+                Icon::ArcSCA | Icon::ArcCSA => {
+                    dot(st);
+                    centre();
+                    p.line_segment([o, st], thin);
+                    p.line_segment([o, en], thin);
+                }
+                Icon::ArcSCL | Icon::ArcCSL => {
+                    dot(st);
+                    centre();
+                    p.extend(Shape::dashed_line(&[st, en], thin, w * 2.0, w * 1.5));
+                }
+                Icon::ArcSEA => {
+                    dot(st);
+                    dot(en);
+                    p.line_segment([o, st], thin);
+                    p.line_segment([o, en], thin);
+                }
+                Icon::ArcSED => {
+                    dot(st);
+                    dot(en);
+                    p.line_segment([st, st - vec2(0.0, rad * 0.9)], thin);
+                }
+                _ => {
+                    dot(st);
+                    dot(en);
+                    p.line_segment([o, mid], thin);
+                }
+            }
+        }
+        Icon::ArcCont => {
+            line(p, r, &[(0.04, 0.85), (0.4, 0.85)], s);
+            let o = at(r, 0.4, 0.5);
+            let rad = r.height() * 0.35;
+            let pts: Vec<Pos2> = (0..=12).map(|i| { let a = std::f32::consts::FRAC_PI_2 - std::f32::consts::PI * i as f32 / 12.0; o + vec2(rad * a.cos(), rad * a.sin()) }).collect();
+            p.add(Shape::line(pts, s));
+        }
+        Icon::EllipseAxis => {
+            let pts: Vec<Pos2> = (0..=32).map(|i| { let a = std::f32::consts::TAU * i as f32 / 32.0; at(r, 0.5 + 0.42 * a.cos(), 0.5 + 0.24 * a.sin()) }).collect();
+            p.add(Shape::line(pts, s));
+            line(p, r, &[(0.08, 0.5), (0.92, 0.5)], Stroke::new(w * 0.7, c));
+            p.circle_filled(at(r, 0.08, 0.5), w * 1.3, c);
+            p.circle_filled(at(r, 0.92, 0.5), w * 1.3, c);
+        }
+        Icon::EllipseArc => {
+            let pts: Vec<Pos2> = (0..=20).map(|i| { let a = std::f32::consts::PI * (1.0 + i as f32 / 20.0); at(r, 0.5 + 0.42 * a.cos(), 0.62 + 0.3 * a.sin()) }).collect();
+            p.add(Shape::line(pts, s));
+        }
+        Icon::ArrayPolar => {
+            p.circle_stroke(r.center(), r.width() * 0.32, Stroke::new(w * 0.6, c));
+            for k in 0..6 {
+                let a = std::f32::consts::TAU * k as f32 / 6.0;
+                let q = r.center() + vec2(r.width() * 0.32 * a.cos(), r.width() * 0.32 * a.sin());
+                p.rect_stroke(Rect::from_center_size(q, vec2(r.width() * 0.18, r.width() * 0.18)), CornerRadius::same(1), s, StrokeKind::Middle);
+            }
+        }
+        Icon::ArrayPath => {
+            line(p, r, &[(0.06, 0.8), (0.3, 0.5), (0.6, 0.55), (0.94, 0.2)], Stroke::new(w * 0.6, c));
+            for (x, y) in [(0.12, 0.72), (0.42, 0.48), (0.82, 0.32)] {
+                p.rect_stroke(Rect::from_center_size(at(r, x, y), vec2(r.width() * 0.2, r.width() * 0.2)), CornerRadius::same(1), s, StrokeKind::Middle);
+            }
         }
         Icon::Link => {
             let k = CornerRadius::same((r.width() * 0.16) as u8);

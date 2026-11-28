@@ -48,7 +48,7 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
   Interface).
 - Dessin : variantes au clic droit sur une icône du ruban (cercle : 6, arc : 11, ellipse : 3,
   réseau : rectangulaire, circulaire, le long d'un tracé) ; la dernière utilisée reste affichée et
-  se relance d'un clic, retenue d'une séance à l'autre. Petit coin sur les boutons à variantes.
+  se relance d'un clic, retenue d'une séance à l'autre. Chaque variante a son icône (points et éléments qui définissent la forme) ; petit coin sur les boutons à variantes.
 - Dessin : réseaux toujours associatifs (lien gardé avec la forme d'origine, modifiables après
   coup, y compris après enregistrement), posés sur le contour de la forme ; décomposer un réseau
   demande confirmation.
