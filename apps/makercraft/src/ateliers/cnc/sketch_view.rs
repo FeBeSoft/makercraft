@@ -875,6 +875,18 @@ fn context_menu(ui: &mut Ui, sketch: &mut Sketch, list: &render::DisplayList, ou
         }
     }
     ui.separator();
+    // changer les objets de contour (calque)
+    let here: Vec<String> = sel.iter().filter_map(|h| sketch.layer_of(*h)).collect();
+    let targets: Vec<String> = sketch.layers().into_iter().map(|l| l.name).filter(|n| n != "Defpoints" && !(here.len() == sel.len() && here.iter().all(|h| h == n))).collect();
+    ui.menu_button("Envoyer dans le contour", |ui| {
+        for t in &targets {
+            if ui.button(t).clicked() {
+                let hs: Vec<String> = sel.iter().map(|h| h.hex()).collect();
+                out.status = status(sketch.session.execute("properties.set", &serde_json::json!({ "handles": hs, "layer": t })));
+            }
+        }
+    });
+    ui.separator();
     if ui.button("Supprimer (Suppr)").clicked() {
         run_cmd(sketch, "erase", out);
     }
