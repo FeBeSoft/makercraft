@@ -108,6 +108,11 @@ impl Sketch {
         d.model.iter().filter(|e| hs.contains(&e.handle) && ok(&e.common.layer)).map(|e| e.handle).collect()
     }
 
+    /// Objets du calque `layer`.
+    pub fn objects_on(&self, layer: &str) -> Vec<doc::Handle> {
+        self.drawing().map(|d| d.model.iter().filter(|e| e.common.layer == layer).map(|e| e.handle).collect()).unwrap_or_default()
+    }
+
     /// Calque de l'objet `h`.
     pub fn layer_of(&self, h: doc::Handle) -> Option<String> {
         self.drawing()?.model.iter().find(|e| e.handle == h).map(|e| e.common.layer.clone())

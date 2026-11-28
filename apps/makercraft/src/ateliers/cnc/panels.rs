@@ -230,9 +230,42 @@ fn drawing(c: &mut Cnc, ui: &mut Ui, pal: &Palette, req: &mut Vec<Request>) {
                 let (r, _) = ui.allocate_exact_size(vec2(12.0, 12.0), Sense::hover());
                 ui.painter().rect_filled(r, egui::CornerRadius::same(3), egui::Color32::from_rgb(l.rgb[0], l.rgb[1], l.rgb[2]));
                 let cur = l.name == current;
-                let name = RichText::new(&l.name).strong().color(if l.visible { ui.visuals().text_color() } else { pal.dim });
-                if ui.radio(cur, name).on_hover_text("Contour courant : ce qu'on dessine va dessus").clicked() {
-                    c.sketch.set_current_layer(&l.name);
+                let editing = c.renaming.as_ref().is_some_and(|(old, _)| *old == l.name);
+                if editing {
+                    // renommage sur place : Entrée valide, Échap annule
+                    let mut commit = false;
+                    if let Some((_, buf)) = c.renaming.as_mut() {
+                        let r = ui.add(egui::TextEdit::singleline(buf).desired_width(150.0));
+                        r.request_focus();
+                        commit = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                    }
+                    if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                        c.renaming = None;
+                    } else if commit && let Some((old, new)) = c.renaming.take() {
+                        keep(&mut msg, rename_contour(c, &old, new.trim()));
+                    }
+                } else {
+                    let name = RichText::new(&l.name).strong().color(if l.visible { ui.visuals().text_color() } else { pal.dim });
+                    let r = ui.radio(cur, name).on_hover_text("Contour courant : ce qu'on dessine va dessus ; double-clic ou F2 : renommer ; clic droit : menu");
+                    if r.clicked() {
+                        c.sketch.set_current_layer(&l.name);
+                    }
+                    if r.double_clicked() || (cur && ui.input(|i| i.key_pressed(egui::Key::F2)) && !ui.ctx().egui_wants_keyboard_input()) {
+                        c.renaming = Some((l.name.clone(), l.name.clone()));
+                    }
+                    r.context_menu(|ui| {
+                        if ui.button("Renommer (F2)").clicked() {
+                            c.renaming = Some((l.name.clone(), l.name.clone()));
+                        }
+                        if ui.button("Sélectionner ses objets").clicked() {
+                            let hs = c.sketch.objects_on(&l.name);
+                            c.sketch.session.set_selection(hs);
+                        }
+                        ui.separator();
+                        if ui.button("Supprimer le contour...").clicked() {
+                            c.delete_contour = Some(l.name.clone());
+                        }
+                    });
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if tool(ui, pal, if l.locked { Icon::Lock } else { Icon::Unlock }, if l.locked { "Verrouillé : cliquer pour déverrouiller" } else { "Verrouiller (plus de modification possible)" }, l.locked) {
@@ -269,6 +302,7 @@ fn drawing(c: &mut Cnc, ui: &mut Ui, pal: &Palette, req: &mut Vec<Request>) {
             }
         }
     });
+    delete_window(c, ui, &mut msg);
     if let Some(m) = msg {
         req.push(Request::Status(m));
     }
@@ -276,6 +310,88 @@ fn drawing(c: &mut Cnc, ui: &mut Ui, pal: &Palette, req: &mut Vec<Request>) {
         ui.label(RichText::new("Les commandes du ruban (ou tapées : ligne, cercle, rect...) demandent leurs points : clic dans la vue, ou valeurs dans la ligne de commande (x,y ; @dx,dy ; longueur). Clic droit : menu de la commande ou de la sélection ; clic molette : menu des vues.").size(12.5).color(pal.weak));
         ui.label(RichText::new("Sélection : clic, ou rectangle glissé. Le cadre orange déplace, met à l'échelle et tourne (Maj : depuis le centre, pas de 15°) ; Entrée ouvre les cotes.").size(12.5).color(pal.weak));
     });
+}
+
+/// Renomme un contour (calque) ; les parcours et commentaires qui le visent suivent.
+fn rename_contour(c: &mut Cnc, old: &str, new: &str) -> Option<String> {
+    if new.is_empty() || new == old {
+        return None;
+    }
+    if c.sketch.layers().iter().any(|l| l.name == new) {
+        return Some(format!("Un contour s'appelle déjà « {new} »"));
+    }
+    if let Err(e) = c.sketch.session.execute("layer.set", &serde_json::json!({ "name": old, "newName": new })) {
+        return Some(e.to_string());
+    }
+    for tp in &mut c.project.toolpaths {
+        for l in &mut tp.layers {
+            if l == old {
+                *l = new.to_owned();
+            }
+        }
+    }
+    if let Some(t) = c.project.comments.remove(old) {
+        c.project.comments.insert(new.to_owned(), t);
+    }
+    c.expanded.remove(old);
+    None
+}
+
+/// Confirmation avant de supprimer un contour et tous ses objets (annulable par Ctrl+Z).
+fn delete_window(c: &mut Cnc, ui: &mut Ui, msg: &mut Option<String>) {
+    let Some(name) = c.delete_contour.clone() else { return };
+    let n = c.sketch.objects_on(&name).len();
+    let used: Vec<String> = c.project.toolpaths.iter().filter(|t| t.layers.contains(&name)).map(|t| t.name.clone()).collect();
+    let mut choice = None;
+    egui::Modal::new(egui::Id::unique("supprimer-contour")).show(ui.ctx(), |ui| {
+        ui.set_width(380.0);
+        ui.label(RichText::new(format!("Supprimer le contour « {name} » ?")).strong().size(15.0));
+        ui.label(format!("{n} objet(s) seront effacés (Ctrl+Z pour revenir en arrière)."));
+        if !used.is_empty() {
+            ui.label(RichText::new(format!("Parcours qui l'utilisent : {}", used.join(", "))).color(pal_warn(ui)));
+        }
+        ui.horizontal(|ui| {
+            if ui.button("Supprimer").clicked() {
+                choice = Some(true);
+            }
+            if ui.button("Annuler").clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                choice = Some(false);
+            }
+        });
+    });
+    match choice {
+        Some(true) => {
+            c.delete_contour = None;
+            keep(msg, delete_contour(c, &name));
+        }
+        Some(false) => c.delete_contour = None,
+        None => {}
+    }
+}
+
+fn pal_warn(ui: &Ui) -> egui::Color32 {
+    ui.visuals().warn_fg_color
+}
+
+fn delete_contour(c: &mut Cnc, name: &str) -> Option<String> {
+    let hs: Vec<String> = c.sketch.objects_on(name).iter().map(|h| h.hex()).collect();
+    if !hs.is_empty()
+        && let Err(e) = c.sketch.session.execute("erase", &serde_json::json!({ "handles": hs }))
+    {
+        return Some(e.to_string());
+    }
+    if c.sketch.current_layer() == name
+        && let Some(other) = c.sketch.layers().into_iter().map(|l| l.name).find(|l| l != name && l != "Defpoints")
+    {
+        c.sketch.set_current_layer(&other);
+    }
+    if name != "0"
+        && let Err(e) = c.sketch.session.execute("layer.delete", &serde_json::json!({ "name": name }))
+    {
+        return Some(e.to_string());
+    }
+    c.project.comments.remove(name);
+    None
 }
 
 /// Garde le premier message d'erreur.

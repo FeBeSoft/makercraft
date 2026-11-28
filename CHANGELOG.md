@@ -60,6 +60,8 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
   largeur), posés en polylignes fermées ; Point et Points multiples (repères de perçage) ;
   Miroir avec variantes Retourner horizontalement / verticalement (sur place) ; Caler (deux
   paires de points), Étirer, Remplir le brut (mise à l'échelle sans déformer, centrée).
+- Contours : renommer sur place (double-clic, F2 ou clic droit ; parcours et commentaires suivent),
+  sélectionner ses objets, supprimer un contour et ses objets après confirmation (annulable).
 - Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
   rétablissent, chevrons étroits aux extrémités du ruban.
 

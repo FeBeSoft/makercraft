@@ -118,6 +118,10 @@ pub struct Cnc {
     explode_confirm: bool,
     /// Boîte Étoile / Oblong ouverte.
     shape: Option<ShapeDialog>,
+    /// Contour en cours de renommage : (ancien nom, saisie).
+    pub(crate) renaming: Option<(String, String)>,
+    /// Contour à supprimer, en attente de confirmation.
+    pub(crate) delete_contour: Option<String>,
 }
 
 /// Boîte des formes paramétrées (étoile, oblong).
@@ -166,6 +170,8 @@ impl Default for Cnc {
             origin_3d: true,
             explode_confirm: false,
             shape: None,
+            renaming: None,
+            delete_contour: None,
         }
     }
 }
