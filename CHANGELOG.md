@@ -113,6 +113,10 @@ v0.51.2; CadCraft stays on v0.20.1 (no newer stable release).*
 - Dessin : dégagements dogbone et T-bone. Le tracé suit désormais l'encoche que laisse la fraise
   qui touche le coin (sur la bissectrice, ou dans la paroi du segment qui part pour le T-bone),
   au lieu d'une boucle extérieure rattachée au coin par un seul point.
+- Dessin : à la fin d'un réseau circulaire, le nouveau réseau est choisi et ses paramètres
+  s'affichent dans Propriétés (comme pour le réseau rectangulaire).
+- Mises à jour : seule une version plus récente est proposée (une version plus ancienne
+  publiée sur GitHub était annoncée comme nouvelle).
 
 ## v0.1.0 bêta 20261121 - 21/11/2026
 

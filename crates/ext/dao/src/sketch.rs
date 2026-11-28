@@ -271,6 +271,11 @@ impl Sketch {
         self.drawing().is_some_and(|d| d.model.iter().any(|e| d.array_params(e).is_some_and(|a| a.editing.is_some())))
     }
 
+    /// Réseaux associatifs du dessin, dans l'ordre de création.
+    pub fn arrays(&self) -> Vec<doc::Handle> {
+        self.drawing().map(|d| d.model.iter().filter(|e| d.array_params(e).is_some()).map(|e| e.handle).collect()).unwrap_or_default()
+    }
+
     /// Un des objets `hs` est-il un réseau associatif ?
     pub fn has_array(&self, hs: &[doc::Handle]) -> bool {
         self.drawing().is_some_and(|d| d.model.iter().any(|e| hs.contains(&e.handle) && d.array_params(e).is_some()))

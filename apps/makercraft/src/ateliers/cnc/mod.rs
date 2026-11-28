@@ -124,6 +124,9 @@ pub struct Cnc {
     pub(crate) delete_contour: Option<String>,
     /// Contour courant à rétablir après une ligne de construction ou une cote.
     restore_layer: Option<String>,
+    /// Commande de réseau lancée par ses invites : nombre de réseaux avant elle, pour choisir le
+    /// nouveau réseau à la fin (ses paramètres s'affichent alors dans Propriétés).
+    arrays_before: Option<usize>,
     /// Boîte des dégagements d'angle : (T-bone, rayon de la fraise).
     relief: Option<(bool, f64)>,
     /// Historique de construction affiché dans la colonne de droite (jusqu'à la prochaine action).
@@ -179,6 +182,7 @@ impl Default for Cnc {
             renaming: None,
             delete_contour: None,
             restore_layer: None,
+            arrays_before: None,
             relief: None,
             history: false,
         }
@@ -390,6 +394,9 @@ impl Cnc {
         }
         // sans commande en cours, cancel() vide la sélection : on la remet, pour que la commande
         // (réseau, déplacer, tourner...) parte des objets déjà choisis
+        if name.starts_with("array") {
+            self.arrays_before = Some(self.sketch.arrays().len());
+        }
         self.sketch.session.cancel();
         if !sel.is_empty() {
             self.sketch.session.set_selection(sel);
@@ -859,6 +866,18 @@ impl Cnc {
                 && let Some(l) = self.restore_layer.take()
             {
                 self.sketch.set_current_layer(&l);
+            }
+            // fin d'une commande de réseau : le nouveau réseau est choisi, Propriétés le règle
+            if self.sketch.session.running.is_none()
+                && let Some(n) = self.arrays_before.take()
+            {
+                let arrays = self.sketch.arrays();
+                if arrays.len() > n
+                    && let Some(h) = arrays.last()
+                {
+                    self.sketch.session.set_selection(vec![*h]);
+                    self.side_tab = props::SideTab::Props;
+                }
             }
             self.explode_window(ui, req);
             self.shape_window(ui, req);

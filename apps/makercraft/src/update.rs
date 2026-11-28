@@ -46,6 +46,34 @@ pub fn current_tag() -> String {
     if date.is_empty() { format!("v{}", env!("CARGO_PKG_VERSION")) } else { format!("v{}-beta.{date}", env!("CARGO_PKG_VERSION")) }
 }
 
+/// Clé de comparaison d'une étiquette `v0.1.1-beta.20261128` : (0, 1, 1, 20261128). Une version
+/// sans suffixe passe après ses bêtas. None si l'étiquette n'est pas de cette forme.
+fn version_key(tag: &str) -> Option<[u64; 4]> {
+    let t = tag.trim().trim_start_matches(['v', 'V']);
+    let (num, pre) = t.split_once('-').map_or((t, None), |(a, b)| (a, Some(b)));
+    let mut k = [0u64; 4];
+    let parts: Vec<&str> = num.split('.').collect();
+    if parts.is_empty() || parts.len() > 3 {
+        return None;
+    }
+    for (i, s) in parts.iter().enumerate() {
+        k[i] = s.parse().ok()?;
+    }
+    k[3] = match pre {
+        None => u64::MAX,
+        Some(p) => p.chars().filter(char::is_ascii_digit).collect::<String>().parse().unwrap_or(0),
+    };
+    Some(k)
+}
+
+/// L'étiquette `tag` est-elle une version plus récente que `current` ?
+fn is_newer(tag: &str, current: &str) -> bool {
+    match (version_key(tag), version_key(current)) {
+        (Some(a), Some(b)) => a > b,
+        _ => false,
+    }
+}
+
 /// `propriétaire/dépôt` d'après l'adresse du dépôt GitHub (vide s'il n'est pas publié).
 fn repo_path(url: &str) -> Option<String> {
     let p = url.trim().trim_end_matches('/').trim_end_matches(".git");
@@ -112,7 +140,7 @@ impl Updater {
     /// Nouvelle version trouvée lors de la dernière vérification (ni l'actuelle, ni passée).
     pub fn newer(&self, prefs: &Prefs) -> Option<&Release> {
         match &self.state {
-            State::Done(Ok(r)) if r.tag != current_tag() && r.tag != prefs.skipped_version => Some(r),
+            State::Done(Ok(r)) if is_newer(&r.tag, &current_tag()) && r.tag != prefs.skipped_version => Some(r),
             _ => None,
         }
     }
@@ -156,7 +184,8 @@ impl Updater {
                         close = true;
                     }
                 }
-                State::Done(Ok(r)) if r.tag == current => {
+                // la dernière version publiée n'est pas plus récente que celle installée
+                State::Done(Ok(r)) if !is_newer(&r.tag, &current) => {
                     ui.label(RichText::new("MakerCraft est à jour.").font(theme::bold(14.0)).color(pal.ok));
                     ui.add_space(6.0);
                     if ui.button("Fermer").clicked() {
@@ -224,5 +253,16 @@ mod tests {
         assert_eq!(repo_path("https://github.com/FeBeSoft/makercraft").as_deref(), Some("FeBeSoft/makercraft"));
         assert_eq!(repo_path(""), None);
         assert!(current_tag().starts_with('v'));
+    }
+
+    #[test]
+    fn compares_versions() {
+        assert!(is_newer("v0.1.1-beta.20261128", "v0.1.0-beta.20261121"));
+        assert!(!is_newer("v0.1.0-beta.20261121", "v0.1.1-beta.20261128"));
+        assert!(!is_newer("v0.1.1-beta.20261128", "v0.1.1-beta.20261128"));
+        assert!(is_newer("v0.1.1-beta.20261205", "v0.1.1-beta.20261128"));
+        assert!(is_newer("v0.2.0-beta.1", "v0.1.9-beta.20991231"));
+        assert!(is_newer("v0.1.1", "v0.1.1-beta.20261128"));
+        assert!(!is_newer("nimporte", "v0.1.0"));
     }
 }
