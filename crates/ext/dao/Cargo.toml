@@ -18,5 +18,8 @@ cadcraft-io.workspace = true
 cadcraft-render.workspace = true
 thiserror.workspace = true
 
+[dev-dependencies]
+serde_json.workspace = true
+
 [lints]
 workspace = true

@@ -298,6 +298,52 @@ pub fn flatten_bulges(v: &[cgeom::PolyVertex], closed: bool, tol: f64) -> Vec<cg
 
 #[cfg(test)]
 mod tests {
+    /// Le lien du réseau (forme d'origine + paramètres) survit à l'enregistrement DXF du .mkc,
+    /// et le réseau reste modifiable après relecture.
+    #[test]
+    fn associative_array_survives_dxf_roundtrip() {
+        let mut sk = Sketch::new();
+        if let Err(e) = sk.session.execute("circle", &serde_json::json!({ "center": [0.0, 0.0], "radius": 5.0 })) {
+            panic!("cercle : {e}");
+        }
+        let hs: Vec<String> = sk.session.doc().map(|d| d.model.handles()).unwrap_or_default().iter().map(|h| h.hex()).collect();
+        assert_eq!(hs.len(), 1);
+        let p = serde_json::json!({ "handles": hs, "rows": 2, "cols": 3, "rowSpacing": 20.0, "colSpacing": 20.0 });
+        if let Err(e) = sk.session.execute("arrayrect", &p) {
+            panic!("réseau : {e}");
+        }
+        let arrays = |s: &Sketch| -> Vec<(doc::Handle, doc::ArrayParams)> {
+            let Ok(d) = s.session.doc() else { return Vec::new() };
+            d.model.iter().filter_map(|e| d.array_params(e).map(|a| (e.handle, a))).collect()
+        };
+        let before = arrays(&sk);
+        assert_eq!(before.len(), 1, "le réseau doit être associatif");
+        let bytes = match sk.to_bytes("essai.dxf") {
+            Ok(b) => b,
+            Err(e) => panic!("écriture : {e}"),
+        };
+        let mut back = match Sketch::from_bytes(&bytes, "essai.dxf") {
+            Ok(s) => s,
+            Err(e) => panic!("relecture : {e}"),
+        };
+        let after = arrays(&back);
+        assert_eq!(after.len(), 1, "le lien du réseau est perdu à la relecture");
+        assert_eq!(after.first().map(|a| &a.1.kind), before.first().map(|a| &a.1.kind));
+        // toujours modifiable : 4 colonnes
+        let Some((h, _)) = after.first() else { panic!("réseau absent") };
+        if let Err(e) = back.session.execute("arrayedit", &serde_json::json!({ "handle": h.hex(), "cols": 4 })) {
+            panic!("arrayedit après relecture : {e}");
+        }
+        let edited = arrays(&back);
+        assert_eq!(edited.len(), 1);
+        assert_ne!(edited.first().map(|a| &a.1.kind), after.first().map(|a| &a.1.kind), "le réseau n'a pas changé");
+        // les copies sont des tracés usinables du contour
+        // les 8 exemplaires sont des tracés fermés du contour d'origine, donc usinés
+        let all = back.all_contours(0.05);
+        assert_eq!(all.len(), 8);
+        assert!(all.iter().all(|c| c.closed && c.layer == "Contour 1"));
+    }
+
     #[test]
     fn bulge_semicircle_flattened_on_the_circle() {
         let v = [
