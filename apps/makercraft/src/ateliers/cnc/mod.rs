@@ -126,6 +126,8 @@ pub struct Cnc {
     restore_layer: Option<String>,
     /// Boîte des dégagements d'angle : (T-bone, rayon de la fraise).
     relief: Option<(bool, f64)>,
+    /// Historique de construction affiché dans la colonne de droite (jusqu'à la prochaine action).
+    history: bool,
 }
 
 /// Boîte des formes paramétrées (étoile, oblong).
@@ -178,6 +180,7 @@ impl Default for Cnc {
             delete_contour: None,
             restore_layer: None,
             relief: None,
+            history: false,
         }
     }
 }
@@ -335,6 +338,12 @@ impl Cnc {
     /// Lance une commande de dessin de CadCraft (la commande en cours est annulée).
     fn draw_command(&mut self, name: &str, req: &mut Vec<Request>) {
         self.step = Step::Dessin;
+        self.history = false;
+        // points de construction : la commande des points multiples, sur le contour Construction
+        let (name, construction) = match name.strip_suffix(".construction") {
+            Some("point") => ("point.multiple", true),
+            _ => (name, false),
+        };
         let sel = self.sketch.session.selection();
         if name == "explode" && !self.explode_confirm && self.sketch.has_array(&sel) {
             self.explode_confirm = true;
@@ -345,7 +354,7 @@ impl Cnc {
         }
         // lignes de construction et cotes : sur leur contour de repère, jamais usiné ; le contour
         // courant revient quand la commande est finie
-        let reference = if matches!(name, "xline" | "ray") {
+        let reference = if construction || matches!(name, "xline" | "ray") {
             Some("Construction")
         } else if name.starts_with("dim") {
             Some("Cotes")
@@ -536,6 +545,7 @@ impl Cnc {
                             modify("cnc.cmd.xline", "Construction", Icon::XLine).tip("Ligne de construction, sur le contour Construction (jamais usiné)").variants(vec![
                                 Variant::new("cnc.cmd.xline", "Ligne infinie", "Construction", Icon::XLine),
                                 Variant::new("cnc.cmd.ray", "Demi-droite", "Demi-droite", Icon::XLine),
+                                Variant::new("cnc.cmd.point.construction", "Points de construction (Entrée termine)", "Points constr.", Icon::PointMulti),
                             ]),
                             modify("cnc.cmd.dimlinear", "Cote", Icon::Dim).tip("Cote, sur le contour Cotes (jamais usiné)").variants(vec![
                                 Variant::new("cnc.cmd.dimlinear", "Linéaire (horizontale, verticale)", "Cote", Icon::Dim),
@@ -571,7 +581,11 @@ impl Cnc {
                     },
                     Group {
                         label: "Historique",
-                        items: vec![modify("cnc.annuler", "Annuler", Icon::Undo).enabled(!busy), modify("cnc.retablir", "Rétablir", Icon::Redo).enabled(!busy)],
+                        items: vec![
+                            modify("cnc.annuler", "Annuler", Icon::Undo).enabled(!busy),
+                            modify("cnc.retablir", "Rétablir", Icon::Redo).enabled(!busy),
+                            modify("cnc.historique", "Historique", Icon::Journal).tip("Historique de construction, dans la colonne de droite (caché à la prochaine action)"),
+                        ],
                     },
                     view_clone(&view),
                 ],
@@ -696,6 +710,10 @@ impl Cnc {
                 }
             }
             "cnc.retourner_h" | "cnc.retourner_v" => self.flip(id == "cnc.retourner_h", req),
+            "cnc.historique" => {
+                self.step = Step::Dessin;
+                self.history = !self.history;
+            }
             "cnc.remplir_brut" => self.fill_stock(req),
             "cnc.reparer" => {
                 if let Some((sel, _)) = self.selection_box(req) {
@@ -819,6 +837,10 @@ impl Cnc {
             if let Some(c) = out.command {
                 self.draw_command(c, req);
             }
+            // l'historique se cache à la prochaine action dans la vue
+            if self.history && (out.changed || ui.input(|i| i.pointer.any_pressed()) && ui.rect_contains_pointer(r2d)) {
+                self.history = false;
+            }
             if self.sketch.session.running.is_none()
                 && let Some(l) = self.restore_layer.take()
             {
@@ -855,6 +877,34 @@ impl Cnc {
         const TABS_H: f32 = 30.0;
         let body = Rect::from_min_max(r.min, pos2(r.right(), r.bottom() - TABS_H - 6.0));
         let tabs = Rect::from_min_max(pos2(r.left(), r.bottom() - TABS_H), r.max);
+        // historique de construction : remplace le panneau jusqu'à la prochaine action
+        if self.history {
+            let mut cui = ui.new_child(UiBuilder::new().max_rect(r));
+            let mut undo_to = None;
+            ScrollArea::vertical().id_salt("cnc-historique").auto_shrink([false, false]).show(&mut cui, |ui| {
+                ui.set_max_width(r.width() - 12.0);
+                crate::widgets::card(ui, pal, Some("Historique de construction"), |ui| {
+                    let steps: Vec<String> = self.sketch.session.state().map(|st| st.undo.iter().map(|s| s.label.clone()).collect()).unwrap_or_default();
+                    if steps.is_empty() {
+                        ui.label(egui::RichText::new("Aucune étape depuis l'ouverture.").color(pal.weak));
+                    }
+                    let n = steps.len();
+                    for (i, s) in steps.iter().enumerate().rev() {
+                        let label = format!("{}. {}", i + 1, props::step_label(s));
+                        if ui.selectable_label(i + 1 == n, label).on_hover_text("Revenir juste après cette étape (les suivantes restent en Rétablir)").clicked() {
+                            undo_to = Some(n - (i + 1));
+                        }
+                    }
+                    ui.label(egui::RichText::new("Clic sur une étape : revenir juste après. Caché à la prochaine action.").size(12.0).color(pal.weak));
+                });
+            });
+            if let Some(k) = undo_to {
+                for _ in 0..k {
+                    let _ = self.sketch.session.cmdline("undo");
+                }
+            }
+            return;
+        }
         if self.side_tab == props::SideTab::View3d {
             let scene = self.scene3d(pal);
             self.view3d.show(ui, body, pal, &scene, "contours posés sur le brut");

@@ -217,6 +217,43 @@ fn array_fields(ui: &mut Ui, pal: &Palette, st: &mut PropsState, sketch: &mut Sk
     msg
 }
 
+/// Libellé français d'une étape d'annulation de CadCraft (nom de commande en anglais).
+pub fn step_label(s: &str) -> String {
+    let t = s.trim();
+    let fr = match t.to_ascii_lowercase().as_str() {
+        "line" => "Ligne",
+        "pline" | "polyline" => "Polyligne",
+        "rectang" | "rectangle" => "Rectangle",
+        "circle" => "Cercle",
+        "arc" => "Arc",
+        "ellipse" => "Ellipse",
+        "polygon" => "Polygone",
+        "spline" => "Spline",
+        "point" | "multiple point" => "Point",
+        "move" => "Déplacer",
+        "copy" => "Copier",
+        "rotate" => "Rotation",
+        "mirror" => "Miroir",
+        "scale" => "Échelle",
+        "offset" => "Décaler",
+        "trim" => "Ajuster",
+        "extend" => "Prolonger",
+        "fillet" => "Raccord",
+        "chamfer" => "Chanfrein",
+        "erase" => "Effacer",
+        "explode" => "Décomposer",
+        "join" => "Joindre",
+        "break" => "Couper",
+        "arrayrect" | "arraypolar" | "array" => "Réseau",
+        "arrayedit" => "Modifier le réseau",
+        "properties.set" | "properties" => "Propriétés",
+        "layer.set" => "Contour (visibilité, verrou, nom)",
+        "layer.delete" => "Supprimer un contour",
+        _ => return t.to_owned(),
+    };
+    fr.to_owned()
+}
+
 /// Un champ numérique ; renvoie la valeur quand elle est validée.
 #[allow(clippy::too_many_arguments)]
 fn field(ui: &mut Ui, st: &mut PropsState, f: Field, label: &str, value: f64, min: f64, suffix: &str, enabled: bool) -> Option<f64> {

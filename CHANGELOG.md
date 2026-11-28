@@ -81,6 +81,9 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
   joindre) ; Dégagements dogbone et T-bone au rayon de la fraise.
 - Ruban : le petit ruban des autres fonctions d'un groupe reste dans la fenêtre et défile avec
   des chevrons quand il est trop large.
+- Dessin : Historique de construction dans la colonne de droite (clic sur une étape : revenir
+  juste après ; caché à la prochaine action) ; points de construction (contour Construction) ;
+  croix bleue au point qui sera pris par la grille, l'ortho ou le polaire.
 - Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
   rétablissent, chevrons étroits aux extrémités du ruban.
 

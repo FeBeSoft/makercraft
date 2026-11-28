@@ -433,6 +433,19 @@ impl SketchView {
             p.rect_stroke(Rect::from_center_size(c, vec2(11.0, 11.0)), CornerRadius::ZERO, Stroke::new(1.6, pal.orange), StrokeKind::Middle);
             p.text(c + vec2(10.0, -10.0), Align2::LEFT_BOTTOM, snap_label(h.name), theme::regular(11.5), pal.orange);
         }
+        // point qui sera pris (grille, ortho, polaire), quand aucune accroche ne le capte
+        if editable
+            && self.snap.is_none()
+            && self.stock_snap.is_none()
+            && (self.aids.grid_snap || self.aids.ortho || self.aids.polar)
+            && let Some(c) = self.cursor
+            && sketch.session.running.is_some()
+        {
+            let base = sketch.session.current_prompt().and_then(|p| p.base);
+            let q = xf.to_screen(self.aids.constrain(c, base));
+            p.line_segment([q - vec2(6.0, 0.0), q + vec2(6.0, 0.0)], Stroke::new(1.4, pal.blue));
+            p.line_segment([q - vec2(0.0, 6.0), q + vec2(0.0, 6.0)], Stroke::new(1.4, pal.blue));
+        }
         if let Some((q, name)) = self.stock_snap {
             let c = xf.to_screen(q);
             p.rect_stroke(Rect::from_center_size(c, vec2(11.0, 11.0)), CornerRadius::ZERO, Stroke::new(1.6, pal.orange), StrokeKind::Middle);
