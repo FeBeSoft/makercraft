@@ -443,7 +443,7 @@ fn paths(c: &mut Cnc, ui: &mut Ui, pal: &Palette) {
         }
     });
     let Some(i) = c.selected_path.filter(|i| *i < c.project.toolpaths.len()) else { return };
-    let layers: Vec<String> = c.sketch.layers().into_iter().filter(|l| l.objects > 0).map(|l| l.name).collect();
+    let layers: Vec<String> = c.sketch.layers().into_iter().filter(|l| l.objects > 0 && !makercraft_dao::sketch::is_reference_layer(&l.name)).map(|l| l.name).collect();
     let tools = c.tooldb().and_then(|db| db.tools().map_err(|e| e.to_string())).unwrap_or_default();
     let tp = &mut c.project.toolpaths[i];
     widgets::card(ui, pal, Some("Réglages du parcours"), |ui| {

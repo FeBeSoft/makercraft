@@ -122,6 +122,8 @@ pub struct Cnc {
     pub(crate) renaming: Option<(String, String)>,
     /// Contour à supprimer, en attente de confirmation.
     pub(crate) delete_contour: Option<String>,
+    /// Contour courant à rétablir après une ligne de construction ou une cote.
+    restore_layer: Option<String>,
 }
 
 /// Boîte des formes paramétrées (étoile, oblong).
@@ -172,6 +174,7 @@ impl Default for Cnc {
             shape: None,
             renaming: None,
             delete_contour: None,
+            restore_layer: None,
         }
     }
 }
@@ -337,6 +340,22 @@ impl Cnc {
         if name.starts_with("array") {
             self.sketch.prepare_array();
         }
+        // lignes de construction et cotes : sur leur contour de repère, jamais usiné ; le contour
+        // courant revient quand la commande est finie
+        let reference = if matches!(name, "xline" | "ray") {
+            Some("Construction")
+        } else if name.starts_with("dim") {
+            Some("Cotes")
+        } else {
+            None
+        };
+        if let Some(l) = reference {
+            let cur = self.sketch.current_layer();
+            if cur != l {
+                self.restore_layer.get_or_insert(cur);
+                self.sketch.set_current_layer(l);
+            }
+        }
         // réseau rectangulaire sur la sélection : créé tout de suite (2 x 2, pas = taille + 5 mm),
         // puis réglé dans Propriétés, chaque valeur mettant à jour le réseau dans la vue
         if name == "arrayrect"
@@ -493,7 +512,34 @@ impl Cnc {
                             modify("cnc.cmd.align", "Caler", Icon::AlignPts).more().tip("Caler la sélection : point source puis point cible (deux paires pour tourner, mise à l'échelle au choix)"),
                             modify("cnc.cmd.stretch", "Étirer", Icon::Stretch).more().tip("Étirer : fenêtre de capture (de droite à gauche), puis déplacement"),
                             modify("cnc.remplir_brut", "Remplir le brut", Icon::FillStock).more().tip("Mettre la sélection à l'échelle du brut, sans déformer, et la centrer"),
+                            modify("cnc.cmd.pedit", "Polyligne", Icon::Polyline).more().tip("Modifier une polyligne : fermer, ouvrir, joindre, lisser, sommets"),
+                            modify("cnc.cmd.divide", "Diviser", Icon::PointMulti).more().tip("Points régulièrement répartis sur un tracé (nombre de parts)"),
+                            modify("cnc.cmd.measure", "Jalonner", Icon::PointMulti).more().tip("Points tous les N mm le long d'un tracé"),
+                            modify("cnc.cmd.lengthen", "Allonger", Icon::Extend).more().tip("Allonger ou raccourcir un trait ou un arc"),
+                            modify("cnc.cmd.reverse", "Inverser le sens", Icon::Redo).more().tip("Inverser le sens de parcours d'un tracé (utile aux parcours d'usinage)"),
+                            modify("cnc.cmd.blend", "Raccord lisse", Icon::Spline).more().tip("Courbe de raccord continue entre deux tracés"),
+                            modify("cnc.cmd.overkill", "Doublons", Icon::Trash).more().tip("Supprimer les objets en double et les traits superposés"),
                             modify("cnc.cmd.erase", "Effacer", Icon::Trash).more(),
+                        ],
+                    },
+                    Group {
+                        label: "Aides",
+                        items: vec![
+                            modify("cnc.cmd.xline", "Construction", Icon::XLine).tip("Ligne de construction, sur le contour Construction (jamais usiné)").variants(vec![
+                                Variant::new("cnc.cmd.xline", "Ligne infinie", "Construction", Icon::XLine),
+                                Variant::new("cnc.cmd.ray", "Demi-droite", "Demi-droite", Icon::XLine),
+                            ]),
+                            modify("cnc.cmd.dimlinear", "Cote", Icon::Dim).tip("Cote, sur le contour Cotes (jamais usiné)").variants(vec![
+                                Variant::new("cnc.cmd.dimlinear", "Linéaire (horizontale, verticale)", "Cote", Icon::Dim),
+                                Variant::new("cnc.cmd.dimaligned", "Alignée", "Cote alignée", Icon::Dim),
+                                Variant::new("cnc.cmd.dimradius", "Rayon", "Cote R", Icon::Dim),
+                                Variant::new("cnc.cmd.dimdiameter", "Diamètre", "Cote Ø", Icon::Dim),
+                                Variant::new("cnc.cmd.dimangular", "Angle", "Cote angle", Icon::Dim),
+                            ]),
+                            modify("cnc.cmd.dist", "Mesurer", Icon::Measure).tip("Distance entre deux points ; le résultat s'affiche sous la vue").variants(vec![
+                                Variant::new("cnc.cmd.dist", "Distance", "Mesurer", Icon::Measure),
+                                Variant::new("cnc.cmd.area", "Aire et périmètre", "Aire", Icon::Measure),
+                            ]),
                         ],
                     },
                     Group {
@@ -744,6 +790,11 @@ impl Cnc {
             }
             if let Some(c) = out.command {
                 self.draw_command(c, req);
+            }
+            if self.sketch.session.running.is_none()
+                && let Some(l) = self.restore_layer.take()
+            {
+                self.sketch.set_current_layer(&l);
             }
             self.explode_window(ui, req);
             self.shape_window(ui, req);

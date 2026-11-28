@@ -139,6 +139,8 @@ pub struct SketchView {
     window: Option<Pos2>,
     /// Menu des vues : position et passe d'ouverture.
     zoom_menu: Option<(Pos2, u64)>,
+    /// Messages de CadCraft déjà montrés (résultats de mesure...).
+    log_seen: usize,
     /// Finesse et transformation du dernier affichage.
     tol: f64,
     xf: Option<Xf>,
@@ -443,6 +445,16 @@ impl SketchView {
             let cr = Rect::from_min_max(pos2(rect.left(), canvas.bottom() + 6.0), rect.max);
             self.command_line(ui, cr, pal, sketch, cmd_id, &mut out);
         }
+        // résultats et messages de CadCraft (distance, aire...) : le dernier, sous la vue
+        let n = sketch.session.log.len();
+        if n > self.log_seen {
+            if out.status.is_none()
+                && let Some(m) = sketch.session.log.last()
+            {
+                out.status = Some(translate(m));
+            }
+            self.log_seen = n;
+        }
         let after = sketch.session.state().map_or(0, |st| Arc::as_ptr(&st.doc) as usize);
         out.changed = before != after;
         out
@@ -680,6 +692,15 @@ fn command_alias(t: &str) -> String {
         "decomposer" | "décomposer" | "dcp" => "explode",
         "chanfrein" | "cha" => "chamfer",
         "reseau" | "réseau" | "res" => "arrayrect",
+        "diviser" | "div" => "divide",
+        "jalonner" => "measure",
+        "allonger" | "all" => "lengthen",
+        "inverser" | "inv" => "reverse",
+        "doublons" => "overkill",
+        "construction" | "xl" => "xline",
+        "cote" => "dimlinear",
+        "distance" | "mesurer" | "di" => "dist",
+        "aire" => "area",
         "annuler" | "u" => "undo",
         "retablir" | "rétablir" => "redo",
         _ => return t.to_owned(),

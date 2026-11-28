@@ -165,6 +165,12 @@ pub enum Icon {
     Stretch,
     /// Remplir le brut sans déformer.
     FillStock,
+    /// Ligne de construction (infinie).
+    XLine,
+    /// Cote linéaire.
+    Dim,
+    /// Mesurer une distance.
+    Measure,
     #[expect(dead_code, reason = "réseau le long d'un tracé : en attente d'un réseau associatif dans CadCraft")]
     ArrayPath,
 }
@@ -779,6 +785,24 @@ pub fn paint(p: &Painter, r: Rect, icon: Icon, c: Color32) {
             p.circle_stroke(r.center(), r.height() * 0.3, s);
             line(p, r, &[(0.24, 0.5), (0.06, 0.5)], s);
             line(p, r, &[(0.76, 0.5), (0.94, 0.5)], s);
+        }
+        Icon::XLine => {
+            p.extend(Shape::dashed_line(&[at(r, 0.02, 0.9), at(r, 0.98, 0.1)], s, w * 3.0, w * 1.5));
+            p.circle_filled(r.center(), w * 1.4, c);
+        }
+        Icon::Dim => {
+            line(p, r, &[(0.1, 0.3), (0.1, 0.85)], Stroke::new(w * 0.6, c));
+            line(p, r, &[(0.9, 0.3), (0.9, 0.85)], Stroke::new(w * 0.6, c));
+            line(p, r, &[(0.1, 0.55), (0.9, 0.55)], s);
+            line(p, r, &[(0.22, 0.45), (0.1, 0.55), (0.22, 0.65)], s);
+            line(p, r, &[(0.78, 0.45), (0.9, 0.55), (0.78, 0.65)], s);
+        }
+        Icon::Measure => {
+            p.rect_stroke(Rect::from_min_max(at(r, 0.04, 0.35), at(r, 0.96, 0.7)), CornerRadius::same(1), s, StrokeKind::Middle);
+            for k in 1..8 {
+                let x = 0.04 + 0.115 * k as f32;
+                line(p, r, &[(x, 0.35), (x, if k % 2 == 0 { 0.55 } else { 0.47 })], Stroke::new(w * 0.6, c));
+            }
         }
         Icon::Link => {
             let k = CornerRadius::same((r.width() * 0.16) as u8);

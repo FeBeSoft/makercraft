@@ -68,6 +68,10 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
   droit).
 - Dessin : édition des nœuds par double-clic sur un objet : ses poignées (sommets, milieux,
   centre) se glissent, avec accroches et aides au tracé ; Échap ou clic dans le vide pour finir.
+- Dessin : Polyligne (fermer, ouvrir, joindre...), Diviser, Jalonner, Allonger, Inverser le sens,
+  Raccord lisse, Doublons ; groupe Aides : lignes de construction et cotes sur leurs contours
+  Construction et Cotes (jamais usinés, contour courant rétabli ensuite), Mesurer (distance,
+  aire) avec le résultat sous la vue.
 - Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
   rétablissent, chevrons étroits aux extrémités du ruban.
 

@@ -251,9 +251,9 @@ impl Sketch {
             .collect()
     }
 
-    /// Tous les tracés, calque par calque.
+    /// Tous les tracés usinables, calque par calque (sans les lignes de construction ni les cotes).
     pub fn all_contours(&self, tolerance: f64) -> Vec<Path2> {
-        self.layers().iter().flat_map(|l| self.contours(&l.name, tolerance)).collect()
+        self.layers().iter().filter(|l| !is_reference_layer(&l.name)).flat_map(|l| self.contours(&l.name, tolerance)).collect()
     }
 
     /// Encombrement du dessin (vide s'il n'y a rien).
@@ -269,6 +269,13 @@ fn close_path(layer: &str, mut pts: Vec<Vec2>) -> Path2 {
         pts.pop();
     }
     Path2 { layer: layer.to_owned(), points: pts, closed }
+}
+
+/// Calques de repère, jamais usinés : lignes de construction et cotes.
+pub const REFERENCE_LAYERS: [&str; 2] = ["Construction", "Cotes"];
+
+pub fn is_reference_layer(name: &str) -> bool {
+    REFERENCE_LAYERS.contains(&name)
 }
 
 /// Couleur d'un nouveau contour, jamais déjà prise : d'abord des couleurs bien distinctes de la
