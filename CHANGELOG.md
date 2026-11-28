@@ -11,6 +11,11 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
 
 ## Non publié
 
+### Ajouté
+- Spécification du format de projet `.mkc` version 2 (`docs/reference/format-mkc.md`) :
+  archive zip à parties avec manifeste, versions par partie et empreintes, façon `.docx`.
+  Pas encore codée.
+
 ### Amont
 - SolidCraft v0.41.0 -> v0.51.2 (extension `cao`) : import STEP plus robuste, import IGES,
   mises en plan, assemblages, tôlerie. Aucun changement de notre code, sauf le numéro de version.
