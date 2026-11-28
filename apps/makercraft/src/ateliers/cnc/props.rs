@@ -44,6 +44,12 @@ enum Field {
     H,
     Radius,
     Turn,
+    Cols,
+    Rows,
+    ColSpacing,
+    RowSpacing,
+    Items,
+    Fill,
 }
 
 /// État des champs entre deux images.
@@ -74,16 +80,26 @@ impl PropsState {
 /// Champs de la sélection `sel` (objets modifiables) de boîte `b`. Renvoie un message
 /// d'erreur si une modification échoue.
 pub fn editor(ui: &mut Ui, pal: &Palette, st: &mut PropsState, sketch: &mut Sketch, sel: &[doc::Handle], b: Option<BBox>) -> Option<String> {
+    let mut msg = None;
+    if sketch.array_editing() {
+        // forme d'origine d'un réseau sortie pour modification : la rentrer met le réseau à jour
+        ui.label(RichText::new("Forme d'origine du réseau en cours de modification : modifiez-la, puis terminez pour mettre à jour tous les exemplaires.").size(12.5).color(pal.orange));
+        if ui.button("Terminer la modification de la forme").clicked()
+            && let Err(e) = sketch.session.execute("arrayclose", &json!({ "save": true }))
+        {
+            msg = Some(e.to_string());
+        }
+        ui.separator();
+    }
     let Some(b) = b.filter(|_| !sel.is_empty()) else {
         ui.label(RichText::new("Aucune sélection. Cliquer un objet, ou glisser un rectangle dans la vue (vers la droite : objets entièrement dedans ; vers la gauche : objets touchés).").size(12.5).color(pal.weak));
-        return None;
+        return msg;
     };
     let mut layers: Vec<String> = sel.iter().filter_map(|h| sketch.layer_of(*h)).collect();
     layers.sort();
     layers.dedup();
     ui.label(RichText::new(format!("{} objet(s) sur {}", sel.len(), layers.join(", "))).font(theme::bold(13.0)));
 
-    let mut msg = None;
     ui.horizontal(|ui| {
         anchor_grid(ui, pal, &mut st.anchor);
         ui.label(RichText::new("Point de référence des cotes X, Y et de la mise à l'échelle.").size(12.0).color(pal.weak));
@@ -137,7 +153,63 @@ pub fn editor(ui: &mut Ui, pal: &Palette, st: &mut PropsState, sketch: &mut Sket
     {
         msg = Some(e);
     }
+    if let [one] = sel
+        && let Some(a) = sketch.array_of(*one)
+        && let Some(e) = array_fields(ui, pal, st, sketch, *one, &a)
+    {
+        msg = Some(e);
+    }
     ui.label(RichText::new("Entrée ou sortie du champ : appliqué (annulable).").size(12.0).color(pal.weak));
+    msg
+}
+
+/// Paramètres d'un réseau associatif, modifiables : tous les exemplaires suivent (arrayedit).
+fn array_fields(ui: &mut Ui, pal: &Palette, st: &mut PropsState, sketch: &mut Sketch, h: doc::Handle, a: &doc::ArrayParams) -> Option<String> {
+    ui.separator();
+    let mut edit = serde_json::Map::new();
+    match &a.kind {
+        doc::ArrayKind::Rect(r) => {
+            ui.label(RichText::new("Réseau rectangulaire, lié à sa forme d'origine").font(theme::bold(13.0)));
+            if let Some(v) = field(ui, st, Field::Cols, "Colonnes", f64::from(r.cols), 1.0, "", true) {
+                edit.insert("cols".into(), json!(v.round().max(1.0) as u32));
+            }
+            if let Some(v) = field(ui, st, Field::Rows, "Rangées", f64::from(r.rows), 1.0, "", true) {
+                edit.insert("rows".into(), json!(v.round().max(1.0) as u32));
+            }
+            if let Some(v) = field(ui, st, Field::ColSpacing, "Pas X", r.col_spacing, -1e6, " mm", true) {
+                edit.insert("colSpacing".into(), json!(v));
+            }
+            if let Some(v) = field(ui, st, Field::RowSpacing, "Pas Y", r.row_spacing, -1e6, " mm", true) {
+                edit.insert("rowSpacing".into(), json!(v));
+            }
+        }
+        doc::ArrayKind::Polar(p) => {
+            ui.label(RichText::new("Réseau circulaire, lié à sa forme d'origine").font(theme::bold(13.0)));
+            if let Some(v) = field(ui, st, Field::Items, "Nombre", f64::from(p.items), 1.0, "", true) {
+                edit.insert("items".into(), json!(v.round().max(1.0) as u32));
+            }
+            if let Some(v) = field(ui, st, Field::Fill, "Angle couvert", p.fill, -360.0, "°", true) {
+                edit.insert("angle".into(), json!(v.clamp(-360.0, 360.0)));
+            }
+            let mut rot = p.rotate;
+            if ui.checkbox(&mut rot, "Tourner les copies").changed() {
+                edit.insert("rotate".into(), json!(rot));
+            }
+            ui.label(RichText::new(format!("Centre : {:.3} ; {:.3}", p.center.x, p.center.y)).size(12.0).color(pal.weak));
+        }
+    }
+    let mut msg = None;
+    if !edit.is_empty() {
+        edit.insert("handle".into(), json!(h.hex()));
+        if let Err(e) = sketch.session.execute("arrayedit", &serde_json::Value::Object(edit)) {
+            msg = Some(e.to_string());
+        }
+    }
+    if ui.button("Modifier la forme d'origine").on_hover_text("La forme sort du réseau pour être modifiée ; « Terminer » met à jour tous les exemplaires").clicked()
+        && let Err(e) = sketch.session.execute("arrayedit", &json!({ "handle": h.hex(), "source": {} }))
+    {
+        msg = Some(e.to_string());
+    }
     msg
 }
 

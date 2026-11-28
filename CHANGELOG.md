@@ -51,7 +51,10 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
   se relance d'un clic, retenue d'une séance à l'autre. Chaque variante a son icône (points et éléments qui définissent la forme) ; petit coin sur les boutons à variantes.
 - Dessin : réseaux toujours associatifs (lien gardé avec la forme d'origine, modifiables après
   coup, y compris après enregistrement), posés sur le contour de la forme ; décomposer un réseau
-  demande confirmation.
+  demande confirmation. Réseau rectangulaire créé d'un clic (2 x 2) puis réglé dans Propriétés :
+  colonnes, rangées, pas ; réseau circulaire : nombre, angle, rotation des copies ; « Modifier la
+  forme d'origine » puis « Terminer » met à jour tous les exemplaires. Le réseau le long d'un
+  tracé n'est pas proposé : CadCraft 0.20.1 n'en fait que des copies sans lien.
 - Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
   rétablissent, chevrons étroits aux extrémités du ruban.
 

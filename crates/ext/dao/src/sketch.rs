@@ -135,6 +135,17 @@ impl Sketch {
         Ok(())
     }
 
+    /// Paramètres du réseau associatif `h` (None si ce n'en est pas un).
+    pub fn array_of(&self, h: doc::Handle) -> Option<doc::ArrayParams> {
+        let d = self.drawing()?;
+        d.array_params(d.model.get(h)?)
+    }
+
+    /// La forme d'origine d'un réseau est-elle sortie pour modification (ARRAYEDIT Source) ?
+    pub fn array_editing(&self) -> bool {
+        self.drawing().is_some_and(|d| d.model.iter().any(|e| d.array_params(e).is_some_and(|a| a.editing.is_some())))
+    }
+
     /// Un des objets `hs` est-il un réseau associatif ?
     pub fn has_array(&self, hs: &[doc::Handle]) -> bool {
         self.drawing().is_some_and(|d| d.model.iter().any(|e| hs.contains(&e.handle) && d.array_params(e).is_some()))

@@ -153,6 +153,7 @@ pub enum Icon {
     EllipseAxis,
     EllipseArc,
     ArrayPolar,
+    #[expect(dead_code, reason = "réseau le long d'un tracé : en attente d'un réseau associatif dans CadCraft")]
     ArrayPath,
 }
 

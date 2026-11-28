@@ -312,6 +312,26 @@ impl Cnc {
         if name.starts_with("array") {
             self.sketch.prepare_array();
         }
+        // réseau rectangulaire sur la sélection : créé tout de suite (2 x 2, pas = taille + 5 mm),
+        // puis réglé dans Propriétés, chaque valeur mettant à jour le réseau dans la vue
+        if name == "arrayrect"
+            && !sel.is_empty()
+            && let Some(b) = self.view2d.bbox_of(&self.sketch, &self.sketch.editable(&sel))
+        {
+            let hs: Vec<String> = self.sketch.editable(&sel).iter().map(|h| h.hex()).collect();
+            let p = serde_json::json!({ "handles": hs, "rows": 2, "cols": 2, "colSpacing": (b[2] - b[0]) + 5.0, "rowSpacing": (b[3] - b[1]) + 5.0 });
+            match self.sketch.session.execute("arrayrect", &p) {
+                Ok(v) => {
+                    if let Some(h) = v.get("handle").and_then(|h| h.as_str()).and_then(makercraft_dao::sketch::doc::Handle::parse_hex) {
+                        self.sketch.session.set_selection(vec![h]);
+                    }
+                    self.side_tab = props::SideTab::Props;
+                    req.push(Request::Status("Réseau créé : colonnes, rangées et pas se règlent dans Propriétés".into()));
+                }
+                Err(e) => req.push(Request::Status(e.to_string())),
+            }
+            return;
+        }
         self.sketch.session.cancel();
         if let Err(e) = self.sketch.session.cmdline(name) {
             req.push(Request::Status(e.to_string()));
@@ -431,10 +451,11 @@ impl Cnc {
                             modify("cnc.cmd.join", "Joindre", Icon::Join).more(),
                             modify("cnc.cmd.explode", "Décomposer", Icon::Explode).more(),
                             modify("cnc.cmd.chamfer", "Chanfrein", Icon::Chamfer).more(),
-                            modify("cnc.cmd.arrayrect", "Réseau", Icon::Array).more().variants(vec![
+                            // le long d'un tracé : pas encore associatif dans CadCraft 0.20.1 (copies sans lien),
+            // donc pas proposé tant que le lien avec la forme d'origine ne peut pas être gardé
+            modify("cnc.cmd.arrayrect", "Réseau", Icon::Array).more().variants(vec![
                 Variant::new("cnc.cmd.arrayrect", "Rectangulaire", "Réseau", Icon::Array),
                 Variant::new("cnc.cmd.arraypolar", "Circulaire", "Réseau circ.", Icon::ArrayPolar),
-                Variant::new("cnc.cmd.arraypath", "Le long d'un tracé", "Réseau tracé", Icon::ArrayPath),
             ]),
                             modify("cnc.cmd.erase", "Effacer", Icon::Trash).more(),
                         ],
