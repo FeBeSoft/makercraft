@@ -6,7 +6,7 @@ Ne jamais y modifier de fichier.
 | Projet | Licence | Usage | Version épinglée |
 |---|---|---|---|
 | CadCraft | MIT/Apache | dépendance Rust : `cadcraft-dxf` (extension dao) | v0.20.1 |
-| SolidCraft | MIT/Apache | dépendance Rust : `solidcraft-kernel` (extension cao) | v0.41.0 |
+| SolidCraft | MIT/Apache | dépendance Rust : `solidcraft-kernel` (extension cao) | v0.51.2 |
 | LaserGRBL | GPLv3 | portage C# → Rust (machine, cam laser) | v7.14.1 |
 | Candle | GPLv3 | portage C++ → Rust (G-code, heightmap) | c04e6f2 |
 | UGS | GPLv3 | portage Java → Rust (architecture contrôleur) | v2.1.27 |

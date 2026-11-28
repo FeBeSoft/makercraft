@@ -15,7 +15,7 @@ use std::path::Path;
 use makercraft_ext_api::{CommandSpec, ExtError, Extension, Registry, Value, json};
 
 /// Version de SolidCraft greffée (doit suivre le tag de `Cargo.toml`).
-pub const SOLIDCRAFT_VERSION: &str = "0.41.0";
+pub const SOLIDCRAFT_VERSION: &str = "0.51.2";
 
 /// Un corps lu dans un fichier STEP, avec ses mesures (mm, mm², mm³).
 #[derive(Debug, Clone, PartialEq)]

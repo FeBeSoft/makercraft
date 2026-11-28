@@ -19,7 +19,7 @@ license = "MIT OR Apache-2.0"
 name = "solidcraft"
 url = "https://github.com/tangency-labs/solidcraft"   # ex bherbruck/solidcraft
 path = "../upstream/solidcraft"
-pinned = "v0.41.0"   # crate lié : solidcraft-kernel (extension cao)
+pinned = "v0.51.2"   # crate lié : solidcraft-kernel (extension cao)
 kind = "dependency"
 license = "MIT OR Apache-2.0"
 

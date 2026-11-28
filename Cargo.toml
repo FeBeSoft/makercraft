@@ -54,11 +54,11 @@ cadcraft-geom     = { git = "https://github.com/storytold/cadcraft", tag = "v0.2
 cadcraft-engine   = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
 cadcraft-io       = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
 cadcraft-render   = { git = "https://github.com/storytold/cadcraft", tag = "v0.20.1" }
-solidcraft-kernel = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.41.0" }
-solidcore-record  = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.41.0" }
-solidcore-tess    = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.41.0" }
-solidcraft-io     = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.41.0" }
-solidcraft-viewport = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.41.0" }
+solidcraft-kernel = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.51.2" }
+solidcore-record  = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.51.2" }
+solidcore-tess    = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.51.2" }
+solidcraft-io     = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.51.2" }
+solidcraft-viewport = { git = "https://github.com/tangency-labs/solidcraft", tag = "v0.51.2" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
