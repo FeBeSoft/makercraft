@@ -33,6 +33,21 @@ pub enum Tone {
     Danger,
 }
 
+/// Variante d'une commande (clic droit sur son bouton) : identifiant, libellé du menu, libellé
+/// court affiché sur le bouton quand c'est la dernière utilisée.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Variant {
+    pub id: &'static str,
+    pub label: &'static str,
+    pub short: &'static str,
+}
+
+impl Variant {
+    pub const fn new(id: &'static str, label: &'static str, short: &'static str) -> Self {
+        Self { id, label, short }
+    }
+}
+
 pub struct Item {
     pub id: &'static str,
     pub label: &'static str,
@@ -52,11 +67,13 @@ pub struct Item {
     pub width: f32,
     /// Rangée dans les fonctions masquées du groupe (flèche à droite du nom du groupe).
     pub more: bool,
+    /// Variantes (clic droit) ; la dernière utilisée est affichée et lancée par un clic.
+    pub variants: Vec<Variant>,
 }
 
 impl Item {
     pub fn large(id: &'static str, label: &'static str, icon: Icon) -> Self {
-        Self { id, label, icon, large: true, enabled: true, checked: None, tone: Tone::Plain, tip: String::new(), choices: Vec::new(), selected: 0, width: 0.0, more: false }
+        Self { id, label, icon, large: true, enabled: true, checked: None, tone: Tone::Plain, tip: String::new(), choices: Vec::new(), selected: 0, width: 0.0, more: false, variants: Vec::new() }
     }
 
     /// Liste déroulante dans une colonne de petits boutons.
@@ -66,6 +83,12 @@ impl Item {
 
     pub fn small(id: &'static str, label: &'static str, icon: Icon) -> Self {
         Self { large: false, ..Self::large(id, label, icon) }
+    }
+
+    /// Variantes au clic droit ; la première est celle par défaut.
+    pub fn variants(mut self, v: Vec<Variant>) -> Self {
+        self.variants = v;
+        self
     }
 
     pub fn enabled(mut self, on: bool) -> Self {
@@ -125,6 +148,12 @@ pub struct Ribbon {
     content_w: f32,
     /// Groupe dont les fonctions masquées sont ouvertes : (onglet, groupe).
     open: Option<(usize, usize)>,
+    /// Dernière variante utilisée de chaque commande : identifiant du bouton -> de la variante.
+    pub chosen: std::collections::BTreeMap<String, String>,
+    /// `chosen` a changé (à enregistrer dans les préférences).
+    pub chosen_changed: bool,
+    /// Barre des variantes ouverte : bouton, position, passe d'ouverture.
+    flyout: Option<(&'static str, egui::Pos2, u64)>,
 }
 
 fn tone_color(pal: &Palette, t: Tone) -> Color32 {
@@ -244,8 +273,12 @@ impl Ribbon {
                 if it.large {
                     let w = large_width(&p, it.label);
                     let br = Rect::from_min_size(pos2(x, top), vec2(w, GROUP_H - 8.0));
-                    if button(&child, &p, pal, br, it, true) {
-                        clicked = Some(it.id);
+                    let (c, menu) = button(&child, &p, pal, br, it, true, self.shown(it));
+                    if c {
+                        clicked = Some(self.shown(it).0);
+                    }
+                    if menu {
+                        self.flyout = Some((it.id, br.left_bottom() + vec2(0.0, 2.0), ui.ctx().cumulative_pass_nr()));
                     }
                     x = br.right() + 2.0;
                     i += 1;
@@ -265,8 +298,14 @@ impl Ribbon {
                             if let Some(k) = choice(&mut child, &p, pal, br, it) {
                                 self.picked = Some((it.id, k));
                             }
-                        } else if button(&child, &p, pal, br, it, false) {
-                            clicked = Some(it.id);
+                        } else {
+                            let (c, menu) = button(&child, &p, pal, br, it, false, self.shown(it));
+                            if c {
+                                clicked = Some(self.shown(it).0);
+                            }
+                            if menu {
+                                self.flyout = Some((it.id, br.left_bottom() + vec2(0.0, 2.0), ui.ctx().cumulative_pass_nr()));
+                            }
                         }
                         y += SMALL_H + 2.0;
                     }
@@ -321,6 +360,7 @@ impl Ribbon {
             && let (Some(g), Some(&(_, at))) = (tab.groups.get(gi), anchors.iter().find(|(k, _)| *k == gi))
         {
             let mut picked = None;
+            let mut flyout_req = None;
             let area = egui::Area::new(ui.scope_id().with(("ruban-plus", self.tab, gi))).order(egui::Order::Foreground).fixed_pos(at).show(ui.ctx(), |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
                     ui.horizontal(|ui| {
@@ -328,22 +368,77 @@ impl Ribbon {
                             let w = large_width(ui.painter(), it.label);
                             let (br, _) = ui.allocate_exact_size(vec2(w, GROUP_H - 8.0), Sense::hover());
                             let painter = ui.painter().clone();
-                            if button(ui, &painter, pal, br, it, true) {
-                                picked = Some(it.id);
+                            let (c, menu) = button(ui, &painter, pal, br, it, true, self.shown(it));
+                            if c {
+                                picked = Some(self.shown(it).0);
+                            }
+                            if menu {
+                                flyout_req = Some((it.id, br.left_bottom() + vec2(0.0, 2.0)));
                             }
                         }
                     });
                     ui.label(egui::RichText::new(format!("{}, autres fonctions", g.label)).size(11.0).color(pal.dim));
                 });
             });
+            if let Some((id, at)) = flyout_req {
+                self.flyout = Some((id, at, ui.ctx().cumulative_pass_nr()));
+            }
             if picked.is_some() {
                 clicked = picked;
                 self.open = None;
-            } else if !arrow_clicked && (area.response.clicked_elsewhere() || ui.input(|i| i.key_pressed(egui::Key::Escape))) {
+            } else if !arrow_clicked && self.flyout.is_none() && (area.response.clicked_elsewhere() || ui.input(|i| i.key_pressed(egui::Key::Escape))) {
                 self.open = None;
             }
         }
+        // ------------------------------------------------------------ variantes (clic droit)
+        if let Some((id, at, opened)) = self.flyout
+            && let Some(it) = tab.groups.iter().flat_map(|g| g.items.iter()).find(|it| it.id == id)
+        {
+            let cur = self.shown(it).0;
+            let mut pick = None;
+            let area = egui::Area::new(ui.scope_id().with(("ruban-variantes", id))).order(egui::Order::Foreground).fixed_pos(at).show(ui.ctx(), |ui| {
+                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                    ui.set_min_width(200.0);
+                    ui.label(egui::RichText::new(it.label).size(11.0).color(pal.dim));
+                    for v in &it.variants {
+                        let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width().max(200.0), 26.0), Sense::click());
+                        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, it.enabled, v.label));
+                        if v.id == cur || resp.hovered() {
+                            ui.painter().rect_filled(r, CornerRadius::same(5), if resp.hovered() { pal.hover } else { theme::mix(pal.bar, pal.blue, 0.2) });
+                        }
+                        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.left() + 14.0, r.center().y), vec2(16.0, 16.0)), it.icon, tone_color(pal, it.tone));
+                        ui.painter().text(pos2(r.left() + 30.0, r.center().y), Align2::LEFT_CENTER, v.label, theme::regular(12.5), pal.text);
+                        if v.id == cur {
+                            ui.painter().text(pos2(r.right() - 8.0, r.center().y), Align2::RIGHT_CENTER, "dernière", theme::regular(10.5), pal.dim);
+                        }
+                        if resp.clicked() && it.enabled {
+                            pick = Some(v.id);
+                        }
+                    }
+                });
+            });
+            if let Some(v) = pick {
+                self.chosen.insert(id.to_owned(), v.to_owned());
+                self.chosen_changed = true;
+                self.flyout = None;
+                self.open = None;
+                clicked = Some(v);
+            } else if (ui.ctx().cumulative_pass_nr() > opened && area.response.clicked_elsewhere()) || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                self.flyout = None;
+            }
+        } else {
+            self.flyout = None;
+        }
         clicked
+    }
+
+    /// Ce que montre le bouton `it` : identifiant lancé, libellé (variante choisie s'il en a).
+    fn shown(&self, it: &Item) -> (&'static str, &'static str) {
+        if it.variants.is_empty() {
+            return (it.id, it.label);
+        }
+        let v = self.chosen.get(it.id).and_then(|c| it.variants.iter().find(|v| v.id == c)).or(it.variants.first());
+        v.map_or((it.id, it.label), |v| (v.id, v.short))
     }
 }
 
@@ -390,11 +485,14 @@ fn choice(ui: &mut Ui, p: &egui::Painter, pal: &Palette, r: Rect, it: &Item) -> 
 }
 
 /// Dessine un bouton du ruban ; renvoie vrai s'il a été cliqué.
-fn button(ui: &Ui, p: &egui::Painter, pal: &Palette, r: Rect, it: &Item, large: bool) -> bool {
+/// Bouton du ruban, montrant `shown` (identifiant, libellé) ; renvoie (clic, clic droit sur un
+/// bouton à variantes).
+fn button(ui: &Ui, p: &egui::Painter, pal: &Palette, r: Rect, it: &Item, large: bool, shown: (&'static str, &'static str)) -> (bool, bool) {
+    let label = shown.1;
     let resp = ui.interact(r, ui.scope_id().with(("ruban", it.id)), if it.enabled { Sense::click() } else { Sense::hover() });
     resp.widget_info(|| match it.checked {
-        Some(on) => egui::WidgetInfo::selected(egui::Role::CheckBox, it.enabled, on, it.label),
-        None => egui::WidgetInfo::labeled(egui::Role::Button, it.enabled, it.label),
+        Some(on) => egui::WidgetInfo::selected(egui::Role::CheckBox, it.enabled, on, label),
+        None => egui::WidgetInfo::labeled(egui::Role::Button, it.enabled, label),
     });
     let accent = tone_color(pal, it.tone);
     let on = it.checked == Some(true);
@@ -413,16 +511,26 @@ fn button(ui: &Ui, p: &egui::Painter, pal: &Palette, r: Rect, it: &Item, large: 
     };
     if large {
         icons::paint(p, Rect::from_center_size(pos2(r.center().x, r.top() + 24.0), vec2(28.0, 28.0)), it.icon, icon_c);
-        let mut job = egui::text::LayoutJob::simple(it.label.to_owned(), theme::regular(12.5), text_c, r.width() - 6.0);
+        let mut job = egui::text::LayoutJob::simple(label.to_owned(), theme::regular(12.5), text_c, r.width() - 6.0);
         job.halign = Align::Center;
         job.wrap.max_rows = 2;
         p.galley(pos2(r.center().x, r.top() + 44.0), p.layout_job(job), text_c);
     } else {
         icons::paint(p, Rect::from_center_size(pos2(r.left() + 14.0, r.center().y), vec2(16.0, 16.0)), it.icon, icon_c);
-        p.text(pos2(r.left() + 28.0, r.center().y), Align2::LEFT_CENTER, it.label, theme::regular(12.5), text_c);
+        p.text(pos2(r.left() + 28.0, r.center().y), Align2::LEFT_CENTER, label, theme::regular(12.5), text_c);
     }
-    let resp = if it.tip.is_empty() { resp } else { resp.on_hover_text(&it.tip) };
-    it.enabled && resp.clicked()
+    let has_variants = !it.variants.is_empty();
+    if has_variants {
+        // petit coin en bas à droite : variantes au clic droit
+        let c = if large { pos2(r.right() - 4.0, r.top() + 38.0) } else { pos2(r.right() - 3.0, r.bottom() - 3.0) };
+        p.add(egui::Shape::convex_polygon(vec![c, c - vec2(6.0, 0.0), c - vec2(0.0, 6.0)], pal.weak, Stroke::NONE));
+    }
+    let resp = match (it.tip.is_empty(), has_variants) {
+        (_, true) => resp.on_hover_text(if it.tip.is_empty() { "Clic droit : variantes".to_owned() } else { format!("{} ; clic droit : variantes", it.tip) }),
+        (true, false) => resp,
+        (false, false) => resp.on_hover_text(&it.tip),
+    };
+    (it.enabled && resp.clicked(), it.enabled && has_variants && resp.secondary_clicked())
 }
 
 #[cfg(test)]

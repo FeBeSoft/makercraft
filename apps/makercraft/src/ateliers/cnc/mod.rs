@@ -24,7 +24,7 @@ use makercraft_tooldb::ToolDb;
 
 use crate::icons::Icon;
 use crate::prefs::{Prefs, Units};
-use crate::ribbon::{Group, Item, Tab, Tone};
+use crate::ribbon::{Group, Item, Tab, Tone, Variant};
 use crate::theme::Palette;
 use sketch_view::SketchView;
 use view3d::View3d;
@@ -372,9 +372,32 @@ impl Cnc {
                             draw("cnc.cmd.line", "Ligne", Icon::Line),
                             draw("cnc.cmd.pline", "Polyligne", Icon::Polyline),
                             draw("cnc.cmd.rectang", "Rectangle", Icon::Rect),
-                            draw("cnc.cmd.circle", "Cercle", Icon::Circle),
-                            draw("cnc.cmd.arc", "Arc", Icon::Arc),
-                            draw("cnc.cmd.ellipse", "Ellipse", Icon::Ellipse).more(),
+                            draw("cnc.cmd.circle", "Cercle", Icon::Circle).variants(vec![
+                                Variant::new("cnc.cmd.circle", "Centre, rayon", "Cercle"),
+                                Variant::new("cnc.cmd.circle.cd", "Centre, diamètre", "Cercle Ø"),
+                                Variant::new("cnc.cmd.circle.2p", "2 points (diamètre)", "Cercle 2 pts"),
+                                Variant::new("cnc.cmd.circle.3p", "3 points", "Cercle 3 pts"),
+                                Variant::new("cnc.cmd.circle.ttr", "Tangent, tangent, rayon", "Cercle TTR"),
+                                Variant::new("cnc.cmd.circle.ttt", "3 tangentes", "Cercle TTT"),
+                            ]),
+                            draw("cnc.cmd.arc", "Arc", Icon::Arc).variants(vec![
+                                Variant::new("cnc.cmd.arc", "3 points", "Arc"),
+                                Variant::new("cnc.cmd.arc.sce", "Départ, centre, fin", "Arc DCF"),
+                                Variant::new("cnc.cmd.arc.sca", "Départ, centre, angle", "Arc DCA"),
+                                Variant::new("cnc.cmd.arc.scl", "Départ, centre, longueur de corde", "Arc DCL"),
+                                Variant::new("cnc.cmd.arc.sea", "Départ, fin, angle", "Arc DFA"),
+                                Variant::new("cnc.cmd.arc.sed", "Départ, fin, direction", "Arc DFD"),
+                                Variant::new("cnc.cmd.arc.ser", "Départ, fin, rayon", "Arc DFR"),
+                                Variant::new("cnc.cmd.arc.cse", "Centre, départ, fin", "Arc CDF"),
+                                Variant::new("cnc.cmd.arc.csa", "Centre, départ, angle", "Arc CDA"),
+                                Variant::new("cnc.cmd.arc.csl", "Centre, départ, longueur de corde", "Arc CDL"),
+                                Variant::new("cnc.cmd.arc.continue", "Dans la suite du dernier tracé", "Arc suite"),
+                            ]),
+                            draw("cnc.cmd.ellipse", "Ellipse", Icon::Ellipse).more().variants(vec![
+                                Variant::new("cnc.cmd.ellipse", "Centre, axes", "Ellipse"),
+                                Variant::new("cnc.cmd.ellipse.axis", "Axe, extrémité", "Ellipse axe"),
+                                Variant::new("cnc.cmd.ellipse.arc", "Arc d'ellipse", "Arc d'ellipse"),
+                            ]),
                             draw("cnc.cmd.polygon", "Polygone", Icon::Polygon).more(),
                             draw("cnc.cmd.spline", "Spline", Icon::Spline).more(),
                             draw("cnc.etoile", "Étoile", Icon::Star).more().enabled(false).tip("À venir"),
@@ -397,7 +420,11 @@ impl Cnc {
                             modify("cnc.cmd.join", "Joindre", Icon::Join).more(),
                             modify("cnc.cmd.explode", "Décomposer", Icon::Explode).more(),
                             modify("cnc.cmd.chamfer", "Chanfrein", Icon::Chamfer).more(),
-                            modify("cnc.cmd.arrayrect", "Réseau", Icon::Array).more(),
+                            modify("cnc.cmd.arrayrect", "Réseau", Icon::Array).more().variants(vec![
+                Variant::new("cnc.cmd.arrayrect", "Rectangulaire", "Réseau"),
+                Variant::new("cnc.cmd.arraypolar", "Circulaire", "Réseau circ."),
+                Variant::new("cnc.cmd.arraypath", "Le long d'un tracé", "Réseau tracé"),
+            ]),
                             modify("cnc.cmd.erase", "Effacer", Icon::Trash).more(),
                         ],
                     },
@@ -811,6 +838,7 @@ fn clone_item(i: &Item) -> Item {
         choices: i.choices.clone(),
         selected: i.selected,
         width: i.width,
+        variants: i.variants.clone(),
     }
 }
 

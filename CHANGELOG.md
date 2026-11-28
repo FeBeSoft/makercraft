@@ -46,6 +46,9 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
   « Enregistrer les modifications ? » (Enregistrer, Ne pas enregistrer, Annuler).
 - Barre de titre de Windows : nom du fichier, puis MakerCraft et sa version (aussi dans la barre des tâches) ; logo et nom retirés de la barre d'accès rapide. Aide tout à droite. État de la machine : pastille verte (connectée) ou rouge après l'onglet « Machine » du ruban CNC, un clic ouvre l'atelier Machines, et rappel dans la barre d'état avant les unités (fin du doublon du nom de fichier) ; menu « Extensions » caché par défaut (Options > Général >
   Interface).
+- Dessin : variantes au clic droit sur une icône du ruban (cercle : 6, arc : 11, ellipse : 3,
+  réseau : rectangulaire, circulaire, le long d'un tracé) ; la dernière utilisée reste affichée et
+  se relance d'un clic, retenue d'une séance à l'autre. Petit coin sur les boutons à variantes.
 - Dessin : un clic remplace la sélection (Maj ajoute ou retire), Ctrl+Z / Ctrl+Y annulent et
   rétablissent, chevrons étroits aux extrémités du ruban.
 

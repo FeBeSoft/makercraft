@@ -84,6 +84,8 @@ pub struct Prefs {
     pub check_updates: bool,
     /// Menu « Extensions » dans la barre de titre (outil de test des commandes, caché par défaut).
     pub extensions_menu: bool,
+    /// Dernière variante utilisée de chaque commande du ruban (bouton -> variante).
+    pub ribbon_variants: BTreeMap<String, String>,
 }
 
 impl Default for Prefs {
@@ -105,6 +107,7 @@ impl Default for Prefs {
             skipped_version: String::new(),
             check_updates: false,
             extensions_menu: false,
+            ribbon_variants: BTreeMap::new(),
         }
     }
 }

@@ -106,6 +106,7 @@ impl App {
             status: "Prêt".to_owned(),
             frames: 0,
         };
+        app.ribbon.chosen = app.prefs.ribbon_variants.clone();
         if app.prefs.check_updates {
             app.updater.check_quietly();
         }
@@ -485,6 +486,10 @@ impl App {
             let br = Rect::from_min_max(pos2(tr.left(), tr.bottom()), pos2(r.right() - 6.0, r.bottom()));
             if let Some(id) = self.ribbon.body_ui(ui, br, pal, &tabs) {
                 actions.push(Action::Ribbon(id));
+            }
+            if std::mem::take(&mut self.ribbon.chosen_changed) {
+                self.prefs.ribbon_variants = self.ribbon.chosen.clone();
+                self.save_prefs();
             }
             if let Some((id, i)) = self.ribbon.picked.take() {
                 actions.push(Action::RibbonChoice(id, i));
