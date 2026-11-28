@@ -9,7 +9,7 @@ pub const SITE: &str = "https://makercraft.fe-be.fr/";
 /// Adresse propre au logiciel (les autres contacts FeBe sont sur son site).
 pub const CONTACT: &str = "makercraft@fe-be.fr";
 /// Étape de développement affichée avec le numéro de version.
-pub const STAGE: &str = "bêta 20261121";
+pub const STAGE: &str = "bêta 20261128";
 
 /// « v0.1.0 bêta ».
 pub fn version_label() -> String {

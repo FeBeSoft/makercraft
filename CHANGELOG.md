@@ -11,6 +11,13 @@ Rubriques : **Ajouté**, **Modifié**, **Corrigé**, **Retiré**, **Amont** (pro
 
 ## Non publié
 
+(rien pour l'instant)
+
+## v0.1.1 bêta 20261128 - 28/11/2026
+
+Deuxième version test, centrée sur le dessin (étape Dessin de l'atelier Fraisage 2,5D). Notes
+complètes : [docs/versions/v0.1.1-beta.20261128.md](docs/versions/v0.1.1-beta.20261128.md).
+
 ### Ajouté
 - Spécification du format de projet `.mkc` version 2 (`docs/reference/format-mkc.md`) :
   archive zip à parties avec manifeste, versions par partie et empreintes, façon `.docx`.

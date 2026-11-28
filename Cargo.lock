@@ -735,7 +735,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "c2d_to_nc"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "eframe",
  "makercraft-c2d",
@@ -3579,7 +3579,7 @@ dependencies = [
 
 [[package]]
 name = "makercraft"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "eframe",
  "image",
@@ -3600,7 +3600,7 @@ dependencies = [
 
 [[package]]
 name = "makercraft-c2d"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "flate2",
  "makercraft-ext-api",
@@ -3612,7 +3612,7 @@ dependencies = [
 
 [[package]]
 name = "makercraft-c2d-tool"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "makercraft-cam",
  "winresource",
@@ -3620,7 +3620,7 @@ dependencies = [
 
 [[package]]
 name = "makercraft-cam"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "geo",
  "makercraft-c2d",
@@ -3630,7 +3630,7 @@ dependencies = [
 
 [[package]]
 name = "makercraft-cao"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "makercraft-ext-api",
  "solidcore-record",
@@ -3642,7 +3642,7 @@ dependencies = [
 
 [[package]]
 name = "makercraft-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "makercraft-cam",
  "makercraft-ext-api",
@@ -3653,7 +3653,7 @@ dependencies = [
 
 [[package]]
 name = "makercraft-dao"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cadcraft-color",
  "cadcraft-doc",
@@ -3670,7 +3670,7 @@ dependencies = [
 
 [[package]]
 name = "makercraft-ext-api"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde_json",
  "thiserror 2.0.21",
@@ -3678,7 +3678,7 @@ dependencies = [
 
 [[package]]
 name = "makercraft-ext-machine"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "makercraft-ext-api",
  "makercraft-geom",
@@ -3688,11 +3688,11 @@ dependencies = [
 
 [[package]]
 name = "makercraft-geom"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "makercraft-mkc"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "makercraft-ext-api",
  "serde",
@@ -3702,7 +3702,7 @@ dependencies = [
 
 [[package]]
 name = "makercraft-outils"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "eframe",
  "makercraft-tooldb",
@@ -3711,7 +3711,7 @@ dependencies = [
 
 [[package]]
 name = "makercraft-send"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ctrlc",
  "makercraft-ext-machine",
@@ -3720,7 +3720,7 @@ dependencies = [
 
 [[package]]
 name = "makercraft-tooldb"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "rusqlite",
  "serde",
@@ -7708,7 +7708,7 @@ checksum = "9440ea3e5aeabb0ac63af70daf835274065238cdd0cec83418f417eae38bacee"
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "toml",
